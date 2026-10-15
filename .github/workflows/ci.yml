@@ -9,7 +9,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          # Linux and Windows check the oldest Qt we support. macOS needs a
+          # newer one: Qt 6.9's headers don't build with the runner's Xcode.
+          - os: ubuntu-latest
+            qt: "6.9.*"
+          - os: windows-latest
+            qt: "6.9.*"
+          - os: macos-latest
+            qt: "6.12.*"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +28,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: "6.9.*"
+          version: ${{ matrix.qt }}
           modules: qtshadertools
           cache: true
       - name: Install Linux dependencies
