@@ -9,8 +9,12 @@
 //! and the audio thread behind one lock. The audio thread only ever *tries*
 //! that lock: if the UI is busy with the plugin, that one block skips it.
 
+#[cfg(target_os = "macos")]
+mod au;
 mod base64;
 mod clap;
+#[cfg(target_os = "macos")]
+mod macwin;
 mod vst3;
 
 use std::path::{Path, PathBuf};
@@ -18,6 +22,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 pub use base64::{decode as decode_state, encode as encode_state};
+#[cfg(target_os = "macos")]
+pub use au::AuPlugin;
 pub use clap::ClapPlugin;
 pub use vst3::Vst3Plugin;
 use isai_engine::plugin::PluginRef;
@@ -28,6 +34,8 @@ use isai_engine::plugin::PluginRef;
 pub enum Format {
     Vst3,
     Clap,
+    /// Audio Units (macOS).
+    Au,
 }
 
 impl Format {
@@ -35,6 +43,7 @@ impl Format {
         match self {
             Format::Vst3 => "VST3",
             Format::Clap => "CLAP",
+            Format::Au => "AU",
         }
     }
 
@@ -43,6 +52,7 @@ impl Format {
         match self {
             Format::Vst3 => "vst3",
             Format::Clap => "clap",
+            Format::Au => "au",
         }
     }
 
@@ -50,6 +60,7 @@ impl Format {
         match key {
             "vst3" => Some(Format::Vst3),
             "clap" => Some(Format::Clap),
+            "au" => Some(Format::Au),
             _ => None,
         }
     }
@@ -78,6 +89,8 @@ pub struct PluginInfo {
 pub fn scan() -> Vec<PluginInfo> {
     let mut found = vst3::scan();
     found.extend(clap::scan());
+    #[cfg(target_os = "macos")]
+    found.extend(au::scan());
     found.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.vendor.cmp(&b.vendor)));
     found.dedup_by(|a, b| a.path == b.path && a.uid == b.uid);
     found
@@ -101,51 +114,47 @@ pub fn describe_clap(path: &Path) -> Vec<PluginInfo> {
 pub enum LoadedPlugin {
     Vst3(Vst3Plugin),
     Clap(ClapPlugin),
+    #[cfg(target_os = "macos")]
+    Au(AuPlugin),
+}
+
+/// Calls the same method on whichever format it is.
+macro_rules! each {
+    ($self:ident, $p:ident => $e:expr) => {
+        match $self {
+            LoadedPlugin::Vst3($p) => $e,
+            LoadedPlugin::Clap($p) => $e,
+            #[cfg(target_os = "macos")]
+            LoadedPlugin::Au($p) => $e,
+        }
+    };
 }
 
 impl LoadedPlugin {
     /// The handle the engine processes through.
     pub fn handle(&self) -> PluginRef {
-        match self {
-            LoadedPlugin::Vst3(p) => p.handle(),
-            LoadedPlugin::Clap(p) => p.handle(),
-        }
+        each!(self, p => p.handle())
     }
 
     pub fn save_state(&mut self) -> Option<Vec<u8>> {
-        match self {
-            LoadedPlugin::Vst3(p) => p.save_state(),
-            LoadedPlugin::Clap(p) => p.save_state(),
-        }
+        each!(self, p => p.save_state())
     }
 
     pub fn load_state(&mut self, data: &[u8]) -> Result<(), String> {
-        match self {
-            LoadedPlugin::Vst3(p) => p.load_state(data),
-            LoadedPlugin::Clap(p) => p.load_state(data),
-        }
+        each!(self, p => p.load_state(data))
     }
 
     pub fn open_window(&mut self) -> Result<(), String> {
-        match self {
-            LoadedPlugin::Vst3(p) => p.open_window(),
-            LoadedPlugin::Clap(p) => p.open_window(),
-        }
+        each!(self, p => p.open_window())
     }
 
     pub fn window_open(&self) -> bool {
-        match self {
-            LoadedPlugin::Vst3(p) => p.window_open(),
-            LoadedPlugin::Clap(p) => p.window_open(),
-        }
+        each!(self, p => p.window_open())
     }
 
     /// Keeps its window responsive; returns whether it's open.
     pub fn service_window(&mut self) -> bool {
-        match self {
-            LoadedPlugin::Vst3(p) => p.service_window(),
-            LoadedPlugin::Clap(p) => p.service_window(),
-        }
+        each!(self, p => p.service_window())
     }
 }
 
@@ -154,10 +163,20 @@ pub fn load(info: &PluginInfo, sample_rate: f64) -> Result<LoadedPlugin, String>
     match info.format {
         Format::Vst3 => Vst3Plugin::load(&info.path, &info.uid, sample_rate).map(LoadedPlugin::Vst3),
         Format::Clap => ClapPlugin::load(&info.path, &info.uid, sample_rate).map(LoadedPlugin::Clap),
+        #[cfg(target_os = "macos")]
+        Format::Au => AuPlugin::load(&info.uid, sample_rate).map(LoadedPlugin::Au),
+        #[cfg(not(target_os = "macos"))]
+        Format::Au => Err("Audio Units only run on macOS".into()),
     }
 }
 
-/// Whether a plugin's file is still where it was.
-pub fn exists(path: &Path) -> bool {
-    path.exists()
+/// Whether a plugin is still installed.
+pub fn exists(info: &PluginInfo) -> bool {
+    match info.format {
+        #[cfg(target_os = "macos")]
+        Format::Au => au::exists(&info.uid),
+        #[cfg(not(target_os = "macos"))]
+        Format::Au => false,
+        _ => info.path.exists(),
+    }
 }

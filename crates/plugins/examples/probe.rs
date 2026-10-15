@@ -28,6 +28,43 @@ fn main() {
         println!("unloaded cleanly");
         return;
     }
+    // `probe --au`: test Apple's own delay and synth.
+    if args.get(1).is_some_and(|a| a == "--au") {
+        let all = isai_plugins::scan();
+        let aus: Vec<_> = all.iter().filter(|p| p.format == isai_plugins::Format::Au).collect();
+        println!("{} Audio Units, e.g. {:?}", aus.len(), aus.iter().take(8).map(|p| format!("{} ({})", p.name, p.vendor)).collect::<Vec<_>>());
+        let t = Transport { bpm: 120.0, playing: true, sample_rate: 48_000.0 };
+        if let Some(delay) = aus.iter().find(|p| p.name == "AUDelay") {
+            let mut fx = isai_plugins::load(delay, 48_000.0).expect("load AUDelay");
+            let h = fx.handle();
+            let mut heard = 0.0f32;
+            let mut dry = 0.0f32;
+            for block in 0..160 {
+                let (mut l, mut r) = (vec![0.0f32; 512], vec![0.0f32; 512]);
+                if block == 0 { l[0] = 1.0; r[0] = 1.0; }
+                h.0.process(&mut l, &mut r, &[], &t, true);
+                if block == 0 { dry = l.iter().fold(0.0, |m, s| m.max(s.abs())); }
+                if block > 2 { heard = l.iter().fold(heard, |m, s| m.max(s.abs())); }
+            }
+            println!("AUDelay: dry click {dry:.3}, echo later {heard:.3}");
+            println!("AUDelay state: {} bytes", fx.save_state().map_or(0, |s| s.len()));
+            let st = fx.save_state().unwrap_or_default();
+            println!("AUDelay restore: {:?}", fx.load_state(&st));
+        }
+        if let Some(synth) = aus.iter().find(|p| p.name == "DLSMusicDevice") {
+            let inst = isai_plugins::load(synth, 48_000.0).expect("load DLS");
+            let h = inst.handle();
+            let mut peak = 0.0f32;
+            for block in 0..40 {
+                let (mut l, mut r) = (vec![0.0f32; 512], vec![0.0f32; 512]);
+                let ev = if block == 0 { vec![NoteEvent { offset: 0, key: 60, velocity: 110 }] } else { vec![] };
+                h.0.process(&mut l, &mut r, &ev, &t, true);
+                peak = l.iter().fold(peak, |m, s| m.max(s.abs()));
+            }
+            println!("DLSMusicDevice: note peak {peak:.3}");
+        }
+        return;
+    }
     let found = isai_plugins::scan();
     for p in &found {
         println!("{:<5} {:<24} {:<22} {:<28} instrument={} gui={}", p.format.label(), p.name, p.vendor, p.category, p.instrument, p.has_gui);

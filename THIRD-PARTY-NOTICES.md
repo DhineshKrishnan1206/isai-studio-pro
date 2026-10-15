@@ -37,6 +37,7 @@ licences. The notable ones:
 | [vst3-host](https://github.com/HelgeSverre/rust-vst3-host) | Hosting VST3 plugins | MIT |
 | [vst3](https://github.com/coupler-rs/vst3-rs) | VST3 API bindings (the VST3 SDK is MIT-licensed) | MIT OR Apache-2.0 |
 | [clack](https://github.com/prokopyl/clack) (clack-host, clack-extensions) | Hosting CLAP plugins | MIT OR Apache-2.0 |
+| [objc2](https://github.com/madsmtm/objc2) (audio-toolbox, app-kit, core-foundation) | Hosting Audio Units and their windows on macOS | Zlib OR Apache-2.0 OR MIT |
 
 The full list, with versions and sources, is in
 [licenses/RUST-LIBRARIES.md](licenses/RUST-LIBRARIES.md). Symphonia's MPL-2.0
@@ -73,7 +74,8 @@ The fonts are unmodified and are not sold on their own.
 VST is a registered trademark of Steinberg Media Technologies GmbH. Isai hosts
 VST3 plugins through the MIT-licensed VST3 API; it does not use the VST logo.
 
-Logic Pro is a trademark of Apple Inc., FL Studio of Image-Line Software,
+Logic Pro, Audio Units and macOS are trademarks of Apple Inc. Isai hosts Audio
+Units through Apple's public Audio Unit API., FL Studio of Image-Line Software,
 Ableton Live of Ableton AG, Bitwig Studio of Bitwig GmbH, and Serum of Xfer
 Records. They are named in Isai's documentation only to compare features.
 Isai is an independent project, not affiliated with or endorsed by any of them.

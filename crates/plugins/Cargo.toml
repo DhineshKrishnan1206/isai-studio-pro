@@ -20,7 +20,11 @@ clack-extensions = { version = "=0.2.0", features = ["clack-host", "state", "gui
 # A plain window to hold a CLAP plugin's view (the same versions vst3-host uses).
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3.2", features = ["NSWindow", "NSResponder", "NSView", "NSGraphics"] }
-objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry", "NSBundle", "NSURL"] }
+# Audio Units, through Apple's C API.
+objc2-audio-toolbox = { version = "0.3.2", features = ["AUComponent", "AudioComponent", "MusicDevice", "objc2-core-foundation", "objc2-core-audio-types"] }
+objc2-core-audio-types = "0.3.2"
+objc2-core-foundation = { version = "0.3.2", features = ["CFPropertyList", "CFData", "CFString"] }
 
 [dev-dependencies]
 # Only for the test plugin (examples/test_clap.rs), which tests CLAP hosting.

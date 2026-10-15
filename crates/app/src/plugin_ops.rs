@@ -149,7 +149,7 @@ impl Plugins {
                 instrument: false,
                 has_gui: true,
             };
-            if !isai_plugins::exists(&info.path) {
+            if !isai_plugins::exists(&info) {
                 let why = format!("{} isn't installed on this computer", slot.name);
                 problems.push(why.clone());
                 self.failed.insert(id, why);

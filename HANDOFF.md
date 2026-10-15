@@ -282,7 +282,7 @@ work, crash recovery, and window dragging. Screenshots look right.
   changes that section (`set_tempo_at`, `set_signature_at`).
 - Dev scene `tempo`.
 
-## Third-party plugins (VST3 and CLAP; AU next)
+## Third-party plugins (VST3, CLAP, Audio Units)
 - **engine::plugin**: `ExternalPlugin` trait (process a block with timed
   `NoteEvent`s, `wait` false on the audio thread = `try_lock`, skip the block if
   busy). `PluginEffect` and `PluginInstrument` (turns song notes and live notes
@@ -313,4 +313,12 @@ work, crash recovery, and window dragging. Screenshots look right.
 - Test plugin: `cargo build -p isai-plugins --example test_clap`, then
   `cargo run -p isai-plugins --example probe -- --clap target/debug/examples/libtest_clap.dylib`;
   in the app: `CLAP_PATH=<folder with it renamed .clap> ISAI_SCENE="plugin:Isai Test Tone"`.
-- Not yet: plugin parameter automation, latency compensation, transport info for CLAP, AU.
+- **Audio Units** (`plugins/src/au.rs`, macOS): Apple's v2 C API through
+  objc2-audio-toolbox. Scan = AudioComponentFindNext for aumu/aufx/aumf (no
+  loading); uid "type:subt:manu". Float32 non-interleaved stereo; effects pull
+  input through a render callback reading boxed `Inputs` (UnsafeCell). MIDI via
+  MusicDeviceMIDIEvent. State = ClassInfo as a binary plist. Window = the unit's
+  CocoaUI view, else CoreAudioKit's AUGenericView, in `macwin::HostWindow`.
+  Test: `cargo run -p isai-plugins --example probe -- --au`; app scene
+  `plugin:DLSMusicDevice`.
+- Not yet: plugin parameter automation, latency compensation, transport info for CLAP/AU, AUv3-only units.

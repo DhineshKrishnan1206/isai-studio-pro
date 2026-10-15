@@ -138,7 +138,7 @@ pub struct ClapPlugin {
 struct Gui {
     ext: PluginGui,
     #[cfg(target_os = "macos")]
-    window: Option<mac::HostWindow>,
+    window: Option<crate::macwin::HostWindow>,
 }
 
 impl ClapPlugin {
@@ -193,7 +193,7 @@ impl ClapPlugin {
             if ext.is_api_supported(&handle, embedded) {
                 ext.create(&handle, embedded).map_err(|e| e.to_string())?;
                 let size = ext.get_size(&handle).map_or((800.0, 500.0), |s| (f64::from(s.width), f64::from(s.height)));
-                let window = mac::HostWindow::new("Plugin", size)?;
+                let window = crate::macwin::HostWindow::new("Plugin", size)?;
                 // SAFETY: the view stays alive until `close_window` destroys the plugin's GUI first.
                 unsafe { ext.set_parent(&handle, ClapWindow::from_generic_ptr(GuiApiType::COCOA, window.view())) }.map_err(|e| e.to_string())?;
                 let _ = ext.show(&handle);
@@ -301,50 +301,5 @@ impl ExternalPlugin for Core {
         l[..n].copy_from_slice(&a.out_bufs[0][..n]);
         r[..n].copy_from_slice(&a.out_bufs[1][..n]);
         true
-    }
-}
-
-#[cfg(target_os = "macos")]
-mod mac {
-    //! A plain window to hold a plugin's view.
-    use objc2::rc::Retained;
-    use objc2::MainThreadMarker;
-    use objc2_app_kit::{NSBackingStoreType, NSWindow, NSWindowStyleMask};
-    use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
-
-    pub struct HostWindow {
-        window: Retained<NSWindow>,
-    }
-
-    impl HostWindow {
-        pub fn new(title: &str, (w, h): (f64, f64)) -> Result<Self, String> {
-            let mtm = MainThreadMarker::new().ok_or("plugin windows open on the main thread")?;
-            let style = NSWindowStyleMask::Titled | NSWindowStyleMask::Closable | NSWindowStyleMask::Miniaturizable;
-            let rect = NSRect::new(NSPoint::new(200.0, 200.0), NSSize::new(w, h));
-            // SAFETY: plain AppKit calls on the main thread.
-            let window = unsafe {
-                let window = NSWindow::initWithContentRect_styleMask_backing_defer(mtm.alloc(), rect, style, NSBackingStoreType::Buffered, false);
-                window.setReleasedWhenClosed(false);
-                window.setTitle(&NSString::from_str(title));
-                window.center();
-                window.makeKeyAndOrderFront(None);
-                window
-            };
-            Ok(Self { window })
-        }
-
-        pub fn view(&self) -> *mut std::ffi::c_void {
-            self.window.contentView().map_or(std::ptr::null_mut(), |v| Retained::as_ptr(&v) as *mut std::ffi::c_void)
-        }
-
-        pub fn is_open(&self) -> bool {
-            self.window.isVisible()
-        }
-    }
-
-    impl Drop for HostWindow {
-        fn drop(&mut self) {
-            self.window.close();
-        }
     }
 }

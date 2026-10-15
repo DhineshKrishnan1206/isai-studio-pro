@@ -372,7 +372,7 @@ ApplicationWindow {
             pluginMeter.start()
         }
     }
-    Timer { id: pluginMeter; interval: 1200; onTriggered: console.log("plugin-meter", app.meterL.toFixed(3), app.meterR.toFixed(3), app.trackMeters) }
+    Timer { id: pluginMeter; interval: 1200; onTriggered: console.log("plugin-meter", app.meterL.toFixed(3), app.meterR.toFixed(3), app.trackMeters, "windows", app.pluginWindows, app.status) }
     // A tempo change at bar 5 and 3/4 from bar 9, with the lanes shown, playing from bar 8.
     Timer { id: tempoTimer; interval: 1500; onTriggered: { app.addTempoChange(16, 90); app.addSignatureChange(9, 3, 4); studio.globalShown = true; app.seekBeats(29) } }
     Timer { id: cycleTimer; interval: 1500; onTriggered: { app.splitAtPlayhead(); app.seekBeats(20); app.selectAllRegions(); app.cycleSelection() } }
