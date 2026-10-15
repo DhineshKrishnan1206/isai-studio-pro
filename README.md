@@ -43,6 +43,9 @@ built so that anyone, including people on old or low-spec computers, can make mu
 - Mixer with channel strips, meters, buses and sends; volume, pan and effect automation
 - 13 effects: EQ (8 bands, live analyzer), compressor, limiter, reverb, delay, chorus,
   flanger, phaser, distortion, bitcrusher, gate, de-esser and Pitch Correct
+- Split any audio region into vocals, drums, bass and other (Spleeter, MIT; the model downloads once)
+- Third-party plugins: VST3, CLAP and Audio Units, with their own windows, saved in songs
+- Tempo and time-signature changes over the song (G)
 - Mastering assistant: listens to the mix and sets up EQ, compressor and limiter
   for streaming (−14 LUFS), loud, or gentle targets
 - Export the song, the cycle region or stems to WAV and FLAC

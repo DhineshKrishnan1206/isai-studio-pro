@@ -30,6 +30,8 @@ Item {
     property bool frozen: false
     readonly property bool isMidi: !!region.midi
     signal editRequested()
+    /// "Split into Stems…" was chosen.
+    signal stemsRequested()
     property int columnWidth: 2
 
     // Colours. Studio: solid header over a tinted body (Theme.tintedRegions).
@@ -667,6 +669,7 @@ Item {
                 { label: item.region.reverse ? "Play Forwards" : "Reverse", enabled: !item.isMidi, action: () => item.app.reverseSelected() },
                 { label: item.region.tempo ? "Stop Following Tempo" : "Follow Song Tempo…", enabled: !item.isMidi,
                   action: () => item.region.tempo ? item.app.setRegionTempo(item.region.id, 0) : tempoPopup.open() },
+                { label: "Split into Stems…", enabled: !item.isMidi && !many && item.app.stemRegion < 0, action: () => item.stemsRequested() },
                 { label: "Remove Fades", enabled: !many && (item.region.fadeIn > 0 || item.region.fadeOut > 0),
                   action: () => item.app.setRegionFades(item.region.id, 0, 0, true) },
                 { separator: true },

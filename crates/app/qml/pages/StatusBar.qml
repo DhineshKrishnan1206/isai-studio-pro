@@ -25,7 +25,13 @@ Rectangle {
         }
 
         // State, most important first: loading, error, no audio, ready.
-        Spinner { visible: bar.app.loading; size: 14 }
+        Spinner { visible: bar.app.loading || bar.app.stemRegion >= 0; size: 14 }
+        DText {
+            visible: bar.app.stemRegion >= 0
+            text: bar.app.stemStage + " " + Math.round(Math.max(0, bar.app.stemProgress) * 100) + "%"
+            dim: true
+            font.pixelSize: Theme.textSm
+        }
         Rectangle {
             visible: !bar.app.loading && bar.app.status === "" && bar.app.audioOk
             width: 7; height: 7; radius: 3.5

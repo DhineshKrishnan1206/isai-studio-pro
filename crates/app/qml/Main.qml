@@ -128,7 +128,7 @@ ApplicationWindow {
                 stepTimer.start()
             }
         }
-        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene.startsWith("plugin") || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
+        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene === "stems" || scene.startsWith("plugin") || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
             app.newProject("Demo Song", 120, 4, 4, "C major")
         if (scene.startsWith("settings")) {
             settingsDialog.section = parseInt(scene.slice(8) || "0")
@@ -142,6 +142,7 @@ ApplicationWindow {
         if (scene === "cycle") cycleTimer.start()
         if (scene === "tempo") tempoTimer.start()
         if (scene.startsWith("plugin")) pluginTimer.start()
+        if (scene === "stems") stemsTimer.start()
         if (scene === "export") Qt.callLater(studio.exportAudio)
         if (scene.startsWith("export:")) exportRunTimer.start()
         if (app.devScreenshot !== "") shotTimer.start()
@@ -351,6 +352,28 @@ ApplicationWindow {
         }
     }
     Timer { id: zoomTimer; interval: 400; onTriggered: studio.zoomForTest(3) }
+    // Splits the first region into stems, then logs how it went.
+    Timer {
+        id: stemsTimer
+        interval: 1500
+        onTriggered: {
+            const r = JSON.parse(app.tracksJson)[0].regions[0]
+            app.splitStems(r.id)
+            stemsWatch.start()
+        }
+    }
+    Timer {
+        id: stemsWatch
+        interval: 500
+        repeat: true
+        onTriggered: {
+            if (app.stemRegion >= 0) { console.log("stems", app.stemStage, app.stemProgress.toFixed(2)); return }
+            stop()
+            console.log("stems done:", JSON.parse(app.tracksJson).map(t => t.name + (t.mute ? " (muted)" : "")).join(" | "), "·", app.status)
+            shotTimer.interval = 1500
+            shotTimer.restart()
+        }
+    }
     // Waits for the plugin scan, adds Pigments with a chord and plays it.
     Timer {
         id: pluginTimer
@@ -401,7 +424,7 @@ ApplicationWindow {
     }
     Timer {
         id: shotTimer
-        interval: app.devScene === "midirec" ? 5000 : app.devScene.startsWith("plugin") ? 30000 : 2800
+        interval: app.devScene === "midirec" ? 5000 : app.devScene.startsWith("plugin") ? 30000 : app.devScene === "stems" ? 240000 : 2800
         onTriggered: {
             root.grabToImage(result => {
                 result.saveToFile(app.devScreenshot)

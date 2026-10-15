@@ -322,3 +322,24 @@ work, crash recovery, and window dragging. Screenshots look right.
   Test: `cargo run -p isai-plugins --example probe -- --au`; app scene
   `plugin:DLSMusicDevice`.
 - Not yet: plugin parameter automation, latency compensation, transport info for CLAP/AU, AUv3-only units.
+
+## Stem splitter
+- **crates/stems** (`isai-stems`): Spleeter 4-stem (Deezer, MIT) run natively.
+  `model::convert_release` checks Deezer's 4stems.tar.gz against its SHA-256,
+  reads the TensorFlow checkpoint (SSTable index + BundleEntryProto, no TF) and
+  writes `ISAISTEMS2` (JSON header + f16 weights, 79 MB). `unet.rs`: the U-Net
+  (ELU, skip connections from raw conv outputs, decoder act-then-BN, sigmoid
+  mask × input) with im2col + matrixmultiply, threads by output rows.
+  `lib.rs`: 4096/1024 STFT at 44.1 kHz with a frame of leading silence,
+  512-frame segments, ratio masks (out² / Σout²), zero above bin 1024, iSTFT ×2/3,
+  streamed out per segment.
+- Checks: conv/transposed-conv tests against direct definitions, STFT round trip;
+  `cargo run --release -p isai-stems --example split -- 4stems.tar.gz [song.wav]`
+  (a bass line → 99.8% Bass, a drum loop → 93% Drums; speech in a mix → Vocals
+  correlates 0.90 with the voice).
+- **app/stems_ops.rs**: first split downloads with the system `curl` into
+  `<app dir>/models/` (progress from the file size), converts, deletes the
+  archive. Splits on a thread (cores − 1), writes four float WAVs at 44.1 kHz
+  into the project's Audio folder (or `<app dir>/Stems`), then
+  `Project::add_stem_tracks` adds coloured tracks below and mutes the original.
+  Region menu "Split into Stems…", ⌘K, StemsDialog, status bar progress. Scene `stems`.

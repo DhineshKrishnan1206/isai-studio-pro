@@ -337,6 +337,7 @@ Item {
                     bottomInset: studio.mixerShown ? mixerPanel.height + mixerPanel.margin * 2
                                : studio.editorShown ? pianoRoll.height + pianoRoll.margin * 2 : 0
                     onEditRequested: id => studio.openEditor(id)
+                onStemsRequested: (id, name) => stemsDialog.openFor(id, name)
                     onInstrumentRequested: id => studio.openInstrument(id)
                     onImportRequested: studio.importAudio()
                     onMixerToggled: studio.mixerShown = !studio.mixerShown
@@ -477,6 +478,15 @@ Item {
 
     ShortcutsOverlay { id: shortcuts; backdrop: studioContent }
     MasteringDialog { id: masteringDialog; app: studio.app; backdrop: studioContent }
+    StemsDialog { id: stemsDialog; app: studio.app; backdrop: studioContent }
+    function splitStems() {
+        for (const t of arrangement.tracks) {
+            const r = t.regions.find(x => x.id === studio.app.selectedRegion && !x.midi)
+            if (r) { stemsDialog.openFor(r.id, r.name); return }
+        }
+        studio.app.statusOk = false
+        studio.app.status = "Select an audio region to split into stems"
+    }
 
     // ------------------------------------------------------ command palette
     CommandPalette {
@@ -531,6 +541,7 @@ Item {
         add("Edit", a.undoLabel !== "" ? "Undo " + a.undoLabel : "Undo", () => a.undo(), mod + "Z", Icons.arrowCounterClockwise)
         add("Edit", a.redoLabel !== "" ? "Redo " + a.redoLabel : "Redo", () => a.redo(), "⇧" + mod + "Z", Icons.arrowsClockwise)
         add("Edit", "Split at playhead", () => a.splitAtPlayhead(), mod + "T", Icons.scissors, "cut scissors")
+        add("Edit", "Split into stems…", () => studio.splitStems(), "", Icons.waveform, "stems vocals drums bass separate isolate acapella instrumental karaoke remove vocals")
         add("Edit", "Undo history…", () => arrangement.openHistory(), "⌥" + mod + "Z", Icons.clock, "steps back go back")
         add("Transport", "Stop (again: go to the start)", () => a.stop(), "0", Icons.stop, "halt")
         add("Markers", "Add marker at playhead", () => a.addMarker(a.positionBeats), "M", Icons.musicNote, "intro verse chorus section locator")

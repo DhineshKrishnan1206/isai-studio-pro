@@ -38,6 +38,8 @@ licences. The notable ones:
 | [vst3](https://github.com/coupler-rs/vst3-rs) | VST3 API bindings (the VST3 SDK is MIT-licensed) | MIT OR Apache-2.0 |
 | [clack](https://github.com/prokopyl/clack) (clack-host, clack-extensions) | Hosting CLAP plugins | MIT OR Apache-2.0 |
 | [objc2](https://github.com/madsmtm/objc2) (audio-toolbox, app-kit, core-foundation) | Hosting Audio Units and their windows on macOS | Zlib OR Apache-2.0 OR MIT |
+| [matrixmultiply](https://github.com/bluss/matrixmultiply) | The stem splitter's convolutions | MIT OR Apache-2.0 |
+| [flate2](https://github.com/rust-lang/flate2-rs), [tar](https://github.com/alexcrichton/tar-rs), [sha2](https://github.com/RustCrypto/hashes) | Unpacking and checking the stem model | MIT OR Apache-2.0 |
 
 The full list, with versions and sources, is in
 [licenses/RUST-LIBRARIES.md](licenses/RUST-LIBRARIES.md). Symphonia's MPL-2.0
@@ -57,6 +59,18 @@ The full licence texts are in
 | [Phosphor Icons](https://phosphoricons.com), © Phosphor Icons | MIT |
 
 The fonts are unmodified and are not sold on their own.
+
+## The stem splitter's model
+
+Splitting into stems uses **Spleeter**'s 4-stem model by Deezer Research, whose
+code and pretrained models are released under the **MIT licence**
+(<https://github.com/deezer/spleeter>; Hennequin et al., "Spleeter: a fast and
+efficient music source separation tool with pre-trained models", JOSS 2020).
+Isai does not ship the model: on first use it downloads Deezer's own release,
+checks it against Deezer's published SHA-256, and keeps a converted copy on the
+user's computer. Isai's code runs the network itself; no Deezer code is included.
+
+Copyright Deezer: you may only separate music you have the rights to use.
 
 ## Artwork and sounds
 

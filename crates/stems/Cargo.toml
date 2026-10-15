@@ -1,0 +1,19 @@
+[package]
+name = "isai-stems"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Splitting a song into vocals, drums, bass and other (Spleeter 4-stem, MIT)"
+
+[dependencies]
+# Fast matrix maths for the convolutions (MIT OR Apache-2.0).
+matrixmultiply = "0.3"
+realfft = "3.5"
+# Reading Deezer's model release (a .tar.gz) and checking it.
+flate2 = "1"
+tar = "0.4"
+sha2 = "0.10"
+serde_json = "1"
+
+[dev-dependencies]
+hound = "3.5.1"

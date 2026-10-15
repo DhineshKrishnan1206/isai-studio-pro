@@ -26,6 +26,7 @@ Rectangle {
     property bool pianoRollShown: false
     /// A MIDI region was double-clicked (or created): open the piano roll.
     signal editRequested(int regionId)
+    signal stemsRequested(int regionId, string name)
     /// Open a track's instrument window.
     signal instrumentRequested(int trackId)
     /// What the "+" menus offer, grouped: one list for both.
@@ -652,6 +653,7 @@ Rectangle {
                         tracks: area.tracks
                         view: area
                         onEditRequested: area.editRequested(modelData.id)
+                        onStemsRequested: area.stemsRequested(modelData.id, modelData.name)
                         selected: area.selectedIds[modelData.id] === true
                         columnWidth: area.columnWidth
                         // Only regions near the screen are drawn.

@@ -14,6 +14,7 @@ mod selection_ops;
 mod sampler_ops;
 mod session;
 mod slicer;
+mod stems_ops;
 mod spectrum;
 mod tap;
 mod tuner;

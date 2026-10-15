@@ -1282,6 +1282,37 @@ impl Project {
         id
     }
 
+    /// After splitting a region into stems: one new track per stem, right below
+    /// the region's track, each playing its stem where the region played. The
+    /// original track is muted. `stems` is (stem name, audio file, seconds).
+    pub fn add_stem_tracks(&mut self, region: u64, stems: &[(String, String, f64)]) -> bool {
+        let Some((track, r)) = self.find_region(region).map(|(t, r)| (t.id, r.clone())) else { return false };
+        let Some(index) = self.tracks.iter().position(|t| t.id == track) else { return false };
+        let colors = ["pink", "red", "yellow", "teal"];
+        for (i, (stem, file, secs)) in stems.iter().enumerate() {
+            let id = self.add_track(Some(&format!("{} · {stem}", r.name)));
+            if let Some(region_id) = self.add_region(id, file, stem, r.start, *secs)
+                && let Some(new) = self.region_mut(region_id)
+            {
+                new.fade_in = r.fade_in;
+                new.fade_out = r.fade_out;
+                new.gain_db = r.gain_db;
+            }
+            if let Some(t) = self.track_mut(id) {
+                t.color = colors[i % colors.len()].into();
+            }
+            // Move it up to just below the original (and the stems before it).
+            if let Some(at) = self.tracks.iter().position(|t| t.id == id) {
+                let t = self.tracks.remove(at);
+                self.tracks.insert(index + 1 + i, t);
+            }
+        }
+        if let Some(t) = self.track_mut(track) {
+            t.mute = true;
+        }
+        true
+    }
+
     /// Every plugin in the song, by its insert or instrument id.
     pub fn plugins(&self) -> Vec<(u64, &PluginSlot)> {
         let chains = self.tracks.iter().map(|t| &t.inserts).chain(self.buses.iter().map(|b| &b.inserts)).chain(std::iter::once(&self.master_inserts));

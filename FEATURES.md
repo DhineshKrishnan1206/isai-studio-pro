@@ -172,7 +172,7 @@ its own open-source versions rather than copying products.
 | Time-stretch audio to tempo ("Follow tempo") | L/F | ✅ (WSOLA, per region) |
 | Flex Time (move beats inside audio) | L | ⬜ |
 | Flex Pitch / Newtone (edit vocal notes) | L/F | ⬜ |
-| Stem splitter (vocals, drums, bass, other) | L/F | ⬜ |
+| Stem splitter (vocals, drums, bass, other) | L/F | ✅ (Spleeter 4-stem, MIT; model downloaded once from Deezer) |
 | Beat slicing | L/F | ⬜ |
 | Normalize, reverse, fade in the audio editor | L/F | ⬜ |
 

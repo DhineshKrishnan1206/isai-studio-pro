@@ -96,6 +96,10 @@ pub mod qobject {
         #[qproperty(bool, plugin_scanning)]
         /// How many plugin windows are open.
         #[qproperty(i32, plugin_windows)]
+        /// The region being split into stems (-1: none), how far along (0..1), and what it's doing.
+        #[qproperty(i32, stem_region)]
+        #[qproperty(f64, stem_progress)]
+        #[qproperty(QString, stem_stage)]
         /// The tuner is open (and listening to the input).
         #[qproperty(bool, tuner_open)]
         /// The browser is playing a preview.
@@ -573,6 +577,14 @@ pub mod qobject {
         /// Opens a plugin's own window (by its insert or instrument id).
         #[qinvokable]
         fn open_plugin(self: Pin<&mut Self>, id: i32);
+        /// Whether the stem model is downloaded (else the first split downloads it).
+        #[qinvokable]
+        fn stem_model_ready(self: &AppController) -> bool;
+        /// Splits an audio region into vocals, drums, bass and other on new tracks.
+        #[qinvokable]
+        fn split_stems(self: Pin<&mut Self>, region: i32);
+        #[qinvokable]
+        fn cancel_stems(self: Pin<&mut Self>);
         #[qinvokable]
         fn set_project_key(self: Pin<&mut Self>, key: &QString);
         #[qinvokable]
@@ -625,6 +637,8 @@ pub(crate) struct State {
     pub settings: Settings,
     /// Installed and loaded third-party plugins.
     pub plugins: crate::plugin_ops::Plugins,
+    /// A region being split into stems.
+    pub stems: Option<crate::stems_ops::StemJob>,
     /// The open song's tempo map, kept for turning playhead samples into beats.
     pub tempo_map: isai_engine::TempoMap,
     hardware: Hardware,
@@ -737,6 +751,9 @@ pub struct AppControllerRust {
     plugins_json: QString,
     plugin_scanning: bool,
     plugin_windows: i32,
+    stem_region: i32,
+    stem_progress: f64,
+    stem_stage: QString,
     tuner_open: bool,
     previewing: bool,
     recent_paths: QStringList,
@@ -836,6 +853,8 @@ impl qobject::AppController {
     pub fn start(mut self: Pin<&mut Self>, software_rendering: bool) {
         self.as_mut().set_volume(1.0);
         self.as_mut().set_freezing_track(-1);
+        self.as_mut().set_stem_region(-1);
+        self.as_mut().set_stem_progress(-1.0);
         let env = |key| std::env::var(key).unwrap_or_default();
         self.as_mut().set_dev_screenshot(qs(&env("ISAI_SCREENSHOT")));
         self.as_mut().set_dev_scene(qs(&env("ISAI_SCENE")));
@@ -1126,6 +1145,7 @@ impl qobject::AppController {
         self.as_mut().poll_export();
         self.as_mut().poll_freeze();
         self.as_mut().poll_master();
+        self.as_mut().poll_stems();
         self.as_mut().poll_engine();
         self.as_mut().poll_preview();
         self.update_busy();
@@ -1236,6 +1256,7 @@ impl qobject::AppController {
             || st.export.is_some()
             || st.freeze.is_some()
             || st.master_job.is_some()
+            || st.stems.is_some()
             || st.input.is_some()
             || st.tuner
             || st.pool.is_loading()
