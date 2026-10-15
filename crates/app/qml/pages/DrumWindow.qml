@@ -81,7 +81,7 @@ Item {
         if (!track) return null
         return track.regions.find(r => r.id === regionId && r.midi) || null
     }
-    readonly property real barBeats: Math.max(1, app.timeSigNum)
+    readonly property real barBeats: TimeMap.barLenAt(region ? region.start : app.positionBeats)
     readonly property real stepBeats: 0.25
     readonly property int steps: Math.round(barBeats / stepBeats)
     readonly property int bars: region ? Math.max(1, Math.round(region.beats / barBeats)) : 1
@@ -97,7 +97,7 @@ Item {
         const first = track.regions.find(r => r.midi)
         const r = sel || first
         if (r) { regionId = r.id; return }
-        const at = Math.floor(app.positionBeats / barBeats) * barBeats
+        const at = TimeMap.barStart(TimeMap.barAt(app.positionBeats))
         regionId = app.addMidiRegion(track.id, at, barBeats)
         page = 0
     }

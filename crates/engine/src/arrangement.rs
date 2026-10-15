@@ -25,15 +25,25 @@ pub struct Arrangement {
     pub master: Vec<PlayInsert>,
     /// Song tempo, for tempo-synced effects.
     pub bpm: f32,
+    /// Tempo changes after the start: (timeline sample, bpm), in order.
+    pub tempo_changes: Vec<(u64, f32)>,
 }
 
 impl Default for Arrangement {
     fn default() -> Self {
-        Self { tracks: Vec::new(), buses: Vec::new(), master: Vec::new(), bpm: 120.0 }
+        Self { tracks: Vec::new(), buses: Vec::new(), master: Vec::new(), bpm: 120.0, tempo_changes: Vec::new() }
     }
 }
 
 impl Arrangement {
+    /// The tempo at a timeline sample.
+    pub fn bpm_at(&self, pos: u64) -> f32 {
+        match self.tempo_changes.partition_point(|c| c.0 <= pos) {
+            0 => self.bpm,
+            i => self.tempo_changes[i - 1].1,
+        }
+    }
+
     /// Every instrument in the arrangement.
     pub fn instruments(&self) -> impl Iterator<Item = &PlayInstrument> {
         self.tracks.iter().filter_map(|t| t.instrument.as_ref())

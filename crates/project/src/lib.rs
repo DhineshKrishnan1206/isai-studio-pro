@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 pub use isai_engine::effects::{EffectKind, MAX_PARAMS};
 pub use isai_engine::instruments::{InstrumentKind, MAX_INST_PARAMS};
-use isai_engine::Meter;
+use isai_engine::{Meter, TempoMap};
 use serde::{Deserialize, Serialize};
 
 pub use history::History;
@@ -105,6 +105,21 @@ pub struct Region {
     /// fit when the song's tempo is different. Audio regions only.
     #[serde(default)]
     pub tempo: Option<f64>,
+}
+
+/// A tempo change: from `beat` on, the song plays at `bpm`.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct TempoChange {
+    pub beat: f64,
+    pub bpm: f64,
+}
+
+/// A time-signature change at the start of `bar` (counted from 1, so 2 or later).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct SignatureChange {
+    pub bar: u32,
+    pub numerator: u32,
+    pub denominator: u32,
 }
 
 /// A named place on the timeline (Intro, Verse, Chorus…).
@@ -327,6 +342,11 @@ pub struct Project {
     pub master_inserts: Vec<Insert>,
     /// Named places on the timeline, sorted by beat.
     pub markers: Vec<Marker>,
+    /// Tempo changes after the start, sorted by beat. `tempo` is the opening tempo.
+    pub tempo_changes: Vec<TempoChange>,
+    /// Time-signature changes after bar 1, sorted by bar. `numerator` and
+    /// `denominator` are the opening signature (and the denominator is the beat unit).
+    pub signature_changes: Vec<SignatureChange>,
     /// Source of unique ids for tracks and regions.
     pub next_id: u64,
 }
@@ -400,12 +420,104 @@ impl Project {
             buses: Vec::new(),
             master_inserts: Vec::new(),
             markers: Vec::new(),
+            tempo_changes: Vec::new(),
+            signature_changes: Vec::new(),
             next_id: 1,
         }
     }
 
     pub fn meter(&self) -> Meter {
         Meter { bpm: self.tempo, numerator: self.numerator, denominator: self.denominator }
+    }
+
+    /// The tempo and time signature over the whole song.
+    pub fn tempo_map(&self) -> TempoMap {
+        let tempos: Vec<isai_engine::TempoPoint> = self.tempo_changes.iter().map(|t| isai_engine::TempoPoint { beat: t.beat, bpm: t.bpm }).collect();
+        let sigs: Vec<isai_engine::SigChange> = self
+            .signature_changes
+            .iter()
+            .map(|c| isai_engine::SigChange { bar: c.bar, numerator: c.numerator, denominator: c.denominator })
+            .collect();
+        TempoMap::new(self.meter(), &tempos, &sigs)
+    }
+
+    /// The tempo and time signature in force at a position.
+    pub fn meter_at(&self, beat: f64) -> Meter {
+        self.tempo_map().meter_at(beat)
+    }
+
+    /// Adds a tempo change (or changes the one already there). At the very
+    /// start it sets the opening tempo instead.
+    pub fn add_tempo_change(&mut self, beat: f64, bpm: f64) -> bool {
+        let bpm = (bpm.clamp(Meter::MIN_BPM, Meter::MAX_BPM) * 10.0).round() / 10.0;
+        let beat = beat.max(0.0);
+        if beat < 1e-6 {
+            self.tempo = bpm;
+            return true;
+        }
+        match self.tempo_changes.iter_mut().find(|t| (t.beat - beat).abs() < 1e-6) {
+            Some(t) => t.bpm = bpm,
+            None => self.tempo_changes.push(TempoChange { beat, bpm }),
+        }
+        self.tempo_changes.sort_by(|a, b| a.beat.total_cmp(&b.beat));
+        true
+    }
+
+    /// Moves the tempo change at `from` to `to` with a new tempo; at the
+    /// start (or dragged onto it) it becomes the opening tempo.
+    pub fn move_tempo_change(&mut self, from: f64, to: f64, bpm: f64) -> bool {
+        let Some(i) = self.tempo_changes.iter().position(|t| (t.beat - from).abs() < 1e-6) else {
+            return from < 1e-6 && self.add_tempo_change(0.0, bpm);
+        };
+        self.tempo_changes.remove(i);
+        self.add_tempo_change(to, bpm)
+    }
+
+    pub fn remove_tempo_change(&mut self, beat: f64) -> bool {
+        let before = self.tempo_changes.len();
+        self.tempo_changes.retain(|t| (t.beat - beat).abs() >= 1e-6);
+        self.tempo_changes.len() != before
+    }
+
+    /// Sets the tempo of the section the position is in (what the tempo
+    /// display and tap tempo change).
+    pub fn set_tempo_at(&mut self, beat: f64, bpm: f64) -> bool {
+        let at = self.tempo_changes.iter().rev().find(|t| t.beat <= beat + 1e-9).map(|t| t.beat);
+        self.add_tempo_change(at.unwrap_or(0.0), bpm)
+    }
+
+    /// Adds a time-signature change at the start of `bar` (or changes the one
+    /// there). Bar 1 sets the opening signature.
+    pub fn add_signature_change(&mut self, bar: u32, numerator: u32, denominator: u32) -> bool {
+        let numerator = numerator.clamp(1, 32);
+        let denominator = if matches!(denominator, 2 | 4 | 8 | 16) { denominator } else { 4 };
+        if bar <= 1 {
+            self.numerator = numerator;
+            self.denominator = denominator;
+            return true;
+        }
+        match self.signature_changes.iter_mut().find(|c| c.bar == bar) {
+            Some(c) => {
+                c.numerator = numerator;
+                c.denominator = denominator;
+            }
+            None => self.signature_changes.push(SignatureChange { bar, numerator, denominator }),
+        }
+        self.signature_changes.sort_by_key(|c| c.bar);
+        true
+    }
+
+    pub fn remove_signature_change(&mut self, bar: u32) -> bool {
+        let before = self.signature_changes.len();
+        self.signature_changes.retain(|c| c.bar != bar);
+        self.signature_changes.len() != before
+    }
+
+    /// Sets the time signature of the section the position is in.
+    pub fn set_signature_at(&mut self, beat: f64, numerator: u32, denominator: u32) -> bool {
+        let map = self.tempo_map();
+        let bar = map.sections().iter().rev().find(|s| s.0 <= beat + 1e-9).map_or(1, |s| s.1) as u32;
+        self.add_signature_change(bar, numerator, denominator)
     }
 
     pub fn set_meter(&mut self, meter: Meter) {
@@ -429,6 +541,13 @@ impl Project {
         if !self.snap {
             return beats.max(0.0);
         }
+        if self.snap_value == Snap::Bar && !self.signature_changes.is_empty() {
+            // Bars change length: snap to the nearer bar line.
+            let map = self.tempo_map();
+            let bar = map.bar_at(beats);
+            let (a, b) = (map.bar_start(bar), map.bar_start(bar + 1));
+            return if beats - a <= b - beats { a } else { b }.max(0.0);
+        }
         let step = self.snap_value.step(&self.meter());
         ((beats / step).round() * step).max(0.0)
     }
@@ -447,17 +566,24 @@ impl Project {
 
     /// The tempo a region's seconds are measured at: the song's, or the
     /// region's own when it follows the tempo.
+    ///
+    /// A region's audio is measured at the tempo where it starts (with tempo
+    /// changes, audio crossing one keeps its own speed).
     pub fn region_meter(&self, region: &Region) -> Meter {
         let mut m = self.meter();
         if let Some(bpm) = region.tempo.filter(|_| region.midi.is_none()) {
             m.bpm = bpm;
+        } else if !self.tempo_changes.is_empty() {
+            m.bpm = self.tempo_map().bpm_at(region.start);
         }
         m
     }
 
     /// How much a following region's audio is stretched to fit (1 = not at all).
     pub fn stretch_ratio(&self, region: &Region) -> f64 {
-        self.meter().beat_secs() / self.region_meter(region).beat_secs()
+        let mut here = self.meter();
+        here.bpm = self.tempo_map().bpm_at(region.start);
+        here.beat_secs() / self.region_meter(region).beat_secs()
     }
 
     /// Turns the cycle on around these regions: from the earliest start to
@@ -479,6 +605,11 @@ impl Project {
     pub fn region_beats(&self, region: &Region) -> f64 {
         match &region.midi {
             Some(m) => m.length,
+            // Across tempo changes: where its audio ends on the song's clock.
+            None if region.tempo.is_none() && !self.tempo_changes.is_empty() => {
+                let map = self.tempo_map();
+                map.secs_to_beats(map.beats_to_secs(region.start) + region.length) - region.start
+            }
             None => self.region_meter(region).secs_to_beats(region.length),
         }
     }
@@ -2027,6 +2158,61 @@ mod tests {
         let right = p.split_region(r, 2.0).unwrap();
         assert_eq!(p.find_region(right).unwrap().1.offset, 1.0, "one second into the audio");
         assert!(p.set_region_tempo(r, None));
+    }
+
+    #[test]
+    fn tempo_changes_are_added_moved_and_removed() {
+        let mut p = Project::default();
+        assert!(p.add_tempo_change(16.0, 90.0));
+        assert!(p.add_tempo_change(8.0, 100.04));
+        assert_eq!(p.tempo_changes, vec![TempoChange { beat: 8.0, bpm: 100.0 }, TempoChange { beat: 16.0, bpm: 90.0 }]);
+        // The tempo display changes the section the playhead is in.
+        assert!(p.set_tempo_at(10.0, 110.0));
+        assert_eq!(p.tempo_changes[0].bpm, 110.0);
+        assert!(p.set_tempo_at(2.0, 130.0));
+        assert_eq!(p.tempo, 130.0);
+        assert!(p.move_tempo_change(16.0, 20.0, 80.0));
+        assert_eq!(p.tempo_changes[1], TempoChange { beat: 20.0, bpm: 80.0 });
+        assert_eq!(p.tempo_map().bpm_at(19.0), 110.0);
+        assert!(p.remove_tempo_change(8.0));
+        assert_eq!(p.tempo_map().bpm_at(10.0), 130.0);
+        // Saved and loaded with the project; old projects without them still load.
+        let text = ron::ser::to_string(&p).unwrap();
+        let back: Project = ron::from_str(&text).unwrap();
+        assert_eq!(back.tempo_changes, p.tempo_changes);
+        let old: Project = ron::from_str("(name: \"Old\", tempo: 100.0)").unwrap();
+        assert!(old.tempo_changes.is_empty() && old.signature_changes.is_empty());
+    }
+
+    #[test]
+    fn audio_keeps_its_speed_through_a_tempo_change() {
+        // 24 s of audio from the start: 8 s at 120 (16 beats), then 16 s at 90 (24 beats).
+        let mut p = Project::default();
+        let track = p.add_track(Some("Loop"));
+        let id = p.add_region(track, "loop.wav", "Loop", 0.0, 24.0).unwrap();
+        let r = p.find_region(id).unwrap().1.clone();
+        assert_eq!(p.region_beats(&r), 48.0);
+        p.add_tempo_change(16.0, 90.0);
+        assert!((p.region_beats(&r) - 40.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn signature_changes_move_the_bar_lines() {
+        let mut p = Project::default();
+        assert!(p.add_signature_change(3, 3, 4));
+        assert!(p.add_signature_change(1, 4, 4), "bar 1 sets the opening signature");
+        let map = p.tempo_map();
+        assert_eq!(map.bar_start(4), 11.0);
+        assert_eq!(p.meter_at(12.0).numerator, 3);
+        // Snapping to bars follows the shorter bars.
+        p.snap = true;
+        p.snap_value = Snap::Bar;
+        assert_eq!(p.snap(10.4), 11.0);
+        assert_eq!(p.snap(9.0), 8.0);
+        assert!(p.set_signature_at(12.0, 6, 8));
+        assert_eq!(p.signature_changes, vec![SignatureChange { bar: 3, numerator: 6, denominator: 8 }]);
+        assert!(p.remove_signature_change(3));
+        assert!(p.signature_changes.is_empty());
     }
 
     #[test]

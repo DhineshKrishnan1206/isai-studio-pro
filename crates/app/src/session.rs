@@ -168,7 +168,9 @@ impl Session {
     /// quality (the piano's Light mode, at most two unison voices on the synth).
     pub fn arrangement(&self, pool: &AudioPool, eco: bool) -> Arrangement {
         let rate = pool.rate();
-        let meter = self.project.meter();
+        // Positions go through the tempo map; an audio region's own length is
+        // measured at the tempo where it starts.
+        let map = self.project.tempo_map();
         let secs = |s: f64| (s * f64::from(rate)).round().max(0.0) as u64;
         // A few milliseconds of fade on every edge, so cutting into a waveform
         // never clicks.
@@ -200,9 +202,17 @@ impl Session {
                     // A looped region plays its audio again and again until its loop end.
                     let beats = self.project.region_beats(r);
                     let span = self.project.region_span(r);
+                    let local = self.project.region_meter(r);
                     let mut pass = 0.0;
                     while pass < span - 1e-9 {
-                        let len = secs(meter.beats_to_secs((span - pass).min(beats))).min(full);
+                        // Audio not following the tempo keeps its speed through tempo changes.
+                        let len = if r.tempo.is_none() {
+                            let from = r.start + pass;
+                            secs(map.beats_to_secs(from + (span - pass).min(beats)) - map.beats_to_secs(from))
+                        } else {
+                            secs(local.beats_to_secs((span - pass).min(beats)) * scale)
+                        }
+                        .min(full);
                         if len == 0 {
                             break;
                         }
@@ -210,7 +220,7 @@ impl Session {
                         let offset = secs(r.offset * scale) + if r.reverse { full - len } else { 0 };
                         regions.push(PlayRegion {
                             audio: Arc::clone(audio),
-                            start: meter.beats_to_samples(r.start + pass, rate),
+                            start: map.beats_to_samples(r.start + pass, rate),
                             offset,
                             len,
                             fade_in: secs(r.fade_in * scale).max(declick).min(len / 2),
@@ -288,14 +298,16 @@ impl Session {
             .iter()
             .map(|b| PlayBus { gain: db_to_gain(b.volume_db), pan: b.pan, audible: !b.mute, inserts: inserts(&b.inserts) })
             .collect();
-        Arrangement { tracks, buses, master: inserts(&self.project.master_inserts), bpm: self.project.tempo as f32 }
+        let tempo_changes = map.tempos().skip(1).map(|(beat, bpm)| (map.beats_to_samples(beat, rate), bpm as f32)).collect();
+        Arrangement { tracks, buses, master: inserts(&self.project.master_inserts), bpm: self.project.tempo as f32, tempo_changes }
     }
 
     /// Every note an instrument track plays, in samples, sorted by start.
     /// Notes outside a region's visible part are left out; a note running
     /// past the region's end is cut there.
     fn play_notes(&self, track: &Track, rate: u32) -> Vec<PlayNote> {
-        let meter = self.project.meter();
+        let map = self.project.tempo_map();
+        let meter = &map;
         let mut notes: Vec<PlayNote> = track
             .regions
             .iter()
@@ -329,7 +341,7 @@ impl Session {
 
     /// A track's automation lanes for the engine, with points in samples.
     fn play_lanes(&self, track: &Track, rate: u32) -> Vec<PlayLane> {
-        let meter = self.project.meter();
+        let meter = self.project.tempo_map();
         track
             .automation
             .iter()

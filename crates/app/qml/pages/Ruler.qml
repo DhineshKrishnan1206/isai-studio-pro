@@ -1,7 +1,14 @@
 import QtQuick
+import QtQuick.Controls.Basic
+import QtQuick.Layouts
 import Isai
 
-// The bar ruler: markers on top, then the cycle strip, then bar numbers.
+// The bar ruler: markers on top, then (when shown) the signature and tempo
+// lanes, then the cycle strip, then bar numbers.
+//   • Signature lane: click a signature to change or remove it; double-click
+//     the lane to add one at that bar.
+//   • Tempo lane: drag a point up or down to change its tempo, sideways to
+//     move it; double-click the lane to add a change; right-click to remove.
 //   • Markers: double-click the lane (or press M) to add one. Click a marker
 //     to jump there, drag it to move it, double-click to rename it,
 //     right-click to cycle its section or delete it.
@@ -21,24 +28,26 @@ Item {
     property real viewWidth: width
 
     readonly property int markerHeight: 18
-    /// Where the cycle strip starts (under the markers).
-    readonly property int cycleY: markerHeight
+    /// The signature and tempo lanes (Logic's global tracks), shown on request.
+    property bool globalShown: false
+    readonly property int sigHeight: globalShown ? 20 : 0
+    readonly property int tempoHeight: globalShown ? 44 : 0
+    readonly property int sigY: markerHeight
+    readonly property int tempoY: markerHeight + sigHeight
+    /// Where the cycle strip starts (under the markers and global lanes).
+    readonly property int cycleY: markerHeight + sigHeight + tempoHeight
     readonly property int stripHeight: 14
-    implicitHeight: 58
+    implicitHeight: 58 + sigHeight + tempoHeight
     readonly property var markers: {
         try { return JSON.parse(app.markersJson || "[]") } catch (e) { return [] }
     }
     height: implicitHeight
 
-    readonly property real barBeats: Math.max(1, app.timeSigNum)
-    readonly property real barPx: barBeats * pxPerBeat
+    /// The bars in view (bars change length with the time signature).
+    readonly property var visibleBars: TimeMap.barsBetween(beatAt(viewStart), beatAt(viewStart + viewWidth), 800)
+    readonly property real barPx: TimeMap.barLenAt(beatAt(viewStart)) * pxPerBeat
     /// Label every Nth bar so numbers never collide.
     readonly property int labelEvery: barPx >= 34 ? 1 : barPx >= 17 ? 2 : barPx >= 9 ? 4 : barPx >= 4 ? 8 : 16
-    readonly property int firstBar: Math.max(0, Math.floor(viewStart / barPx))
-    readonly property int visibleBars: Math.ceil(viewWidth / barPx) + 2
-    /// Beat ticks only when there is room; finer divisions when zoomed far in.
-    readonly property int beatTicks: pxPerBeat >= 8 ? barBeats : 0
-    readonly property int divisions: pxPerBeat >= 60 ? 4 : pxPerBeat >= 30 ? 2 : 1
 
     function beatAt(x) { return Math.max(0, x / pxPerBeat) }
 
@@ -156,34 +165,246 @@ Item {
     Repeater {
         model: ruler.visibleBars
         delegate: Item {
-            required property int index
-            readonly property int bar: ruler.firstBar + index
-            x: bar * ruler.barPx
+            id: barItem
+            required property var modelData
+            readonly property real beatPx: modelData.unit * ruler.pxPerBeat
+            // Beat ticks only when there is room; finer divisions when zoomed far in.
+            readonly property int beatTicks: beatPx >= 8 ? modelData.num : 0
+            readonly property int divisions: beatPx >= 60 ? 4 : beatPx >= 30 ? 2 : 1
+            x: modelData.beat * ruler.pxPerBeat
             y: ruler.cycleY + ruler.stripHeight
             height: ruler.height - ruler.cycleY - ruler.stripHeight
             Rectangle { anchors.bottom: parent.bottom; width: 1; height: 10; color: Theme.lineStrong }
             DText {
-                visible: parent.bar % ruler.labelEvery === 0
+                visible: (barItem.modelData.bar - 1) % ruler.labelEvery === 0
                 x: 4
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 7
-                text: parent.bar + 1
+                text: barItem.modelData.bar
                 font.family: Theme.mono
                 font.pixelSize: Theme.textXs
                 color: Theme.textDim
             }
             Repeater {
-                model: Math.max(0, ruler.beatTicks * ruler.divisions - 1)
+                model: Math.max(0, barItem.beatTicks * barItem.divisions - 1)
                 delegate: Rectangle {
                     required property int index
-                    readonly property bool onBeat: (index + 1) % ruler.divisions === 0
-                    x: (index + 1) * ruler.pxPerBeat / ruler.divisions
+                    readonly property bool onBeat: (index + 1) % barItem.divisions === 0
+                    x: (index + 1) * barItem.beatPx / barItem.divisions
                     anchors.bottom: parent.bottom
                     width: 1
                     height: onBeat ? 5 : 3
                     color: onBeat ? Theme.lineStrong : Theme.line
                 }
             }
+        }
+    }
+
+    // ------------------------------------------------- signature lane
+    Rectangle {
+        visible: ruler.globalShown
+        x: ruler.viewStart; y: ruler.sigY
+        width: ruler.viewWidth; height: ruler.sigHeight
+        color: Theme.tint(Theme.sunken, 0.35)
+        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.line }
+    }
+    MouseArea {
+        visible: ruler.globalShown
+        y: ruler.sigY
+        width: parent.width; height: ruler.sigHeight
+        hoverEnabled: true
+        // Double-click: a new signature from the next bar line.
+        onDoubleClicked: m => {
+            const beat = ruler.beatAt(m.x)
+            const bar = TimeMap.isBarLine(beat) ? TimeMap.barAt(beat) : TimeMap.barAt(beat) + 1
+            const s = TimeMap.sectionAt(beat)
+            sigPopup.openFor(bar, s[2], s[3], m.x)
+        }
+        DToolTip { visible: parent.containsMouse && TimeMap.sigs.length < 2; text: "Time signatures · double-click to change it from a bar on" }
+    }
+    Repeater {
+        model: ruler.globalShown ? TimeMap.sigs : []
+        delegate: AbstractButton {
+            id: sigChip
+            required property var modelData
+            x: modelData[0] * ruler.pxPerBeat
+            y: ruler.sigY + 2
+            height: ruler.sigHeight - 4
+            width: sigText.implicitWidth + 12
+            visible: x + width >= ruler.viewStart - 40 && x <= ruler.viewStart + ruler.viewWidth + 40
+            hoverEnabled: true
+            onClicked: sigPopup.openFor(modelData[1], modelData[2], modelData[3], x)
+            background: Rectangle {
+                radius: 3
+                color: sigChip.hovered ? Theme.hover : Theme.raised
+                border.color: Theme.lineStrong
+                Rectangle { width: 2; height: parent.height; color: Theme.accent }
+            }
+            contentItem: DText {
+                id: sigText
+                leftPadding: 4
+                text: sigChip.modelData[2] + "/" + sigChip.modelData[3]
+                font.family: Theme.mono
+                font.pixelSize: 10
+                verticalAlignment: Text.AlignVCenter
+            }
+            DToolTip { visible: sigChip.hovered; text: "From bar " + sigChip.modelData[1] + " · click to change" }
+        }
+    }
+    Popup {
+        id: sigPopup
+        property int bar: 1
+        property int num: 4
+        property int den: 4
+        readonly property bool exists: TimeMap.sigs.some(s => s[1] === bar)
+        function openFor(b, n, d, px) { bar = b; num = n; den = d; x = Math.max(ruler.viewStart, px - 20); y = ruler.sigY + ruler.sigHeight; open() }
+        padding: 12
+        background: GlassPanel { backdrop: Theme.backdrop; radius: Theme.radiusLg; clarity: 0.3 }
+        contentItem: ColumnLayout {
+            spacing: 10
+            DText { text: sigPopup.bar === 1 ? "Time signature at the start" : "Time signature from bar " + sigPopup.bar; strong: true; font.pixelSize: Theme.textSm }
+            RowLayout {
+                spacing: 6
+                DButton { text: "−"; implicitWidth: 30; onClicked: sigPopup.num = Math.max(1, sigPopup.num - 1) }
+                DText { text: sigPopup.num; font.family: Theme.mono; font.pixelSize: Theme.textLg; horizontalAlignment: Text.AlignHCenter; Layout.preferredWidth: 28 }
+                DButton { text: "+"; implicitWidth: 30; onClicked: sigPopup.num = Math.min(32, sigPopup.num + 1) }
+                DText { text: "/"; dim: true }
+                Segmented {
+                    minItemWidth: 34
+                    options: [2, 4, 8, 16].map(d => ({ value: d, label: "" + d }))
+                    value: sigPopup.den
+                    onActivated: v => sigPopup.den = v
+                }
+            }
+            RowLayout {
+                spacing: 8
+                DButton {
+                    visible: sigPopup.exists && sigPopup.bar > 1
+                    variant: "danger"
+                    text: "Remove"
+                    onClicked: { ruler.app.removeSignatureChange(sigPopup.bar); sigPopup.close() }
+                }
+                Item { Layout.fillWidth: true }
+                DButton { variant: "ghost"; text: "Cancel"; onClicked: sigPopup.close() }
+                DButton {
+                    variant: "primary"
+                    text: "Apply"
+                    onClicked: { ruler.app.addSignatureChange(sigPopup.bar, sigPopup.num, sigPopup.den); sigPopup.close() }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------- tempo lane
+    /// The tempo point being dragged: { index, beat, bpm }, or null.
+    property var tempoDrag: null
+    readonly property var tempoPts: TimeMap.tempos.map((t, i) => tempoDrag && tempoDrag.index === i ? [tempoDrag.beat, tempoDrag.bpm] : t)
+    readonly property real tempoLo: Math.min(...tempoPts.map(t => t[1])) - 15
+    readonly property real tempoHi: Math.max(tempoLo + 40, Math.max(...tempoPts.map(t => t[1])) + 15)
+    function tempoYOf(bpm) { return tempoY + 6 + (1 - (bpm - tempoLo) / (tempoHi - tempoLo)) * (tempoHeight - 12) }
+
+    Rectangle {
+        visible: ruler.globalShown
+        x: ruler.viewStart; y: ruler.tempoY
+        width: ruler.viewWidth; height: ruler.tempoHeight
+        color: Theme.tint(Theme.sunken, 0.5)
+        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.line }
+        DText { anchors.right: parent.right; anchors.rightMargin: 8; y: 3; text: "TEMPO"; faint: true; font.pixelSize: 9; font.letterSpacing: 1 }
+    }
+    MouseArea {
+        visible: ruler.globalShown
+        y: ruler.tempoY
+        width: parent.width; height: ruler.tempoHeight
+        hoverEnabled: true
+        onDoubleClicked: m => { const b = ruler.beatAt(m.x); ruler.app.addTempoChange(b, TimeMap.bpmAt(b)) }
+        DToolTip { visible: parent.containsMouse && TimeMap.tempos.length < 2; text: "Tempo · double-click to add a change, then drag it up or down" }
+    }
+    // The tempo line: flat while the tempo holds, a step at each change.
+    Repeater {
+        model: ruler.globalShown ? ruler.tempoPts : []
+        delegate: Item {
+            required property var modelData
+            required property int index
+            readonly property var next: index + 1 < ruler.tempoPts.length ? ruler.tempoPts[index + 1] : null
+            readonly property real x0: modelData[0] * ruler.pxPerBeat
+            readonly property real x1: next ? next[0] * ruler.pxPerBeat : ruler.width
+            readonly property real yy: ruler.tempoYOf(modelData[1])
+            Rectangle { x: parent.x0; y: parent.yy; width: Math.max(1, parent.x1 - parent.x0); height: 2; color: Theme.accent }
+            Rectangle {
+                visible: !!parent.next
+                x: parent.x1
+                y: Math.min(parent.yy, parent.next ? ruler.tempoYOf(parent.next[1]) : 0)
+                width: 2
+                height: parent.next ? Math.abs(ruler.tempoYOf(parent.next[1]) - parent.yy) + 2 : 0
+                color: Theme.accent
+            }
+        }
+    }
+    Repeater {
+        model: ruler.globalShown ? ruler.tempoPts : []
+        delegate: Item {
+            id: tp
+            required property var modelData
+            required property int index
+            readonly property var original: TimeMap.tempos[index] || modelData
+            x: modelData[0] * ruler.pxPerBeat - 6
+            y: ruler.tempoYOf(modelData[1]) - 5
+            width: 12; height: 12
+            z: 3
+            Rectangle {
+                anchors.centerIn: parent
+                width: 9; height: 9; radius: 4.5
+                color: tpArea.containsMouse || tpArea.pressed ? Theme.accent : Theme.panel
+                border.color: Theme.accent
+                border.width: 2
+            }
+            DText {
+                x: 12; y: -2
+                text: tp.modelData[1].toFixed(1)
+                font.family: Theme.mono
+                font.pixelSize: 9
+                color: Theme.text
+            }
+            MouseArea {
+                id: tpArea
+                anchors.fill: parent
+                anchors.margins: -3
+                hoverEnabled: true
+                preventStealing: true
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                cursorShape: tp.index === 0 ? Qt.SizeVerCursor : Qt.SizeAllCursor
+                property real pressX
+                property real pressY
+                onPressed: m => {
+                    if (m.button === Qt.RightButton) {
+                        if (tp.index > 0) ruler.app.removeTempoChange(tp.original[0])
+                        return
+                    }
+                    const p = mapToItem(ruler, m.x, m.y)
+                    pressX = p.x; pressY = p.y
+                }
+                onPositionChanged: m => {
+                    if (!pressed || !(pressedButtons & Qt.LeftButton)) return
+                    const p = mapToItem(ruler, m.x, m.y)
+                    // Half a BPM per pixel up or down; the first point stays at the start.
+                    const bpm = Math.max(20, Math.min(400, Math.round((tp.original[1] + (pressY - p.y) * 0.5) * 10) / 10))
+                    let beat = tp.original[0]
+                    if (tp.index > 0) {
+                        const prev = TimeMap.tempos[tp.index - 1][0], nxt = TimeMap.tempos[tp.index + 1]
+                        beat = ruler.app.snapBeats(ruler.beatAt(p.x))
+                        beat = Math.max(prev + 0.25, nxt ? Math.min(nxt[0] - 0.25, beat) : beat)
+                    }
+                    ruler.tempoDrag = { index: tp.index, beat: beat, bpm: bpm }
+                }
+                onReleased: m => {
+                    if (m.button === Qt.RightButton || !ruler.tempoDrag) return
+                    const d = ruler.tempoDrag
+                    ruler.tempoDrag = null
+                    if (tp.index === 0) ruler.app.addTempoChange(0, d.bpm)
+                    else ruler.app.moveTempoChange(tp.original[0], d.beat, d.bpm)
+                }
+            }
+            DToolTip { visible: tpArea.containsMouse && !tpArea.pressed; text: tp.index === 0 ? "Opening tempo · drag up or down" : "Drag to change the tempo or move it · right-click to remove" }
         }
     }
 

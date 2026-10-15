@@ -292,7 +292,7 @@ impl AppController {
         // A note reaches us about one buffer after it was played along to.
         let latency = u64::from(engine.info().buffer_size.unwrap_or(512));
         let Some(s) = st.session.as_mut() else { return };
-        let meter = s.project.meter();
+        let meter = s.project.tempo_map();
         let beats = |pos: u64| meter.secs_to_beats(pos.saturating_sub(latency) as f64 / rate);
         let notes: Vec<isai_project::Note> = take
             .notes
@@ -401,7 +401,7 @@ impl AppController {
                 st.pool.request(&take.path);
                 let mut region_id = 0;
                 if let Some(s) = st.session.as_mut() {
-                    let beats = s.project.meter().secs_to_beats(start_secs);
+                    let beats = s.project.tempo_map().secs_to_beats(start_secs);
                     s.edit("Record", |p| {
                         let Some(id) = p.add_region(track, &file, &name, beats, length) else { return false };
                         region_id = id;

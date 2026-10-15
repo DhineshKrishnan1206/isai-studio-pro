@@ -261,3 +261,23 @@ work, crash recovery, and window dragging. Screenshots look right.
 - **Play button**: compact console button in Studio (no pulse).
 - **Website** (docs/): same palette, Young Serif headings, paintings as
   backgrounds. Screenshots come from the dev scenes in `cfg-studio`.
+
+## Tempo and time-signature changes
+- **Model**: `Project.tempo_changes` ([TempoChange{beat,bpm}], after the start;
+  `tempo` is the opening one) and `signature_changes` ([SignatureChange{bar,
+  numerator,denominator}], from bar 2; `numerator/denominator` is the opening
+  one and the denominator stays the song's beat unit). `Project::tempo_map()`.
+- **engine::time::TempoMap**: steps of tempo, sections of signature;
+  beats↔secs↔samples, `bar_beat`, `bar_start`, `next_click`, `meter_at`.
+- **Audio thread**: `Command::SetTempo(Box<TempoMap>)` (old one goes back as
+  garbage). The metronome schedules each click from `next_click` (no per-sample
+  maths); count-in uses the meter at the playhead; previews wait for the next bar.
+  `Arrangement.tempo_changes` (samples) gives tempo-synced effects the local BPM.
+- **Regions**: audio not following the tempo keeps its speed through changes
+  (`region_beats` measures it on the map). Trim/split of audio crossing a change
+  still use the tempo at its start (small error; fix if users notice).
+- **UI**: `TimeMap` singleton (fed `app.tempoJson`) for bar lines everywhere.
+  Ruler lanes (G): signature chips + popup, tempo step line with draggable
+  points. The tempo/signature LCD shows the values at the playhead; editing it
+  changes that section (`set_tempo_at`, `set_signature_at`).
+- Dev scene `tempo`.

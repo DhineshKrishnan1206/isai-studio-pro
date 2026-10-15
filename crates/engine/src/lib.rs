@@ -25,4 +25,4 @@ pub use clip::{Clip, Peaks};
 pub use device::{OutputDevice, list_output_devices};
 pub use engine::{Engine, EngineConfig, StreamInfo};
 pub use input::{Input, InputChannels, InputDevice, list_input_devices, start_input};
-pub use time::{BarBeat, Meter};
+pub use time::{BarBeat, Meter, SigChange, TempoMap, TempoPoint};

@@ -38,8 +38,8 @@ its own open-source versions rather than copying products.
 | Metronome with count-in | L/F | ✅ |
 | Cycle / loop region | L/F | ✅ |
 | Stop twice returns to start | L | ✅ (0 key / palette) |
-| Tempo changes over time (tempo track) | L/F | ⬜ |
-| Time signature changes over time | L/F | ⬜ |
+| Tempo changes over time (tempo track) | L/F | ✅ (tempo lane, G; steps, ramps later) |
+| Time signature changes over time | L/F | ✅ (signature lane; bars, grid, metronome follow) |
 | Markers (Intro, Verse, Chorus…) | L/F | ✅ (marker lane, M, ⌥←/→, cycle a section) |
 | Arrangement sections you can move/copy as blocks | L/F | ⬜ |
 | Punch in/out recording (autopunch) | L/F | ⬜ |

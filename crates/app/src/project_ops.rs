@@ -79,10 +79,31 @@ impl AppController {
         let (Some(engine), Some(s)) = (&mut st.audio.engine, &st.session) else { return };
         let p = &s.project;
         let rate = engine.info().sample_rate;
-        let meter = p.meter();
-        engine.set_meter(meter);
+        let map = p.tempo_map();
+        engine.set_tempo_map(map.clone());
         engine.set_metronome(p.metronome, click);
-        engine.set_cycle(p.cycle, meter.beats_to_samples(p.cycle_start, rate), meter.beats_to_samples(p.cycle_end, rate));
+        engine.set_cycle(p.cycle, map.beats_to_samples(p.cycle_start, rate), map.beats_to_samples(p.cycle_end, rate));
+        st.tempo_map = map;
+    }
+
+    /// Shows the tempo and time signature in force (at the playhead).
+    pub(crate) fn show_meter(mut self: Pin<&mut Self>, m: isai_engine::Meter) {
+        if (*self.tempo() - m.bpm).abs() > 1e-9 {
+            self.as_mut().set_tempo(m.bpm);
+        }
+        if *self.time_sig_num() != m.numerator as i32 {
+            self.as_mut().set_time_sig_num(m.numerator as i32);
+        }
+        if *self.time_sig_den() != m.denominator as i32 {
+            self.as_mut().set_time_sig_den(m.denominator as i32);
+        }
+    }
+
+    /// The tempo map for QML: [[beat, bpm]…] and [[beat, bar, num, den]…].
+    fn tempo_map_json(map: &isai_engine::TempoMap) -> String {
+        let tempos: Vec<serde_json::Value> = map.tempos().map(|(b, bpm)| serde_json::json!([b, bpm])).collect();
+        let sigs: Vec<serde_json::Value> = map.sections().iter().map(|s| serde_json::json!([s.0, s.1, s.2, s.3])).collect();
+        serde_json::json!({ "tempos": tempos, "sigs": sigs }).to_string()
     }
 
     /// Sends the tracks and regions to the engine.
@@ -123,10 +144,14 @@ impl AppController {
         let buses = s.buses_json();
         let master = s.master_inserts_json();
         let markers = s.markers_json();
+        let map = s.project.tempo_map();
+        let tempo = Self::tempo_map_json(&map);
+        let here = map.meter_at(*self.position_beats());
         self.as_mut().set_project_name(qs(&p.name));
-        self.as_mut().set_tempo(p.tempo);
-        self.as_mut().set_time_sig_num(p.numerator as i32);
-        self.as_mut().set_time_sig_den(p.denominator as i32);
+        self.as_mut().show_meter(here);
+        if tempo != self.tempo_json().to_string() {
+            self.as_mut().set_tempo_json(qs(&tempo));
+        }
         self.as_mut().set_key_name(qs(&p.key));
         self.as_mut().set_metronome(p.metronome);
         self.as_mut().set_count_in(p.count_in);
@@ -253,7 +278,10 @@ impl AppController {
     pub fn seek_beats(mut self: Pin<&mut Self>, beats: f64) {
         let beats = beats.max(0.0);
         let st = self.as_mut().st();
-        let Some(meter) = st.session.as_ref().map(|s| s.project.meter()) else { return };
+        if st.session.is_none() {
+            return;
+        }
+        let meter = st.tempo_map.clone();
         if let Some(engine) = &mut st.audio.engine {
             let rate = engine.info().sample_rate;
             engine.seek(meter.beats_to_samples(beats, rate));
@@ -261,6 +289,7 @@ impl AppController {
         let secs = meter.beats_to_secs(beats);
         self.as_mut().set_position_beats(beats);
         self.as_mut().set_bar_text(qs(&meter.bar_beat(beats).to_string()));
+        self.as_mut().show_meter(meter.meter_at(beats));
         self.as_mut().set_position(secs);
         self.set_position_text(qs(&format_time(secs)));
     }
@@ -326,10 +355,8 @@ impl AppController {
         let beats = *self.position_beats();
         // Keep one decimal place, like a hardware tempo display.
         let bpm = (bpm.clamp(Meter::MIN_BPM, Meter::MAX_BPM) * 10.0).round() / 10.0;
-        self.as_mut().edit("Tempo", true, |p| {
-            p.tempo = bpm;
-            true
-        });
+        // With tempo changes, this changes the section the playhead is in.
+        self.as_mut().edit("Tempo", true, |p| p.set_tempo_at(beats, bpm));
         // The playhead stays on the same beat when the tempo changes.
         self.seek_beats(beats);
     }
@@ -340,12 +367,36 @@ impl AppController {
         }
     }
 
-    pub fn set_time_signature(self: Pin<&mut Self>, num: i32, den: i32) {
-        self.edit("Time Signature", true, |p| {
-            p.numerator = num.clamp(1, 32) as u32;
-            p.denominator = if matches!(den, 2 | 4 | 8 | 16) { den as u32 } else { 4 };
-            true
-        });
+    pub fn set_time_signature(mut self: Pin<&mut Self>, num: i32, den: i32) {
+        let beats = *self.position_beats();
+        self.as_mut().edit("Time Signature", true, |p| p.set_signature_at(beats, num.clamp(1, 32) as u32, den.max(1) as u32));
+    }
+
+    // ------------------------------------------------- tempo & signature changes
+
+    /// Adds a tempo change at a position (snapped), or changes the one there.
+    pub fn add_tempo_change(mut self: Pin<&mut Self>, beat: f64, bpm: f64) {
+        let beat = self.snap_beats(beat);
+        self.as_mut().edit("Add Tempo Change", true, |p| p.add_tempo_change(beat, bpm));
+    }
+
+    /// Moves a tempo change and sets its tempo; `done` ends a drag (one undo step).
+    pub fn move_tempo_change(mut self: Pin<&mut Self>, from: f64, to: f64, bpm: f64) {
+        let to = self.snap_beats(to);
+        self.as_mut().edit("Move Tempo Change", true, |p| p.move_tempo_change(from, to, bpm));
+    }
+
+    pub fn remove_tempo_change(mut self: Pin<&mut Self>, beat: f64) {
+        self.as_mut().edit("Remove Tempo Change", true, |p| p.remove_tempo_change(beat));
+    }
+
+    /// Adds a time-signature change at the start of a bar (or changes the one there).
+    pub fn add_signature_change(mut self: Pin<&mut Self>, bar: i32, num: i32, den: i32) {
+        self.as_mut().edit("Time Signature Change", true, |p| p.add_signature_change(bar.max(1) as u32, num.clamp(1, 32) as u32, den.max(1) as u32));
+    }
+
+    pub fn remove_signature_change(mut self: Pin<&mut Self>, bar: i32) {
+        self.as_mut().edit("Remove Time Signature Change", true, |p| p.remove_signature_change(bar.max(1) as u32));
     }
 
     pub fn set_project_key(self: Pin<&mut Self>, key: &QString) {

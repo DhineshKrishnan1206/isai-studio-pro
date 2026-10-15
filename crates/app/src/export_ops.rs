@@ -75,7 +75,7 @@ impl AppController {
         }
         let rate = engine.info().sample_rate;
         let project = &session.project;
-        let meter = project.meter();
+        let meter = project.tempo_map();
         // Exports always use full quality, whatever Eco mode is set to.
         let arrangement = session.arrangement(&st.pool, false);
 
@@ -100,6 +100,7 @@ impl AppController {
             // Master effects (a limiter, say) are left off: stems are for mixing elsewhere.
             let buses = arrangement.buses;
             let bpm = arrangement.bpm;
+            let tempo_changes = arrangement.tempo_changes;
             for (track, play) in project.tracks.iter().zip(arrangement.tracks) {
                 if track.mute || (play.regions.is_empty() && play.notes.is_empty()) {
                     continue;
@@ -107,7 +108,7 @@ impl AppController {
                 let mut solo = play;
                 solo.audible = true; // stems ignore solo
                 let name = format!("{project_name} - {}.{}", safe_name(&track.name), format.extension());
-                jobs.push((Arrangement { tracks: vec![solo], buses: buses.clone(), master: Vec::new(), bpm }, target.join(name)));
+                jobs.push((Arrangement { tracks: vec![solo], buses: buses.clone(), master: Vec::new(), bpm, tempo_changes: tempo_changes.clone() }, target.join(name)));
             }
             if jobs.is_empty() {
                 self.show_problem("Nothing to export: every track is muted or empty");
@@ -153,6 +154,7 @@ impl AppController {
         let thawed = crate::session::Session::new(project, paths.clone());
         let mut all = thawed.arrangement(&st.pool, false);
         let bpm = all.bpm;
+        let tempo_changes = std::mem::take(&mut all.tempo_changes);
         let mut solo = all.tracks.swap_remove(index);
         // Up to the fader: its effects and their automation, but not the fader, pan or sends.
         solo.gain = 1.0;
@@ -160,7 +162,7 @@ impl AppController {
         solo.audible = true;
         solo.sends.clear();
         solo.automation.retain(|l| matches!(l.target, isai_engine::AutoTarget::Param { .. }));
-        let single = Arrangement { tracks: vec![solo], buses: Vec::new(), master: Vec::new(), bpm };
+        let single = Arrangement { tracks: vec![solo], buses: Vec::new(), master: Vec::new(), bpm, tempo_changes };
         let end = content_end(&single, rate);
         if end == 0 {
             self.show_problem("Nothing to freeze: this track has no audio or notes yet");

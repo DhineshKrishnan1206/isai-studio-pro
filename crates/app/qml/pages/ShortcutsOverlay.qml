@@ -46,6 +46,7 @@ Popup {
             ["F9 or X", "Mixer"],
             ["B", "Sound browser"],
             ["I", "Inspector"],
+            ["G", "Tempo & signature lanes"],
             [mod + "K", "Search every command"],
             ["?", "This list"]
         ] },

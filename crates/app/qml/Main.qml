@@ -46,6 +46,7 @@ ApplicationWindow {
     Binding { target: Theme; property: "effects"; value: app.effects }
     Binding { target: Theme; property: "style"; value: app.uiStyle || "studio" }
     Binding { target: Theme; property: "accentChoice"; value: app.accent || "default" }
+    Binding { target: TimeMap; property: "json"; value: app.tempoJson }
 
     // Poll the engine only while something is moving, at the user's frame rate.
     Timer {
@@ -127,7 +128,7 @@ ApplicationWindow {
                 stepTimer.start()
             }
         }
-        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
+        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
             app.newProject("Demo Song", 120, 4, 4, "C major")
         if (scene.startsWith("settings")) {
             settingsDialog.section = parseInt(scene.slice(8) || "0")
@@ -139,6 +140,7 @@ ApplicationWindow {
         if (scene === "master") masterTimer.start()
         if (scene === "stretch") stretchTimer.start()
         if (scene === "cycle") cycleTimer.start()
+        if (scene === "tempo") tempoTimer.start()
         if (scene === "export") Qt.callLater(studio.exportAudio)
         if (scene.startsWith("export:")) exportRunTimer.start()
         if (app.devScreenshot !== "") shotTimer.start()
@@ -348,6 +350,8 @@ ApplicationWindow {
         }
     }
     Timer { id: zoomTimer; interval: 400; onTriggered: studio.zoomForTest(3) }
+    // A tempo change at bar 5 and 3/4 from bar 9, with the lanes shown, playing from bar 8.
+    Timer { id: tempoTimer; interval: 1500; onTriggered: { app.addTempoChange(16, 90); app.addSignatureChange(9, 3, 4); studio.globalShown = true; app.seekBeats(29) } }
     Timer { id: cycleTimer; interval: 1500; onTriggered: { app.splitAtPlayhead(); app.seekBeats(20); app.selectAllRegions(); app.cycleSelection() } }
     Timer {
         id: stretchTimer

@@ -89,6 +89,8 @@ pub mod qobject {
         #[qproperty(QString, history_json)]
         /// Markers: [{ id, beat, name }], sorted by beat.
         #[qproperty(QString, markers_json)]
+        /// The tempo and time-signature map: {"tempos": [[beat, bpm]…], "sigs": [[beat, bar, num, den]…]}.
+        #[qproperty(QString, tempo_json)]
         /// The tuner is open (and listening to the input).
         #[qproperty(bool, tuner_open)]
         /// The browser is playing a preview.
@@ -538,6 +540,19 @@ pub mod qobject {
         fn tap_tempo(self: Pin<&mut Self>);
         #[qinvokable]
         fn set_time_signature(self: Pin<&mut Self>, num: i32, den: i32);
+        /// Adds a tempo change at a position (snapped), or changes the one there.
+        #[qinvokable]
+        fn add_tempo_change(self: Pin<&mut Self>, beat: f64, bpm: f64);
+        /// Moves the tempo change at `from` to `to` (snapped) with a new tempo.
+        #[qinvokable]
+        fn move_tempo_change(self: Pin<&mut Self>, from: f64, to: f64, bpm: f64);
+        #[qinvokable]
+        fn remove_tempo_change(self: Pin<&mut Self>, beat: f64);
+        /// Adds a time-signature change at the start of a bar (bar 1: the opening one).
+        #[qinvokable]
+        fn add_signature_change(self: Pin<&mut Self>, bar: i32, num: i32, den: i32);
+        #[qinvokable]
+        fn remove_signature_change(self: Pin<&mut Self>, bar: i32);
         #[qinvokable]
         fn set_project_key(self: Pin<&mut Self>, key: &QString);
         #[qinvokable]
@@ -588,6 +603,8 @@ const TONE_TICK: Duration = Duration::from_millis(1200);
 #[derive(Default)]
 pub(crate) struct State {
     pub settings: Settings,
+    /// The open song's tempo map, kept for turning playhead samples into beats.
+    pub tempo_map: isai_engine::TempoMap,
     hardware: Hardware,
     bench: Option<mpsc::Receiver<u32>>,
     pub audio: Audio,
@@ -694,6 +711,7 @@ pub struct AppControllerRust {
     redo_label: QString,
     history_json: QString,
     markers_json: QString,
+    tempo_json: QString,
     tuner_open: bool,
     previewing: bool,
     recent_paths: QStringList,
@@ -1143,20 +1161,26 @@ impl qobject::AppController {
         let crackling = suggest && !st.crackle_dismissed && st.crackles >= CRACKLE_THRESHOLD;
         let counting_in = engine.counting_in();
         let rate = f64::from(engine.info().sample_rate);
-        let meter = st.session.as_ref().map(|s| s.project.meter());
+        // Where the playhead is, in beats and bars, and the tempo and signature there.
+        let here = st.session.as_ref().map(|_| {
+            let secs = position as f64 / rate;
+            let beats = st.tempo_map.secs_to_beats(secs);
+            (secs, beats, st.tempo_map.bar_beat(beats).to_string(), st.tempo_map.has_changes().then(|| st.tempo_map.meter_at(beats)))
+        });
 
         self.as_mut().set_playing(playing);
         self.as_mut().set_cpu_load(load);
         if counting_in != *self.counting_in() {
             self.as_mut().set_counting_in(counting_in);
         }
-        if let Some(m) = meter {
-            let secs = position as f64 / rate;
-            let beats = m.secs_to_beats(secs);
+        if let Some((secs, beats, bar, local)) = here {
             self.as_mut().set_position(secs);
             self.as_mut().set_position_text(qs(&format_time(secs)));
             self.as_mut().set_position_beats(beats);
-            self.as_mut().set_bar_text(qs(&m.bar_beat(beats).to_string()));
+            self.as_mut().set_bar_text(qs(&bar));
+            if let Some(m) = local {
+                self.as_mut().show_meter(m);
+            }
         }
         if let Some(((l, r), clipped)) = levels {
             self.as_mut().set_meter_l(meter_scale(l));

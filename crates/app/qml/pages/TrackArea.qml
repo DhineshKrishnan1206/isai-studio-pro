@@ -20,6 +20,9 @@ Rectangle {
     property bool browserShown: false
     signal shortcutsRequested()
     property bool tunerShown: false
+    /// The tempo and signature lanes under the markers (G).
+    property bool globalShown: false
+    signal globalToggled()
     property bool pianoRollShown: false
     /// A MIDI region was double-clicked (or created): open the piano roll.
     signal editRequested(int regionId)
@@ -54,7 +57,6 @@ Rectangle {
 
     readonly property real timelineX: headerWidth + pad * 2
     readonly property real timelineWidth: Math.max(100, width - timelineX - pad)
-    readonly property real barBeats: Math.max(1, app.timeSigNum)
 
     // Zoom: 1 fits the whole timeline; larger zooms in.
     property real zoom: 1
@@ -256,6 +258,13 @@ Rectangle {
             }
             IconButton {
                 implicitWidth: 28; implicitHeight: 26; iconSize: 15
+                glyph: Icons.metronome
+                active: area.globalShown
+                tip: "Tempo and time-signature changes over the song (G)"
+                onClicked: area.globalToggled()
+            }
+            IconButton {
+                implicitWidth: 28; implicitHeight: 26; iconSize: 15
                 glyph: Icons.gauge
                 active: area.tunerShown
                 tip: "Tuner: tune a guitar, bass or voice from your input"
@@ -336,6 +345,7 @@ Rectangle {
             pxPerBeat: area.pxPerBeat
             viewStart: lanes.contentX
             viewWidth: rulerView.width
+            globalShown: area.globalShown
         }
     }
 
@@ -488,18 +498,35 @@ Rectangle {
             id: grid
             width: lanes.contentWidth
             height: lanes.contentHeight
-            readonly property real step: area.pxPerBeat >= 10 ? 1 : area.barBeats * Math.max(1, Math.ceil(6 / (area.barBeats * area.pxPerBeat)))
-            readonly property int first: Math.floor(lanes.contentX / area.pxPerBeat / step)
+            // Bars in view (they change length with the time signature); beat
+            // lines inside them when there's room, every Nth bar when zoomed far out.
+            readonly property var bars: TimeMap.barsBetween(lanes.contentX / area.pxPerBeat, (lanes.contentX + lanes.width) / area.pxPerBeat, 800)
+            readonly property real barPx: TimeMap.barLenAt(lanes.contentX / area.pxPerBeat) * area.pxPerBeat
+            readonly property int every: barPx >= 6 ? 1 : Math.pow(2, Math.ceil(Math.log2(6 / Math.max(0.1, barPx))))
             Repeater {
-                model: Math.ceil(lanes.width / area.pxPerBeat / grid.step) + 2
-                delegate: Rectangle {
-                    required property int index
-                    readonly property real beat: (grid.first + index) * grid.step
-                    readonly property bool isBar: Math.abs(beat % area.barBeats) < 1e-6
-                    x: beat * area.pxPerBeat
-                    width: 1
+                model: grid.bars
+                delegate: Item {
+                    id: barLine
+                    required property var modelData
+                    readonly property real beatPx: modelData.unit * area.pxPerBeat
+                    x: modelData.beat * area.pxPerBeat
                     height: grid.height
-                    color: isBar ? Theme.tint(Theme.lineStrong, 0.55) : Theme.tint(Theme.line, 0.6)
+                    Rectangle {
+                        visible: (barLine.modelData.bar - 1) % grid.every === 0
+                        width: 1
+                        height: parent.height
+                        color: Theme.tint(Theme.lineStrong, 0.55)
+                    }
+                    Repeater {
+                        model: barLine.beatPx >= 10 ? barLine.modelData.num - 1 : 0
+                        delegate: Rectangle {
+                            required property int index
+                            x: (index + 1) * barLine.beatPx
+                            width: 1
+                            height: barLine.height
+                            color: Theme.tint(Theme.line, 0.6)
+                        }
+                    }
                 }
             }
             // Marker lines down through the tracks.
@@ -544,8 +571,9 @@ Rectangle {
                 const row = area.rowAt(m.y)
                 const t = area.tracks[row]
                 if (!t || !t.instrument || m.y >= area.rowTops[row] + area.laneHeight) return
-                const bar = area.barBeats
-                const id = area.app.addMidiRegion(t.id, Math.floor(m.x / area.pxPerBeat / bar) * bar, bar)
+                // A one-bar region, from the start of the bar under the mouse.
+                const beat = m.x / area.pxPerBeat
+                const id = area.app.addMidiRegion(t.id, TimeMap.barStart(TimeMap.barAt(beat)), TimeMap.barLenAt(beat))
                 if (id >= 0) area.editRequested(id)
             }
             onPositionChanged: m => {

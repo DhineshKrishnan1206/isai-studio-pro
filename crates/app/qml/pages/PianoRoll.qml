@@ -44,7 +44,8 @@ Item {
     readonly property var midi: region ? region.midi : null
     readonly property var notes: midi ? midi.notes : []
     readonly property color tint: track ? Theme.trackColor(track.color) : Theme.accent
-    readonly property real barBeats: Math.max(1, app.timeSigNum)
+    /// The bar length where the region starts (bars can change length along the song).
+    readonly property real barBeats: TimeMap.barLenAt(region ? region.start : 0)
 
     property real dockHeight: 420
     readonly property int margin: 12
@@ -560,7 +561,7 @@ Item {
                         delegate: Rectangle {
                             required property int index
                             readonly property int beat: Math.floor(grid.contentX / roll.pxPerBeat) + index
-                            readonly property bool bar: beat % roll.barBeats === 0
+                            readonly property bool bar: TimeMap.isBarLine((roll.region ? roll.region.start : 0) + beat - (roll.midi ? roll.midi.offset : 0))
                             x: beat * roll.pxPerBeat
                             width: 1
                             height: grid.contentHeight

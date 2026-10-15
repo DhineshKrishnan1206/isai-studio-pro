@@ -24,7 +24,7 @@ use crate::effects::{Effect, EffectBank};
 use crate::instruments::{Instrument, InstrumentBank, LiveNote, PlayedNote};
 use crate::clip::Clip;
 use crate::mixer::{BLOCK, Block, Mixer, SILENT};
-use crate::time::Meter;
+use crate::time::{Meter, TempoMap};
 
 pub(crate) enum Command {
     /// Start playback, first counting in this many bars on the metronome.
@@ -33,7 +33,8 @@ pub(crate) enum Command {
     Seek(u64),
     /// Loop between two timeline positions (in samples) while `on`.
     SetCycle { on: bool, start: u64, end: u64 },
-    SetMeter(Meter),
+    /// The song's tempo and time signatures (built on the UI thread).
+    SetTempo(Box<TempoMap>),
     SetMetronome { on: bool, volume: f32 },
     SetVolume(f32),
     SetArrangement(Arc<Arrangement>),
@@ -66,6 +67,7 @@ pub(crate) enum Garbage {
     Effect(#[allow(dead_code)] Box<Effect>, #[allow(dead_code)] Option<Arc<crate::effects::Meters>>),
     Instrument(#[allow(dead_code)] Box<Instrument>),
     Clip(#[allow(dead_code)] Arc<Clip>),
+    Tempo(#[allow(dead_code)] Box<TempoMap>),
 }
 
 /// Not yet recording.
@@ -221,10 +223,14 @@ pub(crate) struct Processor {
     playing: bool,
     pos: usize,
 
+    /// The tempo map, and the meter where playback started (for the count-in).
+    tempo: Box<TempoMap>,
     meter: Meter,
     samples_per_beat: f64,
-    /// Index of the last beat that clicked, so each beat clicks exactly once.
-    last_beat: i64,
+    /// The next metronome click: its timeline sample, its beat, and whether it starts a bar.
+    next_click: usize,
+    click_beat: f64,
+    click_down: bool,
     metronome: bool,
     click_volume: f32,
     click: Click,
@@ -300,9 +306,12 @@ impl Processor {
             mix_r: vec![0.0; BLOCK],
             playing: false,
             pos: 0,
+            tempo: Box::new(TempoMap::constant(meter)),
             meter,
             samples_per_beat,
-            last_beat: -1,
+            next_click: 0,
+            click_beat: 0.0,
+            click_down: true,
             metronome: false,
             click_volume: 0.8,
             click: Click::new(sample_rate),
@@ -420,10 +429,21 @@ impl Processor {
         }
     }
 
-    /// The beat index just before `pos`, so a beat starting exactly at `pos` still clicks.
-    fn beat_before(&self, pos: usize) -> i64 {
-        let b = pos as f64 / self.samples_per_beat;
-        if b.fract() < 1e-9 { b.floor() as i64 - 1 } else { b.floor() as i64 }
+    /// Finds the first metronome beat at or after the playhead.
+    fn schedule_click(&mut self) {
+        let rate = self.sample_rate as u32;
+        let beat = self.tempo.samples_to_beats(self.pos as u64, rate);
+        let (b, down) = self.tempo.next_click(beat);
+        self.click_beat = b;
+        self.click_down = down;
+        self.next_click = self.tempo.beats_to_samples(b, rate) as usize;
+    }
+
+    /// The tempo and time signature at the playhead, for the count-in.
+    fn local_meter(&mut self) {
+        let rate = self.sample_rate as u32;
+        self.meter = self.tempo.meter_at(self.tempo.samples_to_beats(self.pos as u64, rate));
+        self.samples_per_beat = self.meter.samples_per_beat(rate);
     }
 
     fn drain_commands(&mut self) {
@@ -434,7 +454,8 @@ impl Processor {
                         continue;
                     }
                     self.playing = true;
-                    self.last_beat = self.beat_before(self.pos);
+                    self.local_meter();
+                    self.schedule_click();
                     let bar = self.samples_per_beat * f64::from(self.meter.numerator.max(1));
                     self.count_in_left = (bar * f64::from(count_in_bars)).round() as usize;
                     self.count_in_pos = 0;
@@ -445,21 +466,23 @@ impl Processor {
                 }
                 Command::Seek(frame) => {
                     self.pos = frame as usize;
-                    self.last_beat = self.beat_before(self.pos);
+                    self.schedule_click();
                 }
                 Command::SetCycle { on, start, end } => {
                     self.cycle = on && end > start;
                     self.cycle_start = start as usize;
                     self.cycle_end = end as usize;
                 }
-                Command::SetMeter(meter) => {
-                    self.meter = meter;
-                    self.samples_per_beat = meter.samples_per_beat(self.sample_rate as u32);
-                    self.last_beat = self.beat_before(self.pos);
+                Command::SetTempo(map) => {
+                    let old = std::mem::replace(&mut self.tempo, map);
+                    let _ = self.garbage.push(Garbage::Tempo(old));
+                    self.local_meter();
+                    self.schedule_click();
                 }
                 Command::SetMetronome { on, volume } => {
                     self.metronome = on;
                     self.click_volume = volume.clamp(0.0, 1.5);
+                    self.schedule_click();
                 }
                 Command::SetVolume(v) => self.volume = v,
                 Command::SetArrangement(next) => {
@@ -588,17 +611,19 @@ impl Processor {
             self.count_in_pos += 1;
             self.count_in_left -= 1;
             if self.count_in_left == 0 {
-                self.last_beat = self.beat_before(self.pos);
+                self.schedule_click();
             }
         } else if self.fade > 0.0 {
             mix_pos = self.pos as u64;
             mix_fade = self.fade;
-            if self.playing && self.metronome {
-                let beat = (self.pos as f64 / self.samples_per_beat).floor() as i64;
-                if beat > self.last_beat {
-                    self.last_beat = beat;
-                    self.click(beat.rem_euclid(num) == 0);
-                }
+            if self.playing && self.metronome && self.pos >= self.next_click {
+                self.click(self.click_down);
+                // The next beat, from the map (a tempo or signature change may come first).
+                let rate = self.sample_rate as u32;
+                let (b, down) = self.tempo.next_click(self.click_beat + 1e-4);
+                self.click_beat = b;
+                self.click_down = down;
+                self.next_click = self.tempo.beats_to_samples(b, rate) as usize;
             }
             // Record while the transport runs (after any count-in).
             if self.recording && self.playing {
@@ -617,7 +642,7 @@ impl Processor {
             // Cycle is ignored while recording, so a take is one continuous file.
             if self.cycle && !self.recording && self.pos >= self.cycle_end {
                 self.pos = self.cycle_start;
-                self.last_beat = self.beat_before(self.pos);
+                self.schedule_click();
             }
         }
 
@@ -644,8 +669,10 @@ impl Processor {
         if let Some(clip) = &self.preview {
             // In time: wait for the start of a bar while playing.
             if self.preview_wait {
-                let bar = self.samples_per_beat * f64::from(self.meter.numerator.max(1));
-                let at_bar = (self.pos as f64 % bar) < 1.0;
+                let rate = self.sample_rate as u32;
+                let beat = self.tempo.samples_to_beats(self.pos as u64, rate);
+                let bar = self.tempo.bar_start(self.tempo.bar_at(beat + 1e-6));
+                let at_bar = self.tempo.beats_to_samples(bar, rate) == self.pos as u64;
                 if !self.playing || self.count_in_left > 0 || at_bar {
                     self.preview_wait = false;
                 }
@@ -797,11 +824,30 @@ mod tests {
     fn metronome_follows_the_time_signature() {
         let (mut p, mut tx, _g, _shared) = setup(0);
         // 3/4 at 120: beats of 500 samples, bars of 1500.
-        let _ = tx.push(Command::SetMeter(Meter { bpm: 120.0, numerator: 3, denominator: 4 }));
+        let _ = tx.push(Command::SetTempo(Box::new(TempoMap::constant(Meter { bpm: 120.0, numerator: 3, denominator: 4 }))));
         let _ = tx.push(Command::SetMetronome { on: true, volume: 1.0 });
         play(&mut tx);
         run(&mut p, 3000);
         assert_eq!((p.clicks, p.accents), (6, 2));
+    }
+
+    #[test]
+    fn metronome_follows_tempo_and_signature_changes() {
+        use crate::time::{SigChange, TempoPoint};
+        let (mut p, mut tx, _g, _shared) = setup(0);
+        // setup runs at 1000 Hz: at 120 BPM a beat is 500 samples. One bar of 4/4
+        // (2000 samples), then 60 BPM (1000-sample beats) and 3/4 from bar 2.
+        let map = TempoMap::new(
+            Meter::default(),
+            &[TempoPoint { beat: 4.0, bpm: 60.0 }],
+            &[SigChange { bar: 2, numerator: 3, denominator: 4 }],
+        );
+        let _ = tx.push(Command::SetTempo(Box::new(map)));
+        let _ = tx.push(Command::SetMetronome { on: true, volume: 1.0 });
+        play(&mut tx);
+        // 2000 samples of 4/4 (4 clicks) + 6000 of 3/4 at 60 (two bars, 6 clicks).
+        run(&mut p, 8000);
+        assert_eq!((p.clicks, p.accents), (10, 3));
     }
 
     #[test]

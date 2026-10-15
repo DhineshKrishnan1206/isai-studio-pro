@@ -125,8 +125,13 @@ impl Engine {
     pub fn set_cycle(&mut self, on: bool, start: u64, end: u64) {
         self.send(Command::SetCycle { on, start, end });
     }
+    /// One tempo and time signature for the whole song.
     pub fn set_meter(&mut self, meter: Meter) {
-        self.send(Command::SetMeter(meter));
+        self.set_tempo_map(crate::time::TempoMap::constant(meter));
+    }
+    /// The song's tempo and time-signature changes.
+    pub fn set_tempo_map(&mut self, map: crate::time::TempoMap) {
+        self.send(Command::SetTempo(Box::new(map)));
     }
     pub fn set_metronome(&mut self, on: bool, volume: f32) {
         self.send(Command::SetMetronome { on, volume });

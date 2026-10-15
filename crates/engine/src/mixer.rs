@@ -128,7 +128,9 @@ impl Mixer {
         out_l: &mut [f32],
         out_r: &mut [f32],
     ) {
-        let ctx = Context { sample_rate, bpm: arrangement.bpm };
+        // Tempo-synced effects follow the tempo where this block plays.
+        let bpm = block.positions.iter().find(|&&p| p != SILENT).map_or(arrangement.bpm, |&p| arrangement.bpm_at(p));
+        let ctx = Context { sample_rate, bpm };
         let positions = block.positions;
         let n = positions.len().min(BLOCK).min(out_l.len()).min(out_r.len());
         out_l[..n].fill(0.0);

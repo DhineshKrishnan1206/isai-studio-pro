@@ -24,9 +24,12 @@ Item {
     property bool browserShown: false
     /// The Inspector: the selected track's channel, down the left side (I).
     property bool inspectorShown: true
+    /// The tempo and time-signature lanes on the ruler (G).
+    property bool globalShown: false
     Settings {
         category: "studio"
         property alias inspectorShown: studio.inspectorShown
+        property alias globalShown: studio.globalShown
     }
     onEditorShownChanged: if (editorShown) mixerShown = false
     function openEditor(regionId) { editorRegion = regionId; editorShown = true }
@@ -70,8 +73,8 @@ Item {
         const pos = a.positionBeats
         const here = track.regions.find(x => x.midi && x.start <= pos && pos < x.start + x.beats)
         if (here) { openEditor(here.id); return }
-        const bar = Math.max(1, a.timeSigNum)
-        const id = a.addMidiRegion(track.id, Math.floor(pos / bar) * bar, bar * 4)
+        const bar = TimeMap.barAt(pos)
+        const id = a.addMidiRegion(track.id, TimeMap.barStart(bar), TimeMap.barStart(bar + 4) - TimeMap.barStart(bar))
         if (id >= 0) openEditor(id)
     }
     function openEffect(id) { mixerPanel.openInsert(id) }
@@ -327,6 +330,8 @@ Item {
                     onImportRequested: studio.importAudio()
                     onMixerToggled: studio.mixerShown = !studio.mixerShown
                     tunerShown: studio.tunerShown
+                globalShown: studio.globalShown
+                onGlobalToggled: studio.globalShown = !studio.globalShown
                     onTunerToggled: studio.tunerShown = !studio.tunerShown
                     onShortcutsRequested: shortcuts.open()
                     browserShown: studio.browserShown
@@ -485,7 +490,7 @@ Item {
         const bar = q.match(/^(?:bar|go to bar|goto)?\s*(\d{1,4})$/i)
         if (bar && +bar[1] >= 1)
             list.push({ always: true, section: "Suggested", glyph: Icons.skipBack,
-                        title: "Go to bar " + bar[1], action: () => a.seekBeats((+bar[1] - 1) * a.timeSigNum) })
+                        title: "Go to bar " + bar[1], action: () => a.seekBeats(TimeMap.barStart(+bar[1])) })
         const sig = q.match(/^(\d{1,2})\s*\/\s*(2|4|8|16)$/)
         if (sig)
             list.push({ always: true, section: "Suggested", glyph: Icons.musicNote,
@@ -538,6 +543,7 @@ Item {
         add("View", studio.mixerShown ? "Hide mixer" : "Show mixer", () => studio.mixerShown = !studio.mixerShown, "F9", Icons.sliders, "faders channel strips volume")
         add("View", studio.editorShown ? "Hide piano roll" : "Piano roll", () => studio.togglePianoRoll(), "F7", Icons.pianoKeys, "midi notes editor pattern")
         add("View", "Playlist (just the tracks)", () => studio.showPlaylist(), "F5", Icons.waveform, "arrangement tracks")
+        add("View", studio.globalShown ? "Hide tempo & signature lanes" : "Tempo & signature changes", () => studio.globalShown = !studio.globalShown, "G", Icons.metronome, "tempo track change bpm ritardando accelerando time signature global tracks")
         add("View", studio.inspectorShown ? "Hide inspector" : "Show inspector", () => studio.inspectorShown = !studio.inspectorShown, "I", Icons.sliders, "channel track details fader effects")
         add("Tracks", "New piano track", () => { a.addInstrumentTrack("piano"); studio.openInstrument(a.selectedTrack) }, "", Icons.pianoKeys, "piano instrument midi keys")
         add("Tracks", "New synth track", () => { a.addInstrumentTrack("synth"); studio.openInstrument(a.selectedTrack) }, "", Icons.waveform, "synth instrument midi keys bass lead pad")
@@ -635,6 +641,7 @@ Item {
     Shortcut { sequence: "Ctrl+J"; enabled: studio.keysOn; onActivated: studio.app.joinSelected() }
     Shortcut { sequence: "Ctrl+U"; enabled: studio.keysOn; onActivated: studio.app.cycleSelection() }
     Shortcut { sequence: "I"; enabled: studio.keysOn; onActivated: studio.inspectorShown = !studio.inspectorShown }
+    Shortcut { sequence: "G"; enabled: studio.keysOn; onActivated: studio.globalShown = !studio.globalShown }
     Shortcut { sequence: "Ctrl+Alt+Z"; enabled: studio.keysOn; onActivated: arrangement.openHistory() }
     Shortcut { sequences: ["?", "Shift+/"]; enabled: studio.keysOn; onActivated: shortcuts.opened ? shortcuts.close() : shortcuts.open() }
     // These also work from the project chooser.
