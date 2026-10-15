@@ -25,7 +25,12 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | cc | 1.8.0 | MIT OR Apache-2.0 | https://github.com/rust-lang/cc-rs |
 | cesu8 | 1.1.0 | Apache-2.0/MIT | https://github.com/emk/cesu8-rs |
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 | https://github.com/rust-lang/cfg-if |
+| clack-common | 0.2.0 | MIT OR Apache-2.0 | https://github.com/prokopyl/clack |
+| clack-extensions | 0.2.0 | MIT OR Apache-2.0 | https://github.com/prokopyl/clack |
+| clack-host | 0.2.0 | MIT OR Apache-2.0 | https://github.com/prokopyl/clack |
+| clack-plugin | 0.2.0 | MIT OR Apache-2.0 | https://github.com/prokopyl/clack |
 | clang-format | 0.3.0 | MIT OR Apache-2.0 | https://github.com/KDAB/clang-format-rs/ |
+| clap-sys | 0.5.0 | MIT/Apache-2.0 | https://github.com/micahrj/clap-sys |
 | codespan-reporting | 0.11.1 | Apache-2.0 | https://github.com/brendanzab/codespan |
 | codespan-reporting | 0.13.1 | Apache-2.0 | https://github.com/brendanzab/codespan |
 | com-scrape-types | 0.1.1 | MIT OR Apache-2.0 | https://github.com/coupler-rs/vst3-rs |

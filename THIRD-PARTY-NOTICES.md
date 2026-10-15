@@ -36,6 +36,7 @@ licences. The notable ones:
 | [rtrb](https://github.com/mgeier/rtrb) | Lock-free queues for the audio thread | MIT OR Apache-2.0 |
 | [vst3-host](https://github.com/HelgeSverre/rust-vst3-host) | Hosting VST3 plugins | MIT |
 | [vst3](https://github.com/coupler-rs/vst3-rs) | VST3 API bindings (the VST3 SDK is MIT-licensed) | MIT OR Apache-2.0 |
+| [clack](https://github.com/prokopyl/clack) (clack-host, clack-extensions) | Hosting CLAP plugins | MIT OR Apache-2.0 |
 
 The full list, with versions and sources, is in
 [licenses/RUST-LIBRARIES.md](licenses/RUST-LIBRARIES.md). Symphonia's MPL-2.0

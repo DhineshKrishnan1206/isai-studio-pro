@@ -282,7 +282,7 @@ work, crash recovery, and window dragging. Screenshots look right.
   changes that section (`set_tempo_at`, `set_signature_at`).
 - Dev scene `tempo`.
 
-## Third-party plugins (VST3 now; CLAP and AU next)
+## Third-party plugins (VST3 and CLAP; AU next)
 - **engine::plugin**: `ExternalPlugin` trait (process a block with timed
   `NoteEvent`s, `wait` false on the audio thread = `try_lock`, skip the block if
   busy). `PluginEffect` and `PluginInstrument` (turns song notes and live notes
@@ -304,4 +304,13 @@ work, crash recovery, and window dragging. Screenshots look right.
 - **UI**: plugin effects at the end of each add-effect menu, plugin instruments
   in the new-track menu; clicking a plugin insert or instrument opens its window.
 - Dev scene `plugin` (needs Pigments or any instrument plugin installed).
-- Not yet: plugin parameter automation, latency compensation, CLAP, AU.
+- **CLAP** (`plugins/src/clap.rs`, clack-host): scan of the standard folders and
+  `CLAP_PATH`; the started audio processor lives in `Core` (Mutex<Option<Audio>>,
+  preallocated ports/buffers/events); `ClapPlugin` (UI thread) owns the instance,
+  state via the state extension, GUI embedded in our own NSWindow on macOS or the
+  plugin's floating window elsewhere (untested: needs a real CLAP plugin with a GUI).
+  Drop takes the processor back and deactivates on the main thread.
+- Test plugin: `cargo build -p isai-plugins --example test_clap`, then
+  `cargo run -p isai-plugins --example probe -- --clap target/debug/examples/libtest_clap.dylib`;
+  in the app: `CLAP_PATH=<folder with it renamed .clap> ISAI_SCENE="plugin:Isai Test Tone"`.
+- Not yet: plugin parameter automation, latency compensation, transport info for CLAP, AU.

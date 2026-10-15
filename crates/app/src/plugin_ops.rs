@@ -10,7 +10,7 @@ use std::sync::mpsc;
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::QString;
 use isai_engine::arrangement::Arrangement;
-use isai_plugins::{Format, PluginInfo, Vst3Plugin};
+use isai_plugins::{Format, LoadedPlugin, PluginInfo};
 use isai_project::{Chain, PluginSlot, Project};
 
 use crate::controller::qobject;
@@ -22,7 +22,7 @@ pub struct Plugins {
     pub catalog: Vec<PluginInfo>,
     scan: Option<mpsc::Receiver<Vec<PluginInfo>>>,
     /// Loaded plugins, by insert or instrument id.
-    loaded: HashMap<u64, Vst3Plugin>,
+    loaded: HashMap<u64, LoadedPlugin>,
     /// Ones that failed to load (with why), so they aren't retried on every edit.
     failed: HashMap<u64, String>,
     /// The sample rate they were loaded at.
@@ -98,7 +98,7 @@ impl Plugins {
     pub fn slot(&self, index: usize) -> Option<PluginSlot> {
         let p = self.catalog.get(index)?;
         Some(PluginSlot {
-            format: "vst3".into(),
+            format: p.format.key().into(),
             path: p.path.display().to_string(),
             uid: p.uid.clone(),
             name: p.name.clone(),
@@ -112,13 +112,13 @@ impl Plugins {
     pub fn ensure(&mut self, project: &Project, rate: f64) -> Vec<String> {
         if (self.rate - rate).abs() > 0.5 {
             // A new sample rate: reload everything at it (keeping their current sound).
-            let states: Vec<(u64, Vec<u8>)> = self.loaded.iter().filter_map(|(id, p)| Some((*id, p.save_state()?))).collect();
+            let states: Vec<(u64, Vec<u8>)> = self.loaded.iter_mut().filter_map(|(id, p)| Some((*id, p.save_state()?))).collect();
             self.loaded.clear();
             self.failed.clear();
             self.rate = rate;
             let problems = self.ensure(project, rate);
             for (id, state) in states {
-                if let Some(p) = self.loaded.get(&id) {
+                if let Some(p) = self.loaded.get_mut(&id) {
                     let _ = p.load_state(&state);
                 }
             }
@@ -133,8 +133,14 @@ impl Plugins {
             if self.loaded.contains_key(&id) || self.failed.contains_key(&id) {
                 continue;
             }
+            let Some(format) = Format::from_key(&slot.format) else {
+                let why = format!("{} uses a plugin format Isai doesn't know", slot.name);
+                problems.push(why.clone());
+                self.failed.insert(id, why);
+                continue;
+            };
             let info = PluginInfo {
-                format: Format::Vst3,
+                format,
                 path: PathBuf::from(&slot.path),
                 uid: slot.uid.clone(),
                 name: slot.name.clone(),
@@ -150,7 +156,7 @@ impl Plugins {
                 continue;
             }
             match isai_plugins::load(&info, rate) {
-                Ok(plugin) => {
+                Ok(mut plugin) => {
                     if let Some(bytes) = slot.state.as_deref().and_then(isai_plugins::decode_state) {
                         let _ = plugin.load_state(&bytes);
                     }
@@ -168,7 +174,7 @@ impl Plugins {
 
     /// Gives each plugin insert and instrument in `arrangement` its loaded plugin.
     pub fn attach(&self, arrangement: &mut Arrangement) {
-        let handle = |id: u64| self.loaded.get(&id).map(Vst3Plugin::handle);
+        let handle = |id: u64| self.loaded.get(&id).map(LoadedPlugin::handle);
         let inserts = arrangement
             .tracks
             .iter_mut()
@@ -185,8 +191,8 @@ impl Plugins {
     }
 
     /// Copies every loaded plugin's state into the song, ready to save.
-    pub fn store_states(&self, project: &mut Project) {
-        for (id, plugin) in &self.loaded {
+    pub fn store_states(&mut self, project: &mut Project) {
+        for (id, plugin) in &mut self.loaded {
             if let Some(state) = plugin.save_state() {
                 project.set_plugin_state(*id, isai_plugins::encode_state(&state));
             }

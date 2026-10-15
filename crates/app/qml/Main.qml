@@ -128,7 +128,7 @@ ApplicationWindow {
                 stepTimer.start()
             }
         }
-        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene === "plugin" || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
+        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene.startsWith("plugin") || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
             app.newProject("Demo Song", 120, 4, 4, "C major")
         if (scene.startsWith("settings")) {
             settingsDialog.section = parseInt(scene.slice(8) || "0")
@@ -141,7 +141,7 @@ ApplicationWindow {
         if (scene === "stretch") stretchTimer.start()
         if (scene === "cycle") cycleTimer.start()
         if (scene === "tempo") tempoTimer.start()
-        if (scene === "plugin") pluginTimer.start()
+        if (scene.startsWith("plugin")) pluginTimer.start()
         if (scene === "export") Qt.callLater(studio.exportAudio)
         if (scene.startsWith("export:")) exportRunTimer.start()
         if (app.devScreenshot !== "") shotTimer.start()
@@ -360,7 +360,9 @@ ApplicationWindow {
             if (app.pluginScanning) return
             stop()
             const list = JSON.parse(app.pluginsJson || "[]")
-            const p = list.find(x => x.name === "Pigments") || list.find(x => x.instrument)
+            // "plugin:<name>" picks a plugin by name; otherwise Pigments or any instrument.
+            const want = app.devScene.split(":")[1] || "Pigments"
+            const p = list.find(x => x.name === want) || list.find(x => x.instrument)
             if (!p) return
             const track = app.addPluginTrack(p.index)
             const region = app.addMidiRegion(track, 0, 8)
@@ -399,7 +401,7 @@ ApplicationWindow {
     }
     Timer {
         id: shotTimer
-        interval: app.devScene === "midirec" ? 5000 : app.devScene === "plugin" ? 30000 : 2800
+        interval: app.devScene === "midirec" ? 5000 : app.devScene.startsWith("plugin") ? 30000 : 2800
         onTriggered: {
             root.grabToImage(result => {
                 result.saveToFile(app.devScreenshot)

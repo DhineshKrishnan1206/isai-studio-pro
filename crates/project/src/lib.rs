@@ -157,7 +157,7 @@ pub struct Note {
 /// or as an instrument, and its saved state.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct PluginSlot {
-    /// "vst3".
+    /// "vst3" or "clap".
     pub format: String,
     /// Where the plugin is installed.
     pub path: String,

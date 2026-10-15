@@ -180,7 +180,7 @@ its own open-source versions rather than copying products.
 
 | Feature | Source | Isai |
 |---|---|---|
-| Third-party plugins: CLAP, VST3, AU | L/F | 🟡 (VST3: instruments and effects, their windows, saved in songs; CLAP and AU next) |
+| Third-party plugins: CLAP, VST3, AU | L/F | 🟡 (VST3 and CLAP: instruments and effects, their windows, saved in songs; AU next) |
 | Plugin manager / scanner | L/F | 🟡 (scan in a separate process; rescan from the menus) |
 | MIDI controller learn (map knobs to controls) | L/F | ⬜ |
 | Control surface support | L/F | ⬜ |
