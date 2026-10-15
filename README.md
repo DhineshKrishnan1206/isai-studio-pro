@@ -31,8 +31,8 @@ built so that anyone, including people on old or low-spec computers, can make mu
 
 **Instruments**
 - **Isai Synth**: two oscillators, sub, noise, drive, filter, two envelopes, LFO and unison
-- **Isai Piano**: nine tones, including electric piano, Wurli and Clav
-- **Isai Drums**: synthesised 808, 909, Acoustic, Lo-fi and Trap kits with a step sequencer
+- **Isai Piano**: nine tones, including electric, reed and funk keys
+- **Isai Drums**: synthesised 808, Club, Acoustic, Lo-fi and Trap kits with a step sequencer
 - **Isai Sampler**: play a sound across the keys, or slice a loop evenly or on its beats
 
 **Piano roll**
@@ -155,4 +155,7 @@ The Meadow colour palette comes from a palette shared by the artist absentmirror
 
 ## License
 
-[GPL-3.0-or-later](LICENSE)
+[GPL-3.0-or-later](LICENSE). Isai is built on Qt (LGPL-3.0), open-source Rust
+libraries and open fonts; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+for every one and its licence. Logic Pro, FL Studio and other products named
+here are trademarks of their owners; Isai is not affiliated with them.

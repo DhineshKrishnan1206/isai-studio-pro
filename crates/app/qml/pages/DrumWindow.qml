@@ -424,7 +424,7 @@ Item {
             width: parent.width - 28
             spacing: 4
             Repeater {
-                model: ["808", "909", "Acoustic", "Lo-fi", "Trap"]
+                model: ["808", "Club", "Acoustic", "Lo-fi", "Trap"]
                 delegate: TextButton {
                     required property string modelData
                     required property int index

@@ -10,12 +10,15 @@
 <meta property="og:image" content="img/art-field.jpg">
 <meta name="theme-color" content="#00321E">
 <link rel="icon" href="img/mark-ink.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/thin/style.css">
+<!-- Everything is hosted here: no requests to Google, CDNs or trackers. -->
+<link rel="stylesheet" href="vendor/phosphor/regular/style.css">
+<link rel="stylesheet" href="vendor/phosphor/thin/style.css">
 <style>
+/* Fonts (SIL Open Font License; licences in fonts/). */
+@font-face { font-family: "Young Serif"; src: url("fonts/YoungSerif-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: Inter; src: url("fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400 500; font-display: swap; }
+@font-face { font-family: Inter; src: url("fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600 700; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Medium.ttf") format("truetype"); font-display: swap; }
 :root {
   /* The Meadow palette, shared with the app. */
   --night: #00321E;
@@ -35,7 +38,7 @@
   --line: #E2D9C8;
   --sans: Inter, system-ui, sans-serif;
   --serif: "Young Serif", Georgia, serif;
-  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   color-scheme: light;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -319,7 +322,7 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; opacity: 0.7;
       <article class="card reveal" style="--c:#EBC4B2;--tab:#DB977A">
         <div class="folder"><div class="cover"><img src="img/c-drums.jpg" alt="Isai Drums step grid" loading="lazy"></div><span class="label">isai drums</span></div>
         <h3>Program beats</h3>
-        <ul><li>808, 909, Acoustic, Lo-fi and Trap kits</li><li>Click or paint steps, accents and swing</li><li>Slice any loop into pads with the sampler</li></ul>
+        <ul><li>808, Club, Acoustic, Lo-fi and Trap kits</li><li>Click or paint steps, accents and swing</li><li>Slice any loop into pads with the sampler</li></ul>
         <span class="chip">5 kits · <b>10 pieces each</b></span>
         <div class="open">New track → Drum machine <kbd>＋</kbd></div>
       </article>

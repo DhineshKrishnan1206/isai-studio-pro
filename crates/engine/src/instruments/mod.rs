@@ -164,7 +164,7 @@ const SAMPLER_PARAMS: &[ParamDef] = &[
     choice("slice_count", "Slices", SLICE_COUNTS, 1.0),
 ];
 
-pub const PIANO_TONES: &[&str] = &["Grand", "Electric", "Felt", "Wurli", "Clav", "Toy", "Music box", "Celesta", "Honky-tonk"];
+pub const PIANO_TONES: &[&str] = &["Grand", "Electric", "Felt", "Reed", "Funk", "Toy", "Music box", "Celesta", "Honky-tonk"];
 pub const QUALITIES: &[&str] = &["Full", "Light"];
 pub const PAN_MODES: &[&str] = &["Tremolo", "Auto-pan"];
 

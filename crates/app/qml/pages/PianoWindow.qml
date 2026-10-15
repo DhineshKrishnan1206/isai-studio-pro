@@ -114,11 +114,11 @@ Item {
         ] },
         { group: "Electric & cool", items: [
             { name: "Cool Keys", v: { tone: 1, brightness: 35, decay: 5, release: 400, velocity: 70, mod_rate: 0.6, mod_depth: 45, trem_rate: 3.5, trem_depth: 25, autopan: 1, space: 30 } },
-            { name: "Vintage Rhodes", v: { tone: 1, brightness: 55, decay: 6, release: 300, velocity: 80, trem_rate: 4.5, trem_depth: 40, autopan: 1, space: 18, drive: 15 } },
+            { name: "Vintage Tines", v: { tone: 1, brightness: 55, decay: 6, release: 300, velocity: 80, trem_rate: 4.5, trem_depth: 40, autopan: 1, space: 18, drive: 15 } },
             { name: "Suitcase Tremolo", v: { tone: 1, brightness: 50, decay: 6, release: 300, trem_rate: 5.5, trem_depth: 60, space: 15 } },
             { name: "Jazz Club", v: { tone: 1, brightness: 42, decay: 5, release: 280, velocity: 75, mod_rate: 0.8, mod_depth: 22, space: 22 } },
-            { name: "Wurli Grit", v: { tone: 3, brightness: 60, decay: 5, release: 250, velocity: 90, drive: 35, trem_rate: 5, trem_depth: 30, space: 15 } },
-            { name: "Funky Clav", v: { tone: 4, brightness: 75, decay: 3, release: 120, velocity: 85, drive: 20, space: 8, mod_rate: 1.5, mod_depth: 20 } },
+            { name: "Reed Grit", v: { tone: 3, brightness: 60, decay: 5, release: 250, velocity: 90, drive: 35, trem_rate: 5, trem_depth: 30, space: 15 } },
+            { name: "Funky Strings", v: { tone: 4, brightness: 75, decay: 3, release: 120, velocity: 85, drive: 20, space: 8, mod_rate: 1.5, mod_depth: 20 } },
             { name: "Lo-fi Chill", v: { tone: 2, brightness: 20, decay: 5, release: 350, velocity: 40, mod_rate: 1.2, mod_depth: 55, space: 35, volume: -5 } },
             { name: "Neo Soul", v: { tone: 1, brightness: 65, decay: 7, release: 350, velocity: 90, mod_rate: 0.5, mod_depth: 30, trem_rate: 2.5, trem_depth: 20, autopan: 1, space: 25 } },
             { name: "Toy Box", v: { tone: 5, brightness: 65, decay: 4, release: 300, space: 30 } }

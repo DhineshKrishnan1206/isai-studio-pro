@@ -542,7 +542,7 @@ Item {
         add("Tracks", "New piano track", () => { a.addInstrumentTrack("piano"); studio.openInstrument(a.selectedTrack) }, "", Icons.pianoKeys, "piano instrument midi keys")
         add("Tracks", "New synth track", () => { a.addInstrumentTrack("synth"); studio.openInstrument(a.selectedTrack) }, "", Icons.waveform, "synth instrument midi keys bass lead pad")
         add("Tracks", "New sampler track", () => { a.addInstrumentTrack("sampler"); studio.openInstrument(a.selectedTrack) }, "", Icons.waveform, "sampler slicer chop loop sample one-shot")
-        add("Tracks", "New drum track", () => { a.addInstrumentTrack("drums"); studio.openInstrument(a.selectedTrack) }, "", Icons.metronome, "drums beat step sequencer kick snare hats 808 909 pattern")
+        add("Tracks", "New drum track", () => { a.addInstrumentTrack("drums"); studio.openInstrument(a.selectedTrack) }, "", Icons.metronome, "drums beat step sequencer kick snare hats 808 club pattern")
         add("Tracks", "Look for MIDI keyboards", () => a.refreshMidi(), "", Icons.keyboard, "midi controller device input")
         add("Edit", "Copy", () => a.copySelected(), mod + "C", Icons.copy, "regions clipboard")
         add("Edit", "Cut", () => a.cutSelected(), mod + "X", Icons.scissors, "regions clipboard")

@@ -1,5 +1,5 @@
 //! "Isai Drums": a drum machine that synthesises every sound, so it needs
-//! no sample files and runs on any computer. Five kits (808, 909, Acoustic,
+//! no sample files and runs on any computer. Five kits (808, Club, Acoustic,
 //! Lo-fi, Trap) shape ten pieces, played by the usual General MIDI keys:
 //! kick 36, rim 37, snare 38, clap 39, low tom 43, closed hat 42, open hat 46,
 //! high tom 48, crash 49, cowbell 56. A closed hat chokes an open one.
@@ -24,7 +24,7 @@ pub const PIECES: [(&str, u8); 10] = [
     ("Crash", 49),
     ("Cowbell", 56),
 ];
-pub const KITS: &[&str] = &["808", "909", "Acoustic", "Lo-fi", "Trap"];
+pub const KITS: &[&str] = &["808", "Club", "Acoustic", "Lo-fi", "Trap"];
 
 /// Parameters: the kit, volume and drive, then level, tune, decay and pan for
 /// each piece in `PIECES` order.
@@ -52,7 +52,7 @@ const HIGH_TOM: usize = 7;
 const CRASH: usize = 8;
 const COWBELL: usize = 9;
 const KIT_808: usize = 0;
-const KIT_909: usize = 1;
+const KIT_CLUB: usize = 1;
 const KIT_ACOUSTIC: usize = 2;
 const KIT_LOFI: usize = 3;
 const KIT_TRAP: usize = 4;
@@ -171,7 +171,7 @@ impl Voice {
         let s = match self.piece {
             KICK => {
                 let (start, end, sweep, len, click) = match kit {
-                    KIT_909 => (240.0, 55.0, 0.025, 0.5, 0.5),
+                    KIT_CLUB => (240.0, 55.0, 0.025, 0.5, 0.5),
                     KIT_ACOUSTIC => (130.0, 62.0, 0.012, 0.4, 0.6),
                     KIT_LOFI => (150.0, 50.0, 0.04, 0.8, 0.15),
                     KIT_TRAP => (110.0, 40.0, 0.06, 2.2, 0.1),
@@ -188,7 +188,7 @@ impl Voice {
             }
             SNARE => {
                 let (tone, tone_len, rattle_len, rattle): (f32, f32, f32, f32) = match kit {
-                    KIT_909 => (200.0, 0.2, 0.35, 0.7),
+                    KIT_CLUB => (200.0, 0.2, 0.35, 0.7),
                     KIT_ACOUSTIC => (180.0, 0.18, 0.4, 0.75),
                     KIT_TRAP => (220.0, 0.15, 0.25, 0.7),
                     _ => (185.0, 0.25, 0.3, 0.55),
@@ -348,7 +348,7 @@ impl Drums {
         let vel = (f32::from(velocity.clamp(1, 127)) / 127.0).powf(1.3);
         self.clock = self.clock.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
         let (f1, f2) = match piece {
-            SNARE => (Svf::new(if kit == KIT_909 { 2500.0 } else { 1500.0 } * tune, 0.7, rate), Svf::default()),
+            SNARE => (Svf::new(if kit == KIT_CLUB { 2500.0 } else { 1500.0 } * tune, 0.7, rate), Svf::default()),
             CLAP => (Svf::new(1200.0 * tune, 1.2, rate), Svf::default()),
             CLOSED | OPEN | CRASH => (
                 Svf::new(if piece == CRASH { 6000.0 } else { 10_000.0 } * tune, 0.8, rate),

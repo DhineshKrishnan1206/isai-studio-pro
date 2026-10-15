@@ -54,7 +54,7 @@ Rectangle {
     // A different painting and line each time the app opens.
     readonly property int artIndex: Math.floor(Math.random() * art.length)
     readonly property var lines: [
-        "mostly,\ni remember\nthe melody.",
+        "start with\none note.\nthen another.",
         "every song\nstarts\nsomewhere.",
         "hum it first.\nthe rest\nfollows.",
         "the quiet\nbetween notes\nis music too.",

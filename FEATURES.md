@@ -112,11 +112,11 @@ its own open-source versions rather than copying products.
 |---|---|---|
 | Sampler (multi-sample instruments) | L/F | 🟡 (Isai Sampler: one sound across the keys; multi-sample later) |
 | Quick sampler / slicer (chop a loop into pads) | L/F | ✅ (even or beat slicing, slices to pattern) |
-| Drum machine with kits | L/F | ✅ (synthesised 808, 909, Acoustic, Lo-fi, Trap) |
+| Drum machine with kits | L/F | ✅ (synthesised 808, Club, Acoustic, Lo-fi, Trap) |
 | Subtractive synth (classic analog style) | L/F | ✅ (Isai Synth) |
 | FM synth | L/F | ⬜ |
 | Wavetable / additive synth | L/F | ⬜ |
-| Piano, electric piano, organ | L/F | ✅ (Isai Piano: 9 tones incl. electric, Wurli, Clav) |
+| Piano, electric piano, organ | L/F | ✅ (Isai Piano: 9 tones incl. electric, reed, funk keys) |
 | Strings, brass, orchestral | L | ⬜ |
 | Bass synth (303-style) | F | ⬜ |
 | AI drummer / virtual session players | L | ⬜ |
