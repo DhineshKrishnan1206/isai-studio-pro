@@ -209,14 +209,14 @@ its own open-source versions rather than copying products.
 
 | Feature | Source | Isai |
 |---|---|---|
-| Light/dark themes, styles, accent colours | Isai | ✅ (Studio, Midnight, Vivid; glass panels) |
+| Light/dark themes, styles, accent colours | Isai | ✅ (Studio in the Meadow palette, Midnight, Vivid; painted start screen) |
 | Simple/Pro views | L | ✅ |
 | Search all commands (⌘K) | Isai | ✅ |
 | Keyboard shortcuts | L/F | ✅ |
 | Shortcut list and custom key commands | L/F | 🟡 (shortcut list with ?; custom keys later) |
 | UI scale (bigger/smaller) | L/F | ⬜ |
 | Detachable windows / multiple monitors | F | ⬜ |
-| Inspector panel (details of the selected track/region) | L | ⬜ |
+| Inspector panel (details of the selected track/region) | L | 🟡 (track: instrument, effects, fader, pan, mute/solo; I) |
 | Quick help / tooltips everywhere | L | 🟡 |
 | Video track (score to picture) | L/F | ⬜ |
 | Touch and pen support | F | ⬜ |

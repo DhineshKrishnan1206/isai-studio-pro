@@ -14,6 +14,8 @@ Rectangle {
     property int index: 0
     property int count: 1
     property real rowHeight: 84
+    /// Post-fader [left, right] level, 0..1 on the meter scale.
+    property var level: [0, 0]
     /// The instrument icon was clicked: open the instrument's window.
     signal instrumentRequested()
 
@@ -77,12 +79,25 @@ Rectangle {
         anchors.fill: parent
         anchors.leftMargin: 20
         anchors.rightMargin: 8
-        anchors.topMargin: 8
-        anchors.bottomMargin: 8
-        spacing: 6
+        anchors.topMargin: 6
+        anchors.bottomMargin: 5
+        spacing: 4
 
         RowLayout {
             spacing: 6
+            DText {
+                text: header.index + 1
+                font.family: Theme.mono
+                font.pixelSize: Theme.textXs
+                faint: true
+                Layout.preferredWidth: 14
+            }
+            Icon {
+                visible: !header.track.instrument
+                glyph: Icons.waveform
+                size: 15
+                color: header.tint
+            }
             Icon {
                 visible: !!header.track.instrument
                 glyph: Icons.pianoKeys
@@ -141,6 +156,11 @@ Rectangle {
                     Keys.onEscapePressed: visible = false
                 }
             }
+        }
+
+        // Automation, record, monitor, mute and solo; the volume in dB.
+        RowLayout {
+            spacing: 4
             MiniToggle {
                 label: "A"
                 on: !!header.track.automationView
@@ -178,20 +198,7 @@ Rectangle {
                 tip: "Solo"
                 onClicked: header.app.toggleSolo(header.track.id)
             }
-        }
-
-        RowLayout {
-            spacing: 8
-            // Volume: -60 dB (silent) to +6 dB; double-click for 0 dB.
-            DSlider {
-                id: fader
-                Layout.fillWidth: true
-                implicitHeight: 18
-                from: -60; to: 6
-                value: Auto.live(header.track, "volume", header.app.positionBeats, header.app.playing, header.track.volume)
-                onMoved: header.app.setTrackVolume(header.track.id, value, false)
-                onPressedChanged: if (!pressed) header.app.setTrackVolume(header.track.id, value, true)
-            }
+            Item { Layout.fillWidth: true }
             DText {
                 Layout.preferredWidth: 46
                 horizontalAlignment: Text.AlignRight
@@ -206,10 +213,45 @@ Rectangle {
                     DToolTip { visible: parent.containsMouse; text: "Double-click for 0 dB" }
                 }
             }
+        }
+
+        RowLayout {
+            spacing: 8
+            // Volume: -60 dB (silent) to +6 dB; double-click for 0 dB.
+            DSlider {
+                id: fader
+                Layout.fillWidth: true
+                implicitHeight: 18
+                from: -60; to: 6
+                value: Auto.live(header.track, "volume", header.app.positionBeats, header.app.playing, header.track.volume)
+                onMoved: header.app.setTrackVolume(header.track.id, value, false)
+                onPressedChanged: if (!pressed) header.app.setTrackVolume(header.track.id, value, true)
+            }
             PanKnob {
                 value: Auto.live(header.track, "pan", header.app.positionBeats, header.app.playing, header.track.pan)
                 tint: header.tint
                 onMoved: (v, done) => header.app.setTrackPan(header.track.id, v, done)
+            }
+            // The track's level after its fader, left and right.
+            Row {
+                spacing: 2
+                Repeater {
+                    model: 2
+                    delegate: Rectangle {
+                        required property int index
+                        readonly property real v: Math.max(0, Math.min(1, header.level[index] || 0))
+                        width: 4; height: 26
+                        radius: 1
+                        color: Theme.sunken
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: parent.height * parent.v
+                            radius: 1
+                            color: parent.v > 0.97 ? Theme.danger : parent.v > 0.85 ? Theme.warning : Theme.success
+                        }
+                    }
+                }
             }
         }
     }

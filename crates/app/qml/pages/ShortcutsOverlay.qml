@@ -45,6 +45,7 @@ Popup {
             ["F7 or P", "Piano roll"],
             ["F9 or X", "Mixer"],
             ["B", "Sound browser"],
+            ["I", "Inspector"],
             [mod + "K", "Search every command"],
             ["?", "This list"]
         ] },

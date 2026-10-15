@@ -2,13 +2,15 @@ import QtQuick
 import QtQuick.Controls.Basic
 import Isai
 
-// The big round play/stop button, with a soft pulse while playing.
+// The play/stop button. Round with a soft pulse while playing; in Studio a
+// compact console button that matches the rest of the transport.
 AbstractButton {
     id: button
     property bool playing: false
+    readonly property bool compact: Theme.tintedRegions
 
-    implicitWidth: 42
-    implicitHeight: 42
+    implicitWidth: compact ? 44 : 42
+    implicitHeight: compact ? 32 : 42
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
 
@@ -19,7 +21,7 @@ AbstractButton {
             width: parent.width; height: parent.height; radius: width / 2
             color: Theme.playActive
             opacity: 0
-            visible: Theme.motionMs > 0
+            visible: Theme.motionMs > 0 && !button.compact
             SequentialAnimation on scale {
                 running: button.playing && pulse.visible
                 loops: Animation.Infinite
@@ -33,7 +35,7 @@ AbstractButton {
         }
         Rectangle {
             anchors.fill: parent
-            radius: width / 2
+            radius: button.compact ? 7 : width / 2
             readonly property color base: button.playing ? Theme.playActive : Theme.playIdle
             color: !button.enabled ? Theme.raised
                  : button.down ? Qt.darker(base, 1.12)

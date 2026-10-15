@@ -29,8 +29,8 @@ fn main() {
         .map(|f| QmlFile::from(f.as_str()).singleton(singletons.contains(&f.as_str())))
         .collect();
 
-    // Fonts and brand images are compiled into the binary.
-    let assets: Vec<String> = ["assets/fonts", "assets/brand"]
+    // Fonts, brand images and backdrop art are compiled into the binary.
+    let assets: Vec<String> = ["assets/fonts", "assets/brand", "assets/art"]
         .iter()
         .flat_map(|dir| fs::read_dir(dir).expect("assets dir").flatten())
         // Only files: brand/source/ holds the original artwork, not shipped.

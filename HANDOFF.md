@@ -239,3 +239,25 @@ work, crash recovery, and window dragging. Screenshots look right.
 - Mastering assistant (`mastering.rs`: BS.1770 LUFS, plan EQ/comp/limiter, MasteringDialog).
 - Dev scenes: markers, tuner, rolltools, drums, fxdist, sampler, browser, master, midifreeze, stretch.
 - Not yet: tempo/time-signature changes over time, third-party plugins (VST3/CLAP/AU), stem splitter.
+
+## Meadow look: start screen, Studio theme, Inspector
+- **Palette** (Theme.qml `classicTrackColors`): the saved keys keep their old
+  names (blue = lake, green = leaf, yellow = sun, orange = peach, red = clay,
+  pink = salmon, violet = dusk, teal = forest). Studio's default accent is
+  `forest`. Only Studio uses it; Vivid and Midnight are unchanged.
+- **Regions** in Studio (`Theme.tintedRegions`): solid header in the track
+  colour with dark text, body `Theme.regionBody(c)`, waveform and notes in
+  `Theme.regionInk(c)`. RegionItem's `headInk`/`bodyInk` pick per style.
+- **Start screen** (ProjectChooser.qml): fixed forest and cream colours in every
+  theme, a random painting from `assets/art/` and a random poster line, Return
+  creates the song. `ArtButton` is the cream/outline button used there. The
+  Logo has `ink: "light"` to force white ink.
+- **Art**: `tools/paint_art.py` (Pillow) paints them; the docstring lists the
+  exact commands for the shipped files. build.rs bundles `assets/art`.
+- **Track headers**: three rows (name; A R 🎧 M S + dB; fader, pan, meter).
+  Lanes are 90 px. Levels come from `app.trackMeters` (TrackArea.meters).
+- **Inspector** (InspectorPanel.qml, I key, remembered in QSettings
+  "studio/inspectorShown"): reuses EffectsPanel, VFader, PanKnob, MiniToggle.
+- **Play button**: compact console button in Studio (no pulse).
+- **Website** (docs/): same palette, Young Serif headings, paintings as
+  backgrounds. Screenshots come from the dev scenes in `cfg-studio`.

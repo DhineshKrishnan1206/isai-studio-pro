@@ -48,7 +48,7 @@ Rectangle {
     color: Theme.bg
 
     readonly property int headerWidth: 236
-    readonly property int laneHeight: 84
+    readonly property int laneHeight: 90
     readonly property int pad: 12
     readonly property int columnWidth: app.waveformDetail === "high" ? 1 : app.waveformDetail === "low" ? 4 : 2
 
@@ -64,6 +64,10 @@ Rectangle {
 
     readonly property var tracks: {
         try { return JSON.parse(app.tracksJson || "[]") } catch (e) { return [] }
+    }
+    /// Each track's [left, right] level, in track order.
+    readonly property var meters: {
+        try { return JSON.parse(app.trackMeters || "[]") } catch (e) { return [] }
     }
     /// Selected region ids as a lookup: selectedIds[id] === true.
     readonly property var selectedIds: {
@@ -373,6 +377,7 @@ Rectangle {
                     index: headerRow.index
                     count: area.tracks.length
                     rowHeight: area.laneHeight
+                    level: area.meters[headerRow.index] || [0, 0]
                     selected: area.app.selectedTrack === headerRow.modelData.id
                     onInstrumentRequested: area.instrumentRequested(headerRow.modelData.id)
                 }

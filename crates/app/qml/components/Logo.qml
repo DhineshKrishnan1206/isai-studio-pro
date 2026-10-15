@@ -7,6 +7,8 @@ import Isai
 Item {
     property string variant: "mark"
     property real size: 32
+    /// "light" or "dark" ink; empty follows the theme (light ink on dark themes).
+    property string ink: ""
 
     // Taken from the image itself, so replacing the artwork needs no code change.
     readonly property real aspect: art.implicitHeight > 0 ? art.implicitWidth / art.implicitHeight
@@ -21,7 +23,7 @@ Item {
         id: art
         anchors.fill: parent
         source: "qrc:/qt/qml/Isai/assets/brand/isai-" + (parent.variant === "lockup" ? "studio-pro" : "mark")
-                + (Theme.dark ? "-light.png" : "-dark.png")
+                + ((parent.ink === "" ? Theme.dark : parent.ink === "light") ? "-light.png" : "-dark.png")
         sourceSize.height: Math.min(600, Math.ceil(parent.size * 3))
         fillMode: Image.PreserveAspectFit
         smooth: true

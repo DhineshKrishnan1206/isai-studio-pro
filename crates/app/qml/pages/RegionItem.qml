@@ -32,6 +32,12 @@ Item {
     signal editRequested()
     property int columnWidth: 2
 
+    // Colours. Studio: solid header over a tinted body (Theme.tintedRegions).
+    // Vivid: one solid colour with deeper ink. Midnight: solid colour, white ink.
+    readonly property bool tinted: Theme.tintedRegions
+    readonly property color headInk: Theme.vivid ? Qt.darker(tint, 2.6) : tinted ? Theme.regionHeaderText : "#FFFFFF"
+    readonly property color bodyInk: Theme.vivid ? Qt.darker(tint, 2.2) : tinted ? Theme.regionInk(tint) : Qt.rgba(1, 1, 1, 0.85)
+
     // Live previews while dragging; they fall back to the region's values.
     property real previewStart: region.start
     property real previewEnd: region.start + region.beats
@@ -77,18 +83,18 @@ Item {
             width: Math.max(2, beats * item.pxPerBeat)
             height: item.height
             radius: Theme.radiusMd
-            color: Theme.tint(item.tint, 0.5)
+            color: item.tinted ? Theme.tint(Theme.regionBody(item.tint), 0.75) : Theme.tint(item.tint, 0.5)
             border.width: 1
             border.color: Theme.tint(Qt.darker(item.tint, 1.4), 0.8)
             clip: true
             Row {
                 x: 5; y: 2
                 spacing: 3
-                Icon { glyph: Icons.repeat; size: 10; color: Theme.vivid ? Qt.darker(item.tint, 2.4) : "#FFFFFF"; anchors.verticalCenter: parent.verticalCenter }
+                Icon { glyph: Icons.repeat; size: 10; color: item.tinted ? item.bodyInk : item.headInk; anchors.verticalCenter: parent.verticalCenter }
                 DText {
                     text: item.region.name
                     font.pixelSize: Theme.textXs
-                    color: Theme.vivid ? Qt.darker(item.tint, 2.4) : "#FFFFFF"
+                    color: item.tinted ? item.bodyInk : item.headInk
                     opacity: 0.85
                 }
             }
@@ -97,7 +103,7 @@ Item {
                 anchors.fill: parent
                 anchors.topMargin: 18
                 anchors.margins: 3
-                color: Theme.vivid ? Theme.tint(Qt.darker(item.tint, 1.9), 0.6) : Qt.rgba(0, 0, 0, 0.4)
+                color: Theme.vivid ? Theme.tint(Qt.darker(item.tint, 1.9), 0.6) : item.tinted ? Theme.tint(item.bodyInk, 0.55) : Qt.rgba(0, 0, 0, 0.4)
                 columnWidth: item.columnWidth
                 source: item.region.source
                 readonly property real secs: pass.beats * item.region.length / Math.max(1e-9, item.region.beats)
@@ -117,7 +123,7 @@ Item {
                     width: Math.max(2, modelData[1] * item.pxPerBeat - 1)
                     height: Math.max(2, Math.min(5, (pass.height - 24) / noteView.span))
                     radius: 1
-                    color: Theme.vivid ? Qt.darker(item.tint, 2.2) : Qt.rgba(1, 1, 1, 0.6)
+                    color: Theme.tint(item.bodyInk, 0.6)
                 }
             }
         }
@@ -128,9 +134,9 @@ Item {
         width: item.bodyWidth
         height: parent.height
         radius: Theme.radiusMd
-        color: item.region.state === "missing" ? Theme.tint(Theme.danger, 0.25) : item.tint
+        color: item.region.state === "missing" ? Theme.tint(Theme.danger, 0.25) : item.tinted ? Theme.regionBody(item.tint) : item.tint
         border.width: item.selected ? 2 : Theme.vivid ? 0 : 1
-        border.color: item.selected ? "#FFFFFF" : Qt.darker(item.tint, 1.5)
+        border.color: item.selected ? (Theme.dark ? "#FFFFFF" : "#141416") : Qt.darker(item.tint, item.tinted ? 1.6 : 1.5)
         opacity: item.busy ? 0.88 : item.frozen ? 0.45 : 1
         clip: true
 
@@ -139,7 +145,7 @@ Item {
             width: parent.width
             height: 18
             // Vivid: one solid colour, with the name and waveform in a deeper shade of it.
-            color: Theme.vivid ? "transparent" : Qt.darker(item.tint, 1.25)
+            color: Theme.vivid ? "transparent" : item.tinted ? item.tint : Qt.darker(item.tint, 1.25)
             // Gain and reverse badges.
             Row {
                 id: badges
@@ -151,20 +157,20 @@ Item {
                     text: ((item.region.gain || 0) > 0 ? "+" : "") + (item.region.gain || 0).toFixed(1) + " dB"
                     font.family: Theme.mono
                     font.pixelSize: 9
-                    color: Theme.vivid ? Qt.darker(item.tint, 2.6) : "#FFFFFF"
+                    color: item.headInk
                 }
                 Icon {
                     visible: !!item.region.tempo
                     glyph: Icons.metronome
                     size: 10
-                    color: Theme.vivid ? Qt.darker(item.tint, 2.6) : "#FFFFFF"
+                    color: item.headInk
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Icon {
                     visible: !!item.region.reverse
                     glyph: Icons.arrowLeft
                     size: 10
-                    color: Theme.vivid ? Qt.darker(item.tint, 2.6) : "#FFFFFF"
+                    color: item.headInk
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -177,7 +183,7 @@ Item {
                 font.weight: Font.DemiBold
                 font.capitalization: Theme.vivid ? Font.AllUppercase : Font.MixedCase
                 font.letterSpacing: Theme.vivid ? 0.4 : 0
-                color: Theme.vivid ? Qt.darker(item.tint, 2.6) : "#FFFFFF"
+                color: item.headInk
                 elide: Text.ElideRight
             }
         }
@@ -206,7 +212,7 @@ Item {
                     height: Math.max(2, Math.min(5, noteView.height / noteView.span))
                     y: (noteView.high + (noteView.span - (noteView.high - noteView.low + 1)) / 2 - modelData[2]) / noteView.span * (noteView.height - height)
                     radius: 1
-                    color: Theme.vivid ? Qt.darker(item.tint, 2.2) : Qt.rgba(1, 1, 1, 0.85)
+                    color: item.bodyInk
                 }
             }
             DText {
@@ -214,7 +220,7 @@ Item {
                 anchors.centerIn: parent
                 text: "Double-click to add notes"
                 font.pixelSize: Theme.textXs
-                color: Theme.vivid ? Qt.darker(item.tint, 2.4) : "#FFFFFF"
+                color: item.bodyInk
                 opacity: 0.8
             }
         }
@@ -225,7 +231,7 @@ Item {
             anchors.left: parent.left; anchors.right: parent.right
             anchors.bottom: parent.bottom
             anchors.margins: 3
-            color: Theme.vivid ? Theme.tint(Qt.darker(item.tint, 1.9), 0.9) : Qt.rgba(0, 0, 0, 0.6)
+            color: Theme.vivid ? Theme.tint(Qt.darker(item.tint, 1.9), 0.9) : item.tinted ? item.bodyInk : Qt.rgba(0, 0, 0, 0.6)
             columnWidth: item.columnWidth
             source: item.region.source
             // While trimming, show the slice the trim would keep.

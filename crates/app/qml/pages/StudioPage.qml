@@ -22,6 +22,12 @@ Item {
     property bool tunerShown: false
     /// The sound browser on the left.
     property bool browserShown: false
+    /// The Inspector: the selected track's channel, down the left side (I).
+    property bool inspectorShown: true
+    Settings {
+        category: "studio"
+        property alias inspectorShown: studio.inspectorShown
+    }
     onEditorShownChanged: if (editorShown) mixerShown = false
     function openEditor(regionId) { editorRegion = regionId; editorShown = true }
 
@@ -283,148 +289,166 @@ Item {
             }
         }
 
-        Item {
+        RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            spacing: 0
 
-            TrackArea {
-                id: arrangement
-                anchors.fill: parent
-                app: studio.app
-                mixerShown: studio.mixerShown
-                pianoRollShown: studio.editorShown
-                keysEnabled: studio.keysOn
-                onPlaylistRequested: studio.showPlaylist()
-                onPianoRollToggled: studio.togglePianoRoll()
-                // Room to scroll the last tracks up above the docked mixer or piano roll.
-                bottomInset: studio.mixerShown ? mixerPanel.height + mixerPanel.margin * 2
-                           : studio.editorShown ? pianoRoll.height + pianoRoll.margin * 2 : 0
-                onEditRequested: id => studio.openEditor(id)
-                onInstrumentRequested: id => studio.openInstrument(id)
-                onImportRequested: studio.importAudio()
-                onMixerToggled: studio.mixerShown = !studio.mixerShown
-                tunerShown: studio.tunerShown
-                onTunerToggled: studio.tunerShown = !studio.tunerShown
-                onShortcutsRequested: shortcuts.open()
-                browserShown: studio.browserShown
-                onBrowserToggled: studio.browserShown = !studio.browserShown
-            }
-
-            BrowserPanel {
-                app: studio.app
-                shown: studio.browserShown
-                backdrop: arrangement
-                y: 50
-                height: parent.height - y - 12
-                onCloseRequested: studio.browserShown = false
-                onProjectRequested: url => studio.guard("url:" + url)
-            }
-
-            PianoRoll {
-                id: pianoRoll
+            InspectorPanel {
+                visible: studio.inspectorShown
+                Layout.preferredWidth: 244
+                Layout.fillHeight: true
                 app: studio.app
                 tracks: arrangement.tracks
-                regionId: studio.editorRegion
-                shown: studio.editorShown
-                backdrop: arrangement
-                onCloseRequested: studio.editorShown = false
+                meters: arrangement.meters
                 onInstrumentRequested: id => studio.openInstrument(id)
-                activity: keyActivity
-            }
-
-            PianoWindow {
-                id: pianoWindow
-                app: studio.app
-                track: studio.instTrack && studio.instTrack.instrument.kind === "piano" ? studio.instTrack : null
-                activity: keyActivity
-                level: studio.instLevel
-                backdrop: arrangement
-                onCloseRequested: studio.instTrackId = -1
-            }
-
-            SynthWindow {
-                id: synthWindow
-                app: studio.app
-                track: studio.instTrack && studio.instTrack.instrument.kind === "synth" ? studio.instTrack : null
-                backdrop: arrangement
-                activity: keyActivity
-                level: studio.instLevel
-                onCloseRequested: studio.instTrackId = -1
-            }
-
-            DrumWindow {
-                id: drumWindow
-                app: studio.app
-                track: studio.instTrack && studio.instTrack.instrument.kind === "drums" ? studio.instTrack : null
-                backdrop: arrangement
-                activity: keyActivity
-                level: studio.instLevel
-                onCloseRequested: studio.instTrackId = -1
-            }
-
-            SamplerWindow {
-                id: samplerWindow
-                app: studio.app
-                track: studio.instTrack && studio.instTrack.instrument.kind === "sampler" ? studio.instTrack : null
-                backdrop: arrangement
-                activity: keyActivity
-                level: studio.instLevel
-                onCloseRequested: studio.instTrackId = -1
-            }
-
-            EffectEditor {
-                app: studio.app
-                insert: studio.fxEdit
-                chainName: studio.fxEditChain
-                tint: studio.fxEditTint
-                backdrop: arrangement
-                onCloseRequested: studio.fxEditId = -1
-            }
-
-            TunerWindow {
-                app: studio.app
-                shown: studio.tunerShown
-                backdrop: arrangement
-                onCloseRequested: studio.tunerShown = false
-            }
-
-            MixerPanel {
-                id: mixerPanel
                 onEffectEditRequested: (id, chain, tint) => { studio.fxEditId = id; studio.fxEditChain = chain; studio.fxEditTint = tint }
-                onMasteringRequested: masteringDialog.open()
-                app: studio.app
-                backdrop: arrangement
-                tracks: arrangement.tracks
-                shown: studio.mixerShown
-                onCloseRequested: studio.mixerShown = false
+                onCloseRequested: studio.inspectorShown = false
             }
 
-            // Drop audio anywhere on the arrangement to import it.
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 12
-                visible: drop.containsDrag
-                radius: Theme.radiusLg
-                color: Theme.tint(Theme.accent, 0.12)
-                border.color: Theme.accent
-                border.width: 2
-                DText {
-                    anchors.centerIn: parent
-                    text: "Drop to import"
-                    strong: true
-                    font.pixelSize: Theme.textXl
-                    color: Theme.accent
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                TrackArea {
+                    id: arrangement
+                    anchors.fill: parent
+                    app: studio.app
+                    mixerShown: studio.mixerShown
+                    pianoRollShown: studio.editorShown
+                    keysEnabled: studio.keysOn
+                    onPlaylistRequested: studio.showPlaylist()
+                    onPianoRollToggled: studio.togglePianoRoll()
+                    // Room to scroll the last tracks up above the docked mixer or piano roll.
+                    bottomInset: studio.mixerShown ? mixerPanel.height + mixerPanel.margin * 2
+                               : studio.editorShown ? pianoRoll.height + pianoRoll.margin * 2 : 0
+                    onEditRequested: id => studio.openEditor(id)
+                    onInstrumentRequested: id => studio.openInstrument(id)
+                    onImportRequested: studio.importAudio()
+                    onMixerToggled: studio.mixerShown = !studio.mixerShown
+                    tunerShown: studio.tunerShown
+                    onTunerToggled: studio.tunerShown = !studio.tunerShown
+                    onShortcutsRequested: shortcuts.open()
+                    browserShown: studio.browserShown
+                    onBrowserToggled: studio.browserShown = !studio.browserShown
                 }
-            }
-            DropArea {
-                id: drop
-                anchors.fill: parent
-                onDropped: d => {
-                    if (!d.hasUrls) return
-                    const url = d.urls[0].toString()
-                    // A dropped project replaces this one; audio is imported.
-                    if (url.toLowerCase().endsWith(".isai")) studio.guard("url:" + url)
-                    else if (!arrangement.dropFiles(d.urls, d.x, d.y)) studio.app.importUrl(d.urls[0])
+
+                BrowserPanel {
+                    app: studio.app
+                    shown: studio.browserShown
+                    backdrop: arrangement
+                    y: 50
+                    height: parent.height - y - 12
+                    onCloseRequested: studio.browserShown = false
+                    onProjectRequested: url => studio.guard("url:" + url)
+                }
+
+                PianoRoll {
+                    id: pianoRoll
+                    app: studio.app
+                    tracks: arrangement.tracks
+                    regionId: studio.editorRegion
+                    shown: studio.editorShown
+                    backdrop: arrangement
+                    onCloseRequested: studio.editorShown = false
+                    onInstrumentRequested: id => studio.openInstrument(id)
+                    activity: keyActivity
+                }
+
+                PianoWindow {
+                    id: pianoWindow
+                    app: studio.app
+                    track: studio.instTrack && studio.instTrack.instrument.kind === "piano" ? studio.instTrack : null
+                    activity: keyActivity
+                    level: studio.instLevel
+                    backdrop: arrangement
+                    onCloseRequested: studio.instTrackId = -1
+                }
+
+                SynthWindow {
+                    id: synthWindow
+                    app: studio.app
+                    track: studio.instTrack && studio.instTrack.instrument.kind === "synth" ? studio.instTrack : null
+                    backdrop: arrangement
+                    activity: keyActivity
+                    level: studio.instLevel
+                    onCloseRequested: studio.instTrackId = -1
+                }
+
+                DrumWindow {
+                    id: drumWindow
+                    app: studio.app
+                    track: studio.instTrack && studio.instTrack.instrument.kind === "drums" ? studio.instTrack : null
+                    backdrop: arrangement
+                    activity: keyActivity
+                    level: studio.instLevel
+                    onCloseRequested: studio.instTrackId = -1
+                }
+
+                SamplerWindow {
+                    id: samplerWindow
+                    app: studio.app
+                    track: studio.instTrack && studio.instTrack.instrument.kind === "sampler" ? studio.instTrack : null
+                    backdrop: arrangement
+                    activity: keyActivity
+                    level: studio.instLevel
+                    onCloseRequested: studio.instTrackId = -1
+                }
+
+                EffectEditor {
+                    app: studio.app
+                    insert: studio.fxEdit
+                    chainName: studio.fxEditChain
+                    tint: studio.fxEditTint
+                    backdrop: arrangement
+                    onCloseRequested: studio.fxEditId = -1
+                }
+
+                TunerWindow {
+                    app: studio.app
+                    shown: studio.tunerShown
+                    backdrop: arrangement
+                    onCloseRequested: studio.tunerShown = false
+                }
+
+                MixerPanel {
+                    id: mixerPanel
+                    onEffectEditRequested: (id, chain, tint) => { studio.fxEditId = id; studio.fxEditChain = chain; studio.fxEditTint = tint }
+                    onMasteringRequested: masteringDialog.open()
+                    app: studio.app
+                    backdrop: arrangement
+                    tracks: arrangement.tracks
+                    shown: studio.mixerShown
+                    onCloseRequested: studio.mixerShown = false
+                }
+
+                // Drop audio anywhere on the arrangement to import it.
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 12
+                    visible: drop.containsDrag
+                    radius: Theme.radiusLg
+                    color: Theme.tint(Theme.accent, 0.12)
+                    border.color: Theme.accent
+                    border.width: 2
+                    DText {
+                        anchors.centerIn: parent
+                        text: "Drop to import"
+                        strong: true
+                        font.pixelSize: Theme.textXl
+                        color: Theme.accent
+                    }
+                }
+                DropArea {
+                    id: drop
+                    anchors.fill: parent
+                    onDropped: d => {
+                        if (!d.hasUrls) return
+                        const url = d.urls[0].toString()
+                        // A dropped project replaces this one; audio is imported.
+                        if (url.toLowerCase().endsWith(".isai")) studio.guard("url:" + url)
+                        else if (!arrangement.dropFiles(d.urls, d.x, d.y)) studio.app.importUrl(d.urls[0])
+                    }
                 }
             }
         }
@@ -514,6 +538,7 @@ Item {
         add("View", studio.mixerShown ? "Hide mixer" : "Show mixer", () => studio.mixerShown = !studio.mixerShown, "F9", Icons.sliders, "faders channel strips volume")
         add("View", studio.editorShown ? "Hide piano roll" : "Piano roll", () => studio.togglePianoRoll(), "F7", Icons.pianoKeys, "midi notes editor pattern")
         add("View", "Playlist (just the tracks)", () => studio.showPlaylist(), "F5", Icons.waveform, "arrangement tracks")
+        add("View", studio.inspectorShown ? "Hide inspector" : "Show inspector", () => studio.inspectorShown = !studio.inspectorShown, "I", Icons.sliders, "channel track details fader effects")
         add("Tracks", "New piano track", () => { a.addInstrumentTrack("piano"); studio.openInstrument(a.selectedTrack) }, "", Icons.pianoKeys, "piano instrument midi keys")
         add("Tracks", "New synth track", () => { a.addInstrumentTrack("synth"); studio.openInstrument(a.selectedTrack) }, "", Icons.waveform, "synth instrument midi keys bass lead pad")
         add("Tracks", "New sampler track", () => { a.addInstrumentTrack("sampler"); studio.openInstrument(a.selectedTrack) }, "", Icons.waveform, "sampler slicer chop loop sample one-shot")
@@ -609,6 +634,7 @@ Item {
     Shortcut { sequence: "Alt+Left"; enabled: studio.keysOn; onActivated: studio.app.jumpMarker(false) }
     Shortcut { sequence: "Ctrl+J"; enabled: studio.keysOn; onActivated: studio.app.joinSelected() }
     Shortcut { sequence: "Ctrl+U"; enabled: studio.keysOn; onActivated: studio.app.cycleSelection() }
+    Shortcut { sequence: "I"; enabled: studio.keysOn; onActivated: studio.inspectorShown = !studio.inspectorShown }
     Shortcut { sequence: "Ctrl+Alt+Z"; enabled: studio.keysOn; onActivated: arrangement.openHistory() }
     Shortcut { sequences: ["?", "Shift+/"]; enabled: studio.keysOn; onActivated: shortcuts.opened ? shortcuts.close() : shortcuts.open() }
     // These also work from the project chooser.

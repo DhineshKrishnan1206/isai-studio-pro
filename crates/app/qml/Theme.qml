@@ -6,7 +6,10 @@ import QtQuick
 //
 // Styles:
 //   studio   – the default: neutral graphite, flat and compact, a classic
-//              studio-console feel (inspired by Logic Pro, drawn from scratch)
+//              studio-console feel (inspired by Logic Pro, drawn from scratch),
+//              coloured with the Meadow palette: forest, lake, leaf, sun,
+//              peach and clay. Regions have a solid coloured header over a
+//              tinted body.
 //   midnight – deep blue-black with a violet accent and soft glows
 //   vivid    – pure black with bright, saturated track colours that run from
 //              violet through pink and orange to yellow; full-height regions
@@ -40,11 +43,11 @@ QtObject {
     function v(vividDark, other) { return vivid && dark ? vividDark : other }
 
     // Surfaces, from back to front
-    readonly property color bg:         v("#000000", pick("#232325", "#E2E2E6", "#0A0B0F", "#F2F3F7"))
-    readonly property color panel:      v("#0B0B0D", pick("#2C2C2F", "#F1F1F3", "#0F1116", "#FFFFFF"))
-    readonly property color surface:    v("#131316", pick("#323236", "#FAFAFB", "#15171E", "#FFFFFF"))
-    readonly property color raised:     v("#1B1B1F", pick("#3A3A3E", "#EAEAED", "#1C1F28", "#F5F6F9"))
-    readonly property color sunken:     v("#060607", pick("#19191B", "#D6D6DB", "#0C0E12", "#ECEEF3"))
+    readonly property color bg:         v("#000000", pick("#222326", "#E2E2E6", "#0A0B0F", "#F2F3F7"))
+    readonly property color panel:      v("#0B0B0D", pick("#28292D", "#F1F1F3", "#0F1116", "#FFFFFF"))
+    readonly property color surface:    v("#131316", pick("#2F3034", "#FAFAFB", "#15171E", "#FFFFFF"))
+    readonly property color raised:     v("#1B1B1F", pick("#393A3F", "#EAEAED", "#1C1F28", "#F5F6F9"))
+    readonly property color sunken:     v("#060607", pick("#18191B", "#D6D6DB", "#0C0E12", "#ECEEF3"))
     readonly property color hover:      v("#26262B", pick("#45454A", "#DDDDE2", "#242833", "#E9EBF0"))
     readonly property color line:       v("#1A1A1E", pick("#161618", "#C3C3C9", "#242833", "#E0E3EA"))
     readonly property color lineStrong: v("#303036", pick("#4B4B50", "#ACACB3", "#353A48", "#C9CED8"))
@@ -62,15 +65,16 @@ QtObject {
         green:  { dark: "#4CC25A", light: "#2A9A3A", label: "Green" },
         orange: { dark: "#F2994A", light: "#D2701A", label: "Orange" },
         pink:   { dark: "#F06292", light: "#D63B72", label: "Pink" },
-        red:    { dark: "#F2564B", light: "#D23228", label: "Red" }
+        red:    { dark: "#F2564B", light: "#D23228", label: "Red" },
+        forest: { dark: "#2FA38A", light: "#16765F", label: "Forest" }
     })
     readonly property string accentKey: accentChoice !== "default" && accents[accentChoice] !== undefined
-                                        ? accentChoice : (studio && !vivid ? "blue" : "violet")
+                                        ? accentChoice : (studio && !vivid ? "forest" : "violet")
     readonly property color accent: dark ? accents[accentKey].dark : accents[accentKey].light
     readonly property color accentHover: Qt.lighter(accent, dark ? 1.12 : 0.92)
     readonly property color accentText:  "#FFFFFF"
     readonly property color accentSoft:  tint(accent, dark ? 0.18 : 0.12)
-    readonly property color accent2:     pick("#5AC8FA", "#1A93C9", "#34D5C4", "#0EA394")
+    readonly property color accent2:     pick("#F4B271", "#C9783A", "#34D5C4", "#0EA394")
 
     // Status
     readonly property color success: dark ? "#4CD07A" : "#169C45"
@@ -80,11 +84,11 @@ QtObject {
     // Transport. Studio uses the classic console colours: green play, yellow cycle.
     readonly property color playIdle:      studio ? raised : accent
     readonly property color playIdleIcon:  studio ? text : accentText
-    readonly property color playActive:    studio ? (dark ? "#4CC25A" : "#2E9E3C") : accent
-    readonly property color loopOn:        studio ? (dark ? "#E9C440" : "#B8920F") : accent
+    readonly property color playActive:    studio ? (dark ? "#6DBB5A" : "#3F8F2E") : accent
+    readonly property color loopOn:        studio ? (dark ? "#EBCB4E" : "#B8920F") : accent
     readonly property color record:        dark ? "#F2453D" : "#D42A22"
     /// Markers (Intro, Verse…) on the ruler: warm orange in every style.
-    readonly property color marker:        dark ? "#F0A04B" : "#E08A2C"
+    readonly property color marker:        dark ? "#F4B271" : "#C9783A"
 
     // The time display, styled like a hardware LCD in every style.
     readonly property color lcd:       vivid ? sunken : studio ? "#141416" : sunken
@@ -92,7 +96,13 @@ QtObject {
     readonly property color lcdDim:    studio ? "#7C7C82" : textFaint
 
     // Regions (clips) on the timeline
-    readonly property color region:        studio ? (dark ? "#3F7DC1" : "#5A93D2") : tint(accent, dark ? 0.10 : 0.07)
+    readonly property color region:        studio ? (dark ? "#4E9C99" : "#3E8885") : tint(accent, dark ? 0.10 : 0.07)
+    /// Studio's Logic-style regions: a solid header in the track colour over a
+    /// body tinted with it, and the waveform or notes in a light shade of it.
+    readonly property bool tintedRegions: studio && !vivid
+    function regionBody(c) { return Qt.tint(dark ? "#1E1F22" : "#F4F4F6", tint(c, dark ? 0.42 : 0.30)) }
+    function regionInk(c) { return dark ? Qt.tint(c, Qt.rgba(1, 1, 1, 0.55)) : Qt.darker(c, 1.9) }
+    readonly property color regionHeaderText: "#141416"
     readonly property color regionHeader:  studio ? Qt.darker(region, 1.25) : tint(accent, dark ? 0.22 : 0.14)
     readonly property color regionBorder:  studio ? Qt.darker(region, 1.5) : tint(accent, 0.45)
     readonly property color regionText:    studio ? "#FFFFFF" : (dark ? text : accent)
@@ -113,15 +123,18 @@ QtObject {
         violet: dark ? "#5C8DFF" : "#3F74F0",
         teal:   dark ? "#3FD3C6" : "#1FB3A6"
     })
+    // The Meadow palette. The keys keep their old names (they're saved in
+    // projects): blue is lake, green leaf, yellow sun, orange peach, red clay,
+    // pink salmon, violet dusk and teal forest.
     readonly property var classicTrackColors: ({
-        blue:   dark ? "#3F7DC1" : "#5A93D2",
-        green:  dark ? "#3E9B5A" : "#55B06F",
-        yellow: dark ? "#B8962F" : "#D4B04A",
-        orange: dark ? "#C2702F" : "#DE8A47",
-        red:    dark ? "#B9474A" : "#D4605F",
-        pink:   dark ? "#B54C86" : "#D166A0",
-        violet: dark ? "#7158C2" : "#8B74D8",
-        teal:   dark ? "#2E9A92" : "#45B2A9"
+        blue:   dark ? "#4E9C99" : "#3E8885",
+        green:  dark ? "#7DB862" : "#5E9E45",
+        yellow: dark ? "#E9CB4C" : "#C9A92A",
+        orange: dark ? "#F4B271" : "#DD8F48",
+        red:    dark ? "#CD6138" : "#BC522B",
+        pink:   dark ? "#E0876F" : "#CC6A52",
+        violet: dark ? "#9A86D6" : "#7F69C2",
+        teal:   dark ? "#2F8F7A" : "#237B68"
     })
     readonly property var trackColors: vivid ? vividTrackColors : classicTrackColors
     readonly property var trackColorNames: ["blue", "green", "yellow", "orange", "red", "pink", "violet", "teal"]
@@ -138,7 +151,7 @@ QtObject {
     readonly property bool glass: effects
     /// The two colours that glow inside glass panels.
     readonly property color glowA: vivid ? "#A55CF5" : accent
-    readonly property color glowB: vivid ? "#F27141" : studio ? (dark ? "#2EC4B6" : "#0E9488") : accent2
+    readonly property color glowB: vivid ? "#F27141" : studio ? (dark ? "#CD6138" : "#DD8F48") : accent2
     /// Soft colour glows behind glass, in every style, only with effects on.
     readonly property bool glows: effects
     /// The window's content, which popups (menus, dropdowns) blur behind them.
@@ -166,11 +179,16 @@ QtObject {
     property FontLoader monoLoader: FontLoader { source: theme.fontDir + "JetBrainsMono-Medium.ttf" }
     property FontLoader iconLoader: FontLoader { source: theme.fontDir + "Phosphor.ttf" }
     property FontLoader iconFillLoader: FontLoader { source: theme.fontDir + "Phosphor-Fill.ttf" }
+    property FontLoader serifLoader: FontLoader { source: theme.fontDir + "YoungSerif-Regular.ttf" }
 
     readonly property string font: interRegular.name
     readonly property string mono: monoLoader.name
     readonly property string iconFont: iconLoader.name
     readonly property string iconFillFont: iconFillLoader.name
+    /// Young Serif (SIL OFL): headings on the start screen.
+    readonly property string serif: serifLoader.name
+    /// The painted backdrops (tools/paint_art.py).
+    readonly property string artDir: "qrc:/qt/qml/Isai/assets/art/"
 
     function tint(c, alpha) {
         return Qt.rgba(c.r, c.g, c.b, alpha)

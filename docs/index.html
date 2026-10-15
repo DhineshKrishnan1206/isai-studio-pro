@@ -6,228 +6,226 @@
 <title>Isai Studio Pro</title>
 <meta name="description" content="A free, open-source music studio for macOS, Windows and Linux that runs on low-spec computers.">
 <meta property="og:title" content="Isai Studio Pro">
-<meta property="og:description" content="Make music on an old laptop. Every tool. Free.">
-<meta property="og:image" content="img/multi.jpg">
+<meta property="og:description" content="Every song starts somewhere. A free music studio for any computer.">
+<meta property="og:image" content="img/art-field.jpg">
+<meta name="theme-color" content="#00321E">
 <link rel="icon" href="img/mark-ink.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/thin/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
 <style>
-@font-face {
-  font-family: "Departure Mono";
-  src: url("fonts/DepartureMono-Regular.woff2") format("woff2");
-  font-display: swap;
-}
 :root {
-  --bg: #F5F5F3;
-  --paper: #FFFFFF;
-  --ink: #151515;
-  --ink2: #3A3A3A;
-  --mute: #6B6B6B;
-  --faint: #9A9A96;
-  --line: #E3E3DF;
-  --red: #E5372B;
-  --violet: #6C5CE7;
+  /* The Meadow palette, shared with the app. */
+  --night: #00321E;
+  --forest: #116252;
+  --lake: #56A096;
+  --leaf: #7DB862;
+  --sun: #F5DC53;
+  --peach: #F4B271;
+  --clay: #CD6138;
+  --cream: #F6ECD6;
+
+  --paper: #F5EFE3;
+  --card: #FBF7EE;
+  --ink: #10251D;
+  --ink2: #34463E;
+  --mute: #66776E;
+  --line: #E2D9C8;
   --sans: Inter, system-ui, sans-serif;
-  --head: "Inter Tight", Inter, system-ui, sans-serif;
+  --serif: "Young Serif", Georgia, serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-  --pixel: "Departure Mono", var(--mono);
   color-scheme: light;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 a { color: inherit; }
 img { display: block; max-width: 100%; height: auto; }
 .wrap { width: min(1200px, 100% - 32px); margin-inline: auto; }
-.narrow { width: min(980px, 100% - 32px); margin-inline: auto; }
-.pixel { font-family: var(--pixel); font-weight: 400; letter-spacing: -0.02em; }
+.narrow { width: min(1040px, 100% - 32px); margin-inline: auto; }
+.serif { font-family: var(--serif); font-weight: 400; }
 .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--mute); margin-bottom: 14px; }
-h2 { font: 600 clamp(26px, 3.4vw, 40px)/1.1 var(--head); letter-spacing: -0.035em; }
-.live { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 5px; background: var(--red); color: #fff; font: 500 10.5px/1.5 var(--mono); letter-spacing: 0.08em; }
-.live::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: blink 1.6s infinite; }
-@keyframes blink { 50% { opacity: .3; } }
+h2 { font: 400 clamp(28px, 3.6vw, 44px)/1.12 var(--serif); letter-spacing: -0.01em; }
+h2 em { font-style: normal; color: var(--clay); }
 
 /* Strip + nav */
-.strip { background: #EEF3FB; border-bottom: 1px solid #DCE5F3; font-size: 13px; }
+.strip { background: var(--night); color: var(--cream); font-size: 13px; }
 .strip .wrap { display: flex; align-items: center; justify-content: center; gap: 10px; height: 38px; }
-.strip b { font-weight: 600; }
-.strip a { color: var(--ink2); text-decoration: none; font-size: 12px; }
+.strip .new { padding: 2px 8px; border-radius: 5px; background: var(--clay); font: 500 10.5px/1.5 var(--mono); letter-spacing: 0.1em; color: #fff; }
+.strip a { color: var(--peach); text-decoration: none; font-size: 12px; }
 .strip a:hover { text-decoration: underline; }
-nav { position: sticky; top: 0; z-index: 20; background: rgba(245,245,243,0.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+nav { position: sticky; top: 0; z-index: 20; background: rgba(245,239,227,0.85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
 nav .wrap { display: flex; align-items: center; gap: 34px; height: 64px; }
-nav .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-nav .brand img { height: 26px; width: auto; }
-nav .brand span { font: 400 15px var(--pixel); }
+nav .brand { display: flex; align-items: baseline; gap: 10px; text-decoration: none; }
+nav .brand img { height: 28px; width: auto; align-self: center; }
+nav .brand span { font: 400 13px var(--sans); letter-spacing: 0.18em; color: var(--mute); }
 nav .links { display: flex; gap: 26px; font-size: 14px; color: var(--ink2); }
 nav .links a { text-decoration: none; }
 nav .links a:hover { color: var(--ink); }
 nav .right { margin-left: auto; display: flex; gap: 8px; }
-.pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); font-size: 14px; font-weight: 500; text-decoration: none; box-shadow: 0 1px 0 rgba(0,0,0,0.04); transition: border-color .15s; }
-.pill:hover { border-color: #C9C9C4; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 500; text-decoration: none; }
+.pill.dark { background: var(--night); color: var(--cream); border-color: var(--night); }
 
-/* Hero */
-.hero { position: relative; padding: 140px 0 120px; text-align: center; overflow: hidden;
-  background: radial-gradient(900px 520px at 50% 40%, #FFFFFF 0%, rgba(255,255,255,0) 70%); }
-.hero .tag { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 9px; background: #EEF3FB; border: 1px solid #DCE5F3; font-size: 13px; color: #2F6FD6; font-weight: 500; margin-bottom: 30px; text-decoration: none; }
-.hero .tag em { font-style: normal; color: #6C93D6; font-weight: 400; }
-.hero h1 { font: 600 clamp(38px, 6vw, 76px)/1.04 var(--head); letter-spacing: -0.055em; }
-.hero h1 .rot { color: #8C8C88; font-weight: 500; letter-spacing: -0.045em; }
-.hero h1 .caret { display: inline-block; width: 0.06em; height: 0.8em; background: var(--violet); margin-left: 4px; vertical-align: -0.04em; animation: blink 1s steps(1) infinite; }
-.hero h1 .pixel { letter-spacing: -0.06em; }
-.hero p.lead { margin: 34px auto 38px; max-width: 560px; font-size: 18px; line-height: 1.55; color: var(--ink2); }
-.ctas { display: flex; justify-content: center; align-items: center; gap: 26px; flex-wrap: wrap; }
-.btn-dark { display: inline-flex; align-items: center; gap: 10px; padding: 13px 18px 13px 20px; border-radius: 11px; background: #232323; color: #fff; text-decoration: none; font-weight: 500; font-size: 15px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 6px 16px rgba(0,0,0,0.2), 0 2px 0 #000; transition: transform .15s; }
-.btn-dark:hover { transform: translateY(-1px); }
-.link { display: inline-flex; align-items: center; gap: 8px; color: var(--ink2); font-size: 15px; text-decoration: none; border-bottom: 1px solid #BDBDB8; padding-bottom: 1px; }
+/* Hero: a painting, poster style */
+.hero { position: relative; min-height: min(880px, 92vh); padding: 0 0 200px; background: var(--night) url(img/art-field.jpg) center/cover; color: var(--cream); overflow: hidden; display: flex; align-items: center; }
+.hero::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 46%, rgba(0,40,24,0.38), rgba(0,40,24,0) 62%), linear-gradient(rgba(0,40,24,0.12), rgba(0,40,24,0.12) 70%, rgba(245,239,227,0) 100%); }
+.hero .corner { position: absolute; top: 28px; font: 400 15px var(--sans); letter-spacing: 0.14em; opacity: 0.9; }
+.hero .foot { position: absolute; bottom: 200px; font: 400 13px var(--sans); letter-spacing: 0.12em; opacity: 0.85; }
+.hero .inner { position: relative; text-align: center; width: 100%; padding-top: 70px; }
+.hero h1 { font: 400 clamp(42px, 7vw, 84px)/1.04 var(--serif); letter-spacing: -0.01em; text-shadow: 0 2px 40px rgba(0,40,24,0.35); }
+.hero p.lead { margin: 26px auto 34px; max-width: 540px; font-size: 18px; line-height: 1.55; opacity: 0.95; text-shadow: 0 1px 14px rgba(0,40,24,0.4); }
+.ctas { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 12px; font-weight: 600; font-size: 15px; text-decoration: none; transition: transform .15s; }
+.btn:hover { transform: translateY(-1px); }
+.btn.cream { background: var(--cream); color: var(--night); box-shadow: 0 12px 30px rgba(0,30,18,0.3); }
+.btn.glass { background: rgba(0,50,30,0.35); color: var(--cream); border: 1px solid rgba(246,236,214,0.45); backdrop-filter: blur(6px); }
+.playmark { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-left: 24px solid var(--peach); filter: drop-shadow(0 2px 8px rgba(0,30,18,0.4)); }
 
-/* Hero floats */
-.float { position: absolute; z-index: 0; pointer-events: none; }
-.hero .inner { position: relative; z-index: 1; }
-.cover { border-radius: 8px; overflow: hidden; background: #111; box-shadow: 0 18px 40px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.15); border: 4px solid #fff; }
-.cover img { width: 100%; height: 100%; object-fit: cover; }
-.f1 { left: 2.5%; top: 70px; width: 180px; transform: rotate(-11deg); }
-.f1 .cover { aspect-ratio: 3/4; }
-.f2 { left: 6%; top: 190px; width: 160px; transform: rotate(4deg); }
-.f2 .cover { aspect-ratio: 4/5; }
-.note { background: var(--paper); border-radius: 14px; border: 1px solid var(--line); padding: 22px 22px 18px; text-align: left; box-shadow: 0 20px 50px rgba(0,0,0,0.08); }
-.note .k { font: 500 10.5px var(--mono); letter-spacing: 0.14em; color: var(--faint); text-transform: uppercase; }
-.note h4 { font: 600 21px/1.15 var(--head); letter-spacing: -0.03em; margin: 10px 0 10px; }
-.note p { font-size: 12.5px; line-height: 1.55; color: var(--mute); }
-.f3 { right: 3%; top: 70px; width: 230px; transform: rotate(3deg); }
-.meter { position: absolute; right: -10px; bottom: -40px; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: #1B1B1B; color: #fff; box-shadow: 0 14px 30px rgba(0,0,0,0.3); transform: rotate(-3deg); white-space: nowrap; }
-.meter small { font: 500 10px var(--mono); padding: 4px 8px; background: #fff; color: #111; border-radius: 6px; }
-.meter .bars { display: flex; gap: 3px; }
-.meter .bars i { width: 5px; height: 16px; border-radius: 1px; background: #fff; }
-.meter .bars i.off { background: #555; }
-.meter b { font: 500 17px var(--head); }
-.f4 { left: 3%; bottom: 70px; width: 220px; transform: rotate(5deg); opacity: 0.55; filter: blur(0.6px); }
-.f4 .cover { aspect-ratio: 16/10; }
-.f5 { right: 3%; bottom: 50px; width: 230px; transform: rotate(-6deg); opacity: 0.45; filter: blur(0.8px); }
-
-/* Product shot */
-.shot { position: relative; margin-top: -40px; padding: 12px; border-radius: 22px; background: linear-gradient(180deg, #FFFFFF, #ECECE8); border: 1px solid var(--line); box-shadow: 0 50px 100px -30px rgba(0,0,0,0.3); }
+.shot { position: relative; z-index: 2; margin-top: -150px; padding: 10px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 50px 100px -30px rgba(0,40,24,0.45); }
 .shot img { border-radius: 12px; }
 
 /* Marquee */
-.marquee { padding: 90px 0 30px; text-align: center; }
-.marquee .eyebrow { margin-bottom: 28px; }
+.marquee { padding: 80px 0 20px; text-align: center; }
+.marquee .eyebrow { margin-bottom: 26px; }
 .rail { overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
 .track { display: flex; gap: 46px; width: max-content; animation: slide 40s linear infinite; padding: 10px 0; }
 .rail.rev .track { animation-direction: reverse; animation-duration: 46s; }
-.track span { display: inline-flex; align-items: center; gap: 9px; font: 500 17px var(--head); color: #4A4A48; letter-spacing: -0.01em; white-space: nowrap; }
-.track span i { font-size: 22px; color: #6B6B68; }
+.track span { display: inline-flex; align-items: center; gap: 9px; font: 400 19px var(--serif); color: var(--ink2); white-space: nowrap; }
+.track span i { font-size: 22px; color: var(--forest); }
 @keyframes slide { to { transform: translateX(-50%); } }
 
-/* Paths */
 section { padding: 100px 0; }
-.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 30px; }
-.card { border-radius: 10px; padding: 24px 24px 22px; background: var(--c); display: flex; flex-direction: column; transition: transform .25s, box-shadow .25s; }
-.card:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -18px rgba(0,0,0,0.25); }
+
+/* Paths */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 32px; }
+.card { border-radius: 12px; padding: 24px 24px 22px; background: var(--c); display: flex; flex-direction: column; transition: transform .25s, box-shadow .25s; }
+.card:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -18px rgba(0,40,24,0.3); }
 .folder { position: relative; margin-right: 22px; margin-bottom: 26px; }
-.folder::after { content: ""; position: absolute; top: 14px; right: -16px; width: 22px; height: 64px; border-radius: 0 8px 8px 0; background: var(--tab, rgba(0,0,0,0.12)); }
-.folder .cover { border: 0; border-radius: 6px; aspect-ratio: 4/3; box-shadow: 0 2px 0 rgba(0,0,0,0.1), 0 14px 28px -12px rgba(0,0,0,0.35); position: relative; z-index: 1; }
-.folder .label { position: absolute; z-index: 2; left: 12px; bottom: 12px; font: 400 12px var(--pixel); color: #fff; background: rgba(0,0,0,0.55); padding: 4px 8px; border-radius: 4px; backdrop-filter: blur(4px); }
-.card .soon { align-self: flex-start; font: 500 10.5px var(--mono); letter-spacing: 0.12em; padding: 3px 8px; border-radius: 5px; background: rgba(255,255,255,0.55); color: #3D3D3B; margin-bottom: 12px; }
-.card h3 { font: 600 23px/1.15 var(--head); letter-spacing: -0.03em; margin-bottom: 14px; }
+.folder::after { content: ""; position: absolute; top: 14px; right: -16px; width: 22px; height: 64px; border-radius: 0 8px 8px 0; background: var(--tab); }
+.folder .cover { border-radius: 7px; overflow: hidden; aspect-ratio: 4/3; background: #1E1F22; position: relative; z-index: 1; box-shadow: 0 2px 0 rgba(0,0,0,0.1), 0 14px 28px -12px rgba(0,40,24,0.45); }
+.folder .cover img { width: 100%; height: 100%; object-fit: cover; }
+.folder .label { position: absolute; z-index: 2; left: 12px; bottom: 12px; font: 400 13px var(--serif); color: var(--cream); background: rgba(0,40,24,0.7); padding: 3px 9px; border-radius: 5px; }
+.card h3 { font: 400 24px/1.15 var(--serif); margin-bottom: 14px; }
 .card ul { list-style: none; display: grid; gap: 6px; margin-bottom: 20px; }
-.card li { font-size: 14px; color: #2F2F2D; padding-left: 16px; position: relative; }
-.card li::before { content: "+"; position: absolute; left: 0; color: #5A5A57; }
-.chip { align-self: flex-start; font: 500 10.5px var(--mono); letter-spacing: 0.08em; padding: 6px 10px; border-radius: 99px; background: rgba(255,255,255,0.6); color: #3B3B39; text-transform: uppercase; }
-.chip b { font-weight: 600; color: #111; }
+.card li { font-size: 14px; color: #2B3A33; padding-left: 16px; position: relative; }
+.card li::before { content: "+"; position: absolute; left: 0; color: #56645C; }
+.chip { align-self: flex-start; font: 500 10.5px var(--mono); letter-spacing: 0.08em; padding: 6px 10px; border-radius: 99px; background: rgba(255,255,255,0.55); color: #3B4A42; text-transform: uppercase; }
+.chip b { font-weight: 600; color: var(--ink); }
 .card .open { margin-top: auto; padding-top: 26px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; }
 .card .open kbd { font: 500 11px var(--mono); padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.08); }
 
+/* Start screen feature */
+.begin { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 60px; align-items: center; }
+.begin p { color: var(--ink2); font-size: 17px; margin-top: 16px; max-width: 440px; }
+.begin .frame { border-radius: 16px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 40px 80px -30px rgba(0,40,24,0.45); }
+.begin ul { list-style: none; margin-top: 24px; display: grid; gap: 10px; }
+.begin li { display: flex; gap: 10px; align-items: baseline; font-size: 15px; color: var(--ink2); }
+.begin li i { color: var(--clay); }
+
 /* Manifesto */
-.manifesto { background: linear-gradient(180deg, var(--bg), #F2EADC 25%, #F2EADC 75%, var(--bg)); padding: 130px 0; }
+.manifesto { background: linear-gradient(180deg, var(--paper), #F1E2C9 25%, #F1E2C9 75%, var(--paper)); padding: 130px 0; }
 .manifesto .grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 70px; align-items: center; }
-.manifesto p { color: #3A3833; font-size: 16px; line-height: 1.85; margin-bottom: 26px; max-width: 470px; }
-.manifesto .sig { font: 400 26px var(--pixel); color: #8D877A; margin-top: 50px; }
+.manifesto p { color: #3A3528; font-size: 16px; line-height: 1.85; margin-bottom: 26px; max-width: 470px; }
+.manifesto .sig { font: 400 26px var(--serif); color: #8D7B5E; margin-top: 50px; }
 .manifesto .links { display: flex; gap: 22px; font-size: 13px; font-weight: 600; }
-.manifesto .links a { text-decoration: none; border-bottom: 1px solid #222; }
+.manifesto .links a { text-decoration: none; border-bottom: 1px solid var(--ink); }
 .box { position: relative; aspect-ratio: 1 / 1.08; }
 .box .back { position: absolute; inset: 0 6% 4% 0; background: #B9854F; border-radius: 6px; box-shadow: 0 30px 60px -20px rgba(90,55,20,0.45); }
 .box .grid-paper { position: absolute; inset: 6% 0 8% 8%; background-color: #FBFAF4; background-image: linear-gradient(#D9E0E8 1px, transparent 1px), linear-gradient(90deg, #D9E0E8 1px, transparent 1px); background-size: 14px 14px; border: 1px solid #E2DED2; transform: rotate(1.5deg); }
-.box .front { position: absolute; inset: 12% 3% 0 6%; background: #C08E58; border-radius: 4px; box-shadow: 0 -2px 0 rgba(255,255,255,0.15) inset, 0 20px 40px -14px rgba(80,45,15,0.5);
-  background-image: radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px); background-size: 6px 6px; }
+.box .front { position: absolute; inset: 12% 3% 0 6%; background: #C08E58; border-radius: 4px; box-shadow: 0 20px 40px -14px rgba(80,45,15,0.5); background-image: radial-gradient(rgba(0,0,0,0.05) 1px, transparent 1px); background-size: 6px 6px; }
 .sticker { position: absolute; display: flex; align-items: center; gap: 14px; }
 .sticker .s { width: 66px; height: 66px; display: grid; place-items: center; font-size: 30px; box-shadow: 0 8px 16px -6px rgba(0,0,0,0.35); }
-.sticker .t b { display: block; font: 600 26px/1 var(--head); color: #2B1B0C; letter-spacing: -0.02em; }
-.sticker .t span { display: block; font: 600 16px/1.2 var(--head); color: #2B1B0C; margin-top: 4px; }
+.sticker .t b { display: block; font: 400 26px/1 var(--serif); color: #2B1B0C; }
+.sticker .t span { display: block; font: 600 16px/1.2 var(--sans); color: #2B1B0C; margin-top: 4px; }
 .sticker .t small { font-size: 11.5px; color: #5B3D1F; }
 .box .stamp { position: absolute; right: 9%; bottom: 4%; font: 500 9.5px/1.5 var(--mono); letter-spacing: 0.14em; color: #6E4A25; text-align: center; border-top: 1px solid rgba(80,50,20,0.35); padding-top: 6px; }
 
 /* Tiles */
 .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 44px; }
-.tile { position: relative; aspect-ratio: 1 / 1.25; border-radius: 10px; padding: 22px; background: var(--c); color: var(--fg, #141414); display: flex; flex-direction: column; overflow: hidden; transition: transform .25s; }
+.tile { position: relative; aspect-ratio: 1 / 1.22; border-radius: 12px; padding: 22px; background: var(--c); color: var(--fg, var(--ink)); display: flex; flex-direction: column; overflow: hidden; transition: transform .25s; }
 .tile:hover { transform: translateY(-3px); }
 .tile .num { position: absolute; top: 16px; right: 20px; text-align: right; }
-.tile .num b { display: block; font: 600 40px/1 var(--head); letter-spacing: -0.04em; }
+.tile .num b { display: block; font: 400 40px/1 var(--serif); }
 .tile .num small { display: block; font: 500 9.5px/1.4 var(--mono); letter-spacing: 0.14em; margin-top: 8px; text-transform: uppercase; }
 .tile i.big { font-size: 96px; margin-top: 24px; line-height: 1; }
 .tile .bottom { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; }
-.tile h4 { font: 600 27px/1.05 var(--head); letter-spacing: -0.035em; }
+.tile h4 { font: 400 26px/1.05 var(--serif); }
 .tile p { font-size: 12.5px; margin-top: 6px; opacity: 0.85; max-width: 190px; line-height: 1.45; }
 .tile .arrow { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,0.1); font-size: 14px; }
 
+/* Colours */
+.colours { position: relative; min-height: 620px; background: var(--night) url(img/art-dusk.jpg) center/cover; color: var(--cream); overflow: hidden; }
+.colours .wrap { position: relative; display: grid; grid-template-columns: 0.8fr 1.6fr; gap: 40px; align-items: center; min-height: 620px; }
+.colours h2 { font-size: clamp(32px, 4vw, 46px); text-shadow: 0 2px 30px rgba(0,40,24,0.4); }
+.colours p { margin-top: 18px; font-size: 16px; line-height: 1.7; max-width: 330px; opacity: 0.92; text-shadow: 0 1px 12px rgba(0,40,24,0.5); }
+.swatches { display: flex; flex-wrap: wrap; gap: 30px 34px; justify-content: center; }
+.sw { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.sw:nth-child(even) { margin-top: 70px; }
+.sw b { width: 112px; height: 112px; border-radius: 50%; border: 6px solid var(--cream); box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+.sw span { padding: 8px 16px; border-radius: 10px; background: var(--cream); font: 400 20px var(--serif); color: #3A1A10; }
+.sw small { font: 500 11px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; }
+
 /* Low spec */
-.specs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); margin-top: 44px; background: var(--paper); border-radius: 10px; overflow: hidden; }
+.specs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); margin-top: 44px; background: var(--card); border-radius: 12px; overflow: hidden; }
 .spec { padding: 30px 26px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.spec .n { font: 400 44px/1 var(--pixel); letter-spacing: -0.04em; margin-bottom: 14px; }
+.spec .n { font: 400 42px/1 var(--serif); margin-bottom: 14px; color: var(--forest); }
 .spec .l { font-size: 14px; color: var(--mute); }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: end; }
 .split .sub { color: var(--ink2); font-size: 17px; max-width: 470px; }
 
 /* Shortcuts */
 .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 34px; margin-top: 36px; }
-.key { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px dashed #D6D6D1; font-size: 15px; color: var(--ink2); }
-kbd { font: 500 12px var(--mono); color: var(--ink); padding: 4px 9px; border-radius: 7px; background: var(--paper); border: 1px solid var(--line); border-bottom-width: 2px; }
+.key { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px dashed #D3C9B5; font-size: 15px; color: var(--ink2); }
+kbd { font: 500 12px var(--mono); color: var(--ink); padding: 4px 9px; border-radius: 7px; background: var(--card); border: 1px solid var(--line); border-bottom-width: 2px; }
 
 /* Get */
 .get { display: grid; grid-template-columns: 1fr 1.15fr; gap: 60px; align-items: start; }
 .get ul { list-style: none; margin-top: 26px; display: grid; gap: 12px; }
 .get li { display: flex; gap: 12px; align-items: center; font-size: 15px; color: var(--ink2); }
-.get li i { font-size: 18px; color: var(--violet); }
-.term { border-radius: 14px; background: #141414; color: #D7D7D2; overflow: hidden; box-shadow: 0 30px 70px -30px rgba(0,0,0,0.5); }
-.term .bar { display: flex; align-items: center; gap: 7px; padding: 13px 16px; border-bottom: 1px solid #262626; }
-.term .bar i { width: 11px; height: 11px; border-radius: 50%; background: #3A3A3A; }
-.term .bar span { margin-left: 10px; font: 400 12px var(--pixel); color: #8A8A85; }
+.get li i { font-size: 18px; color: var(--forest); }
+.term { border-radius: 14px; background: var(--night); color: #D9E4DC; overflow: hidden; box-shadow: 0 30px 70px -30px rgba(0,40,24,0.6); }
+.term .bar { display: flex; align-items: center; gap: 7px; padding: 13px 16px; border-bottom: 1px solid #0F4A33; }
+.term .bar i { width: 11px; height: 11px; border-radius: 50%; background: #1B5A40; }
+.term .bar span { margin-left: 10px; font: 400 12px var(--mono); color: #8FB3A0; }
 .term pre { font: 400 13.5px/1.8 var(--mono); padding: 20px 22px 24px; overflow-x: auto; }
-.term .c { color: #77776F; }
-.term .p { color: #9C8CFF; user-select: none; }
+.term .c { color: #6F9883; }
+.term .p { color: var(--peach); user-select: none; }
 
-footer { border-top: 1px solid var(--line); padding: 50px 0 70px; }
+footer { background: var(--night); color: var(--cream); padding: 56px 0 70px; }
 footer .wrap { display: flex; flex-wrap: wrap; gap: 20px 40px; align-items: center; justify-content: space-between; }
-footer img { height: 34px; width: auto; }
-footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--faint); text-transform: uppercase; }
+footer img { height: 40px; width: auto; }
+footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; opacity: 0.7; text-transform: uppercase; }
 
 .reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
 .reveal.in { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
-  .track, .live::before, .hero h1 .caret { animation: none; }
+  .track { animation: none; }
   html { scroll-behavior: auto; }
 }
 
-@media (max-width: 1320px) { .float { display: none; } .hero { padding: 90px 0 110px; } }
 @media (max-width: 980px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
   .tiles { grid-template-columns: repeat(2, 1fr); }
   .specs { grid-template-columns: repeat(2, 1fr); }
-  .manifesto .grid, .get, .split { grid-template-columns: 1fr; gap: 40px; }
+  .manifesto .grid, .get, .split, .begin, .colours .wrap { grid-template-columns: 1fr; gap: 40px; }
+  .colours .wrap { padding: 80px 0; }
   .keys { grid-template-columns: repeat(2, 1fr); }
   nav .links { display: none; }
 }
 @media (max-width: 620px) {
   .cards, .tiles, .keys { grid-template-columns: 1fr; }
   .tile { aspect-ratio: auto; min-height: 260px; }
-  .strip .wrap { font-size: 12px; } .strip a { display: none; }
+  .strip a { display: none; }
   section { padding: 70px 0; }
-  .shot { padding: 6px; border-radius: 14px; }
+  .shot { padding: 6px; border-radius: 14px; margin-top: -110px; }
+  .hero { padding-bottom: 150px; }
+  .hero .foot { display: none; }
+  .playmark { bottom: 110px; }
+  .sw b { width: 84px; height: 84px; }
+  .sw:nth-child(even) { margin-top: 0; }
   .sticker .s { width: 48px; height: 48px; font-size: 22px; }
   .sticker .t b { font-size: 20px; } .sticker .t span { font-size: 13px; } .sticker .t small { display: none; }
 }
@@ -237,61 +235,47 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
 
 <div class="strip">
   <div class="wrap">
-    <span class="live">NEW</span>
-    <b>Isai Studio Pro 0.0.1 is in early access</b>
+    <span class="new">NEW</span>
+    <span>Isai 0.0.1 · a new look, with the Meadow palette</span>
     <a href="#get">Build it from source →</a>
   </div>
 </div>
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="#"><img src="img/mark-ink.png" alt="Isai"><span>studio&nbsp;pro</span></a>
+    <a class="brand" href="#"><img src="img/mark-ink.png" alt="Isai"><span>studio pro</span></a>
     <div class="links">
       <a href="#start">Features</a>
       <a href="#why">Why Isai</a>
       <a href="#more">Tools</a>
+      <a href="#colours">Colours</a>
       <a href="#lowspec">Low-spec</a>
     </div>
     <div class="right">
       <a class="pill" href="https://github.com/DhineshKrishnan1206/isai-studio-pro"><i class="ph ph-github-logo"></i> GitHub</a>
-      <a class="pill" href="#get">Get Isai</a>
+      <a class="pill dark" href="#get">Get Isai</a>
     </div>
   </div>
 </nav>
 
 <header class="hero">
-  <div class="float f1"><div class="cover"><img src="img/c-filter.jpg" alt=""></div></div>
-  <div class="float f2"><div class="cover"><img src="img/c-drums.jpg" alt=""></div></div>
-  <div class="float f3">
-    <div class="note">
-      <div class="k">Tip · 012</div>
-      <h4>Cycle your selection</h4>
-      <p>Select regions on any tracks and press ⌘U. The repeat bar wraps them and playback loops.</p>
-    </div>
-    <div class="meter"><small>Audio CPU</small><span class="bars"><i></i><i></i><i class="off"></i><i class="off"></i><i class="off"></i><i class="off"></i></span><b>3%</b></div>
-  </div>
-  <div class="float f4"><div class="cover"><img src="img/c-keys.jpg" alt=""></div></div>
-  <div class="float f5">
-    <div class="note">
-      <div class="k">Low-spec · 4 GB</div>
-      <h4>Runs on a dual-core laptop</h4>
-      <p>Eco mode, track freeze and an idle UI that uses no CPU.</p>
-    </div>
-  </div>
-
+  <div class="corner" style="left:36px">isai</div>
+  <div class="corner" style="right:36px">studio pro</div>
   <div class="inner wrap">
-    <a class="tag" href="#get"><span class="live">LIVE</span> Isai Synth, Drums &amp; Sampler <em>New instruments</em> →</a>
-    <h1>Make music on <span class="rot" id="rot">any laptop</span><span class="caret"></span><br>Every tool. <span class="pixel">Free.</span></h1>
-    <p class="lead">A full studio to record, compose, mix and master on macOS, Windows and Linux. No account, no subscription, no internet.</p>
+    <h1>every song starts<br>somewhere.</h1>
+    <p class="lead">A free music studio for any computer. Record, write, mix and master on macOS, Windows and Linux, offline and yours.</p>
     <div class="ctas">
-      <a class="btn-dark" href="#get">Get Isai free <i class="ph ph-arrow-right"></i></a>
-      <a class="link" href="#start"><i class="ph ph-play-circle"></i> See what's inside</a>
+      <a class="btn cream" href="#get">Get Isai free <i class="ph ph-arrow-right"></i></a>
+      <a class="btn glass" href="#start">See what's inside</a>
     </div>
   </div>
+  <div class="foot" style="left:36px">macOS · Windows · Linux</div>
+  <div class="foot" style="right:36px">GPL-3.0 · இசை</div>
+  <div class="playmark" aria-hidden="true"></div>
 </header>
 
 <div class="narrow">
-  <div class="shot reveal"><img src="img/multi.jpg" alt="Isai Studio Pro: two audio tracks with looped regions and crossfades" width="1600" height="1006"></div>
+  <div class="shot reveal"><img src="img/multi.jpg" alt="The Isai studio: the inspector on the left, tracks with their headers, and regions in lake teal and leaf green" width="1600" height="1006"></div>
 </div>
 
 <div class="marquee">
@@ -301,52 +285,52 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
     <span><i class="ph ph-apple-logo"></i>macOS</span><span><i class="ph ph-windows-logo"></i>Windows</span><span><i class="ph ph-linux-logo"></i>Linux</span><span><i class="ph ph-file-audio"></i>WAV</span><span><i class="ph ph-file-audio"></i>FLAC</span><span><i class="ph ph-music-notes"></i>MP3</span><span><i class="ph ph-music-notes"></i>OGG</span><span><i class="ph ph-music-notes"></i>AAC / M4A</span><span><i class="ph ph-file-audio"></i>AIFF</span><span><i class="ph ph-piano-keys"></i>MIDI keyboards</span><span><i class="ph ph-microphone"></i>USB mics</span><span><i class="ph ph-plugs"></i>Audio interfaces</span><span><i class="ph ph-headphones"></i>Headphones</span>
   </div></div>
   <div class="rail rev"><div class="track">
-    <span>Chorus</span><span>Flanger</span><span>Phaser</span><span>Distortion</span><span>Bitcrusher</span><span>Gate</span><span>De-esser</span><span>Pitch Correct</span><span>8-band EQ</span><span>Compressor</span><span>Limiter</span><span>Reverb</span><span>Delay</span>
-    <span>Chorus</span><span>Flanger</span><span>Phaser</span><span>Distortion</span><span>Bitcrusher</span><span>Gate</span><span>De-esser</span><span>Pitch Correct</span><span>8-band EQ</span><span>Compressor</span><span>Limiter</span><span>Reverb</span><span>Delay</span>
+    <span>chorus</span><span>flanger</span><span>phaser</span><span>distortion</span><span>bitcrusher</span><span>gate</span><span>de-esser</span><span>pitch correct</span><span>8-band eq</span><span>compressor</span><span>limiter</span><span>reverb</span><span>delay</span>
+    <span>chorus</span><span>flanger</span><span>phaser</span><span>distortion</span><span>bitcrusher</span><span>gate</span><span>de-esser</span><span>pitch correct</span><span>8-band eq</span><span>compressor</span><span>limiter</span><span>reverb</span><span>delay</span>
   </div></div>
 </div>
 
 <section id="start">
   <div class="wrap">
     <div class="eyebrow">Pick your starting point</div>
-    <h2>Choose where to start</h2>
+    <h2>choose where to <em>start.</em></h2>
     <div class="cards">
-      <article class="card reveal" style="--c:#EBCBC4;--tab:#D9A79C">
+      <article class="card reveal" style="--c:#CFE2DE;--tab:#9FC7C0">
         <div class="folder"><div class="cover"><img src="img/c-arrange.jpg" alt="Regions with crossfades on the timeline" loading="lazy"></div><span class="label">playlist</span></div>
         <h3>Arrange a song</h3>
         <ul><li>Move, trim, split, fade and loop regions</li><li>Loops follow your tempo, pitch stays put</li><li>Markers, cycle and full undo history</li></ul>
         <span class="chip">Audio + MIDI · <b>unlimited tracks</b></span>
         <div class="open">Open the playlist <kbd>F5</kbd></div>
       </article>
-      <article class="card reveal" style="--c:#C6CDBA;--tab:#A5AF95">
+      <article class="card reveal" style="--c:#F6DCC0;--tab:#EDBB8A">
         <div class="folder"><div class="cover"><img src="img/c-compose.jpg" alt="Notes in the piano roll" loading="lazy"></div><span class="label">piano roll</span></div>
         <h3>Write melodies</h3>
         <ul><li>Chords in your key, in one click</li><li>Strum, arpeggiate and quantize with swing</li><li>Ghost notes and scale highlighting</li></ul>
         <span class="chip">Computer keys or <b>MIDI keyboard</b></span>
         <div class="open">Open the piano roll <kbd>F7</kbd></div>
       </article>
-      <article class="card reveal" style="--c:#F3E2A0;--tab:#E2C86A">
+      <article class="card reveal" style="--c:#F3E7A6;--tab:#E6D06A">
         <div class="folder"><div class="cover"><img src="img/c-synth.jpg" alt="Isai Synth oscillators and filter" loading="lazy"></div><span class="label">isai synth</span></div>
         <h3>Design sounds</h3>
         <ul><li>Two oscillators, sub, noise and drive</li><li>A filter you drag, two envelopes, an LFO</li><li>Unison, glide and presets with A/B</li></ul>
         <span class="chip">Synth · Piano · <b>9 piano tones</b></span>
         <div class="open">New track → Synth <kbd>＋</kbd></div>
       </article>
-      <article class="card reveal" style="--c:#BCCCDD;--tab:#94ADC6">
+      <article class="card reveal" style="--c:#EBC4B2;--tab:#DB977A">
         <div class="folder"><div class="cover"><img src="img/c-drums.jpg" alt="Isai Drums step grid" loading="lazy"></div><span class="label">isai drums</span></div>
         <h3>Program beats</h3>
         <ul><li>808, 909, Acoustic, Lo-fi and Trap kits</li><li>Click or paint steps, accents and swing</li><li>Slice any loop into pads with the sampler</li></ul>
         <span class="chip">5 kits · <b>10 pieces each</b></span>
         <div class="open">New track → Drum machine <kbd>＋</kbd></div>
       </article>
-      <article class="card reveal" style="--c:#D9BEE4;--tab:#BE97CF">
+      <article class="card reveal" style="--c:#D6E6C6;--tab:#AFCF93">
         <div class="folder"><div class="cover"><img src="img/c-bands.jpg" alt="EQ band controls" loading="lazy"></div><span class="label">mixer</span></div>
         <h3>Mix it</h3>
-        <ul><li>Mixer with buses, sends and big meters</li><li>13 effects, from EQ to Pitch Correct</li><li>Automate any knob over time</li></ul>
+        <ul><li>An inspector and a mixer with buses and sends</li><li>13 effects, from EQ to Pitch Correct</li><li>Automate any knob over time</li></ul>
         <span class="chip">13 effects · <b>8-band EQ</b></span>
         <div class="open">Open the mixer <kbd>F9</kbd></div>
       </article>
-      <article class="card reveal" style="--c:#9FD0CD;--tab:#76B8B4">
+      <article class="card reveal" style="--c:#BFD6CC;--tab:#8DB5A5">
         <div class="folder"><div class="cover"><img src="img/c-eq.jpg" alt="The EQ curve over a live analyzer of the mix" loading="lazy"></div><span class="label">mastering</span></div>
         <h3>Finish and share</h3>
         <ul><li>Mastering assistant for streaming loudness</li><li>Export the song, a section or stems</li><li>WAV and FLAC, at full quality</li></ul>
@@ -354,6 +338,22 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
         <div class="open">Export <kbd>⌘E</kbd></div>
       </article>
     </div>
+  </div>
+</section>
+
+<section style="padding-top:20px">
+  <div class="wrap begin">
+    <div class="reveal">
+      <div class="eyebrow">The start screen</div>
+      <h2>a quiet place<br>to <em>begin.</em></h2>
+      <p>Isai opens on a painting, not a wall of buttons. Pick a template, set the tempo and key, and press Return.</p>
+      <ul>
+        <li><i class="ph ph-plus-circle"></i>Five templates: beat, song, ballad, voice or empty</li>
+        <li><i class="ph ph-clock-counter-clockwise"></i>Recent songs, each with its own little cover</li>
+        <li><i class="ph ph-lifebuoy"></i>Recovers your song if Isai closed unexpectedly</li>
+      </ul>
+    </div>
+    <div class="frame reveal"><img src="img/chooser.jpg" alt="The Isai start screen: a painted backdrop with the greeting 'good afternoon. what are we making?'" loading="lazy" width="1600" height="1006"></div>
   </div>
 </section>
 
@@ -365,17 +365,17 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
       <p>It is built to run on the computer you already have. A dual-core laptop with 4 GB of RAM is the target, and every heavy feature can be turned down.</p>
       <p>Start with a template and press play, then go as deep as you like. <em>Isai</em> (இசை) means <em>music</em> in Tamil.</p>
       <div class="links"><a href="#more">See every tool</a><a href="#get">Build it yourself</a></div>
-      <div class="sig">@ Isai Studio</div>
+      <div class="sig">— isai studio</div>
     </div>
     <div class="box reveal">
       <div class="back"></div>
       <div class="grid-paper"></div>
       <div class="front">
-        <div class="sticker" style="left:11%;top:12%"><div class="s" style="background:#F6E04A;transform:rotate(-4deg)"><i class="ph ph-heart"></i></div><div class="t"><b>01</b><span>Free</span><small>forever, GPL-3.0</small></div></div>
-        <div class="sticker" style="left:55%;top:6%"><div class="t" style="text-align:right"><b>02</b><span>Offline</span><small>no account, no login</small></div><div class="s" style="background:#E8F04C;transform:rotate(5deg)"><i class="ph ph-wifi-slash"></i></div></div>
-        <div class="sticker" style="left:22%;top:41%"><div class="s" style="background:#FFFDF6;border:6px solid #F3D34A;transform:rotate(-3deg)"><i class="ph ph-cpu"></i></div><div class="t"><b>03</b><span>Low-spec</span><small>2 cores, 4 GB RAM</small></div></div>
-        <div class="sticker" style="left:52%;top:57%"><div class="s" style="background:#5B8DEF;color:#fff;transform:rotate(-12deg)"><i class="ph ph-code"></i></div><div class="t"><b>04</b><span>Open</span><small>read and change the code</small></div></div>
-        <div class="sticker" style="left:16%;top:72%"><div class="s" style="background:linear-gradient(180deg,#49C6E5 50%,#F0506E 50%);color:#fff;transform:rotate(-8deg)"><i class="ph ph-folder-simple"></i></div><div class="t"><b>05</b><span>Yours</span><small>songs stay on your disk</small></div></div>
+        <div class="sticker" style="left:11%;top:12%"><div class="s" style="background:#F5DC53;transform:rotate(-4deg)"><i class="ph ph-heart"></i></div><div class="t"><b>01</b><span>Free</span><small>forever, GPL-3.0</small></div></div>
+        <div class="sticker" style="left:55%;top:6%"><div class="t" style="text-align:right"><b>02</b><span>Offline</span><small>no account, no login</small></div><div class="s" style="background:#F4B271;transform:rotate(5deg)"><i class="ph ph-wifi-slash"></i></div></div>
+        <div class="sticker" style="left:22%;top:41%"><div class="s" style="background:#FFFDF6;border:6px solid #7DB862;transform:rotate(-3deg)"><i class="ph ph-cpu"></i></div><div class="t"><b>03</b><span>Low-spec</span><small>2 cores, 4 GB RAM</small></div></div>
+        <div class="sticker" style="left:52%;top:57%"><div class="s" style="background:#116252;color:#F6ECD6;transform:rotate(-12deg)"><i class="ph ph-code"></i></div><div class="t"><b>04</b><span>Open</span><small>read and change the code</small></div></div>
+        <div class="sticker" style="left:16%;top:72%"><div class="s" style="background:linear-gradient(180deg,#56A096 50%,#CD6138 50%);color:#fff;transform:rotate(-8deg)"><i class="ph ph-folder-simple"></i></div><div class="t"><b>05</b><span>Yours</span><small>songs stay on your disk</small></div></div>
         <div class="stamp">CONTENTS<br>OF THE STUDIO BOX</div>
       </div>
     </div>
@@ -385,24 +385,40 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
 <section id="more">
   <div class="wrap">
     <div class="eyebrow">Beyond the basics</div>
-    <h2>Everything else in <span class="pixel">Isai.</span></h2>
+    <h2>everything else in <em>isai.</em></h2>
     <div class="tiles">
-      <div class="tile reveal" style="--c:#F2B4AE"><div class="num"><b>01</b><small>Tune up</small></div><i class="ph-thin ph-guitar big"></i><div class="bottom"><div><h4>Tuner</h4><p>Chromatic, guitar and bass</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#EA8430"><div class="num"><b>02</b><small>Draw motion</small></div><i class="ph-thin ph-wave-sine big"></i><div class="bottom"><div><h4>Automation</h4><p>Volume, pan and any effect knob</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#FAFAF8"><div class="num"><b>03</b><small>Find sounds</small></div><i class="ph-thin ph-folder-open big"></i><div class="bottom"><div><h4>Browser</h4><p>Preview in time, drag onto tracks</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#2C62C9;--fg:#fff"><div class="num"><b>04</b><small>Loud &amp; clean</small></div><i class="ph-thin ph-magic-wand big"></i><div class="bottom"><div><h4>Mastering<br>assistant</h4><p>EQ, compressor and limiter in one step</p></div><span class="arrow" style="background:rgba(255,255,255,0.2)"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#5FC48E"><div class="num"><b>05</b><small>Save CPU</small></div><i class="ph-thin ph-snowflake big"></i><div class="bottom"><div><h4>Freeze</h4><p>Render heavy tracks to audio</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#C3B8EE"><div class="num"><b>06</b><small>Type it</small></div><i class="ph-thin ph-magnifying-glass big"></i><div class="bottom"><div><h4>Command palette</h4><p>⌘K: "128 bpm", "bar 17", "A minor"</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#72C3E6"><div class="num"><b>07</b><small>Sing in tune</small></div><i class="ph-thin ph-microphone-stage big"></i><div class="bottom"><div><h4>Pitch Correct</h4><p>From gentle touch-up to hard snap</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
-      <div class="tile reveal" style="--c:#F1D27E"><div class="num"><b>08</b><small>Never lose work</small></div><i class="ph-thin ph-floppy-disk big"></i><div class="bottom"><div><h4>Autosave</h4><p>Crash recovery, self-contained projects</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#CD6138;--fg:#FFF4E6"><div class="num"><b>01</b><small>Tune up</small></div><i class="ph-thin ph-guitar big"></i><div class="bottom"><div><h4>Tuner</h4><p>Chromatic, guitar and bass</p></div><span class="arrow" style="background:rgba(255,255,255,0.2)"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#F5DC53"><div class="num"><b>02</b><small>Draw motion</small></div><i class="ph-thin ph-wave-sine big"></i><div class="bottom"><div><h4>Automation</h4><p>Volume, pan and any effect knob</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#FBF7EE"><div class="num"><b>03</b><small>Find sounds</small></div><i class="ph-thin ph-folder-open big"></i><div class="bottom"><div><h4>Browser</h4><p>Preview in time, drag onto tracks</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#116252;--fg:#F6ECD6"><div class="num"><b>04</b><small>Loud &amp; clean</small></div><i class="ph-thin ph-magic-wand big"></i><div class="bottom"><div><h4>Mastering<br>assistant</h4><p>EQ, compressor and limiter in one step</p></div><span class="arrow" style="background:rgba(255,255,255,0.18)"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#7DB862"><div class="num"><b>05</b><small>Save CPU</small></div><i class="ph-thin ph-snowflake big"></i><div class="bottom"><div><h4>Freeze</h4><p>Render heavy tracks to audio</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#F4B271"><div class="num"><b>06</b><small>Type it</small></div><i class="ph-thin ph-magnifying-glass big"></i><div class="bottom"><div><h4>Command palette</h4><p>⌘K: "128 bpm", "bar 17", "A minor"</p></div><span class="arrow"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#56A096;--fg:#F6ECD6"><div class="num"><b>07</b><small>Sing in tune</small></div><i class="ph-thin ph-microphone-stage big"></i><div class="bottom"><div><h4>Pitch Correct</h4><p>From gentle touch-up to hard snap</p></div><span class="arrow" style="background:rgba(255,255,255,0.2)"><i class="ph ph-arrow-right"></i></span></div></div>
+      <div class="tile reveal" style="--c:#00321E;--fg:#F6ECD6"><div class="num"><b>08</b><small>Never lose work</small></div><i class="ph-thin ph-floppy-disk big"></i><div class="bottom"><div><h4>Autosave</h4><p>Crash recovery, self-contained projects</p></div><span class="arrow" style="background:rgba(255,255,255,0.15)"><i class="ph ph-arrow-right"></i></span></div></div>
     </div>
   </div>
 </section>
 
-<section id="lowspec" style="padding-top:40px">
+<div class="colours" id="colours">
+  <div class="wrap">
+    <div class="reveal">
+      <h2>the colours<br>of isai.</h2>
+      <p>Every track, region and button in the app takes its colour from this palette, and every painting is generated from it.</p>
+    </div>
+    <div class="swatches reveal">
+      <div class="sw"><b style="background:#00321E"></b><span>#00321E</span><small>Night</small></div>
+      <div class="sw"><b style="background:#116252"></b><span>#116252</span><small>Forest</small></div>
+      <div class="sw"><b style="background:#CD6138"></b><span>#CD6138</span><small>Clay</small></div>
+      <div class="sw"><b style="background:#F4B271"></b><span>#F4B271</span><small>Peach</small></div>
+      <div class="sw"><b style="background:#F5DC53"></b><span>#F5DC53</span><small>Sun</small></div>
+    </div>
+  </div>
+</div>
+
+<section id="lowspec">
   <div class="wrap">
     <div class="split">
-      <div><div class="eyebrow">Made for every computer</div><h2>Your laptop is <span class="pixel">enough.</span></h2></div>
+      <div><div class="eyebrow">Made for every computer</div><h2>your laptop is <em>enough.</em></h2></div>
       <p class="sub">On first launch Isai checks your hardware, benchmarks your CPU and suggests a setup. You stay in control of every option.</p>
     </div>
     <div class="specs reveal">
@@ -417,7 +433,7 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
 <section style="padding-top:20px">
   <div class="wrap">
     <div class="eyebrow">Fast hands</div>
-    <h2>Keyboard first.</h2>
+    <h2>keyboard first.</h2>
     <p style="color:var(--ink2);margin-top:12px">Press <kbd>?</kbd> in the app to see them all.</p>
     <div class="keys">
       <div class="key">Play / stop <kbd>Space</kbd></div>
@@ -425,9 +441,9 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
       <div class="key">Command palette <kbd>⌘K</kbd></div>
       <div class="key">Cycle the selection <kbd>⌘U</kbd></div>
       <div class="key">Add a marker <kbd>M</kbd></div>
+      <div class="key">Inspector <kbd>I</kbd></div>
       <div class="key">Metronome <kbd>K</kbd></div>
       <div class="key">Tap tempo <kbd>T</kbd></div>
-      <div class="key">Snap <kbd>N</kbd></div>
       <div class="key">Browser <kbd>B</kbd></div>
     </div>
   </div>
@@ -437,7 +453,7 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
   <div class="wrap get">
     <div class="reveal">
       <div class="eyebrow">Get it</div>
-      <h2>Build it from <span class="pixel">source.</span></h2>
+      <h2>build it from <em>source.</em></h2>
       <p style="color:var(--ink2);font-size:17px;margin-top:16px;max-width:460px">Ready-made downloads come with the first release. Until then, building it takes a few minutes.</p>
       <ul>
         <li><i class="ph ph-check-circle"></i><span><a href="https://rustup.rs">Rust</a> 1.88 or newer</span></li>
@@ -463,8 +479,8 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
 
 <footer>
   <div class="wrap">
-    <img src="img/wordmark-ink.png" alt="Isai Studio Pro">
-    <span class="meta">GPL-3.0 · Built with Rust &amp; Qt · இசை</span>
+    <img src="img/wordmark-light.png" alt="Isai Studio Pro">
+    <span class="meta">GPL-3.0 · Built with Rust &amp; Qt · Art made with tools/paint_art.py · இசை</span>
   </div>
 </footer>
 
@@ -473,26 +489,6 @@ footer .meta { font: 500 11px var(--mono); letter-spacing: 0.12em; color: var(--
     for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
   }, { rootMargin: '0px 0px -8% 0px' });
   document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
-
-  // The grey word in the headline types itself out, one machine at a time.
-  const words = ['any laptop', 'an old PC', 'Linux', 'Windows', 'a MacBook'];
-  const rot = document.getElementById('rot');
-  if (rot && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    let w = 0, i = words[0].length, deleting = true;
-    const tick = () => {
-      const word = words[w];
-      if (deleting) {
-        i--;
-        if (i <= 0) { deleting = false; w = (w + 1) % words.length; }
-      } else {
-        i++;
-        if (i >= words[w].length) { deleting = true; rot.textContent = words[w]; return setTimeout(tick, 2200); }
-      }
-      rot.textContent = words[w].slice(0, Math.max(i, 0)) || '​';
-      setTimeout(tick, deleting ? 45 : 80);
-    };
-    setTimeout(tick, 2400);
-  }
 </script>
 </body>
 </html>
