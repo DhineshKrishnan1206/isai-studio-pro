@@ -136,9 +136,19 @@ impl Default for Shared {
 }
 
 pub(crate) fn raise_peak(peak: &AtomicU32, value: f32) {
-    let _ = peak.fetch_update(Relaxed, Relaxed, |old| {
-        (value > f32::from_bits(old)).then_some(value.to_bits())
-    });
+    swap_f32_while(peak, value, |new, old| new > old);
+}
+
+/// Stores `value` in `cell` (an f32's bits) for as long as `better(value, current)`
+/// holds, retrying if another thread changes it in between. Lock-free.
+pub(crate) fn swap_f32_while(cell: &AtomicU32, value: f32, better: impl Fn(f32, f32) -> bool) {
+    let mut old = cell.load(Relaxed);
+    while better(value, f32::from_bits(old)) {
+        match cell.compare_exchange_weak(old, value.to_bits(), Relaxed, Relaxed) {
+            Ok(_) => break,
+            Err(now) => old = now,
+        }
+    }
 }
 
 /// A short pitched blip for the metronome: higher on the first beat of a bar.

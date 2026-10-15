@@ -1588,7 +1588,12 @@ impl Project {
 
     /// Deletes regions; true if any existed.
     pub fn remove_regions(&mut self, ids: &[u64]) -> bool {
-        ids.iter().fold(false, |any, &id| self.remove_region(id) || any)
+        // Not `any`: that would stop after the first one it removes.
+        let mut removed = false;
+        for &id in ids {
+            removed |= self.remove_region(id);
+        }
+        removed
     }
 
     /// Every audio file the project uses, without duplicates.

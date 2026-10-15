@@ -265,7 +265,7 @@ impl Engine {
     pub fn take_track_peaks(&self, tracks: usize, out: &mut Vec<(f32, f32)>) {
         let take = |p: &std::sync::atomic::AtomicU32| f32::from_bits(p.swap(0, Relaxed));
         out.clear();
-        out.extend(self.shared.track_peaks.chunks_exact(2).take(tracks).map(|p| (take(&p[0]), take(&p[1]))));
+        out.extend(self.shared.track_peaks.as_chunks::<2>().0.iter().take(tracks).map(|[l, r]| (take(l), take(r))));
     }
     /// Share of the real-time budget the audio thread is using, where 1.0 means 100%.
     pub fn load(&self) -> f32 {

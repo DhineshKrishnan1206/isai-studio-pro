@@ -28,7 +28,7 @@ pub fn detect(samples: &[f32], rate: f32) -> Option<Reading> {
     }
     // Halve high sample rates: the same accuracy for a quarter of the work.
     let (x, rate): (Vec<f32>, f32) = if rate > 32_000.0 {
-        (samples.chunks_exact(2).map(|p| (p[0] + p[1]) * 0.5).collect(), rate / 2.0)
+        (samples.as_chunks::<2>().0.iter().map(|[a, b]| (a + b) * 0.5).collect(), rate / 2.0)
     } else {
         (samples.to_vec(), rate)
     };

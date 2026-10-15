@@ -758,7 +758,12 @@ impl AppController {
             let audio: Vec<u64> = ids.iter().copied().filter(|&r| p.find_region(r).is_some_and(|(_, r)| r.midi.is_none())).collect();
             // Reverse them all, unless they all already are: then play them forwards again.
             let on = !audio.iter().all(|&r| p.find_region(r).is_some_and(|(_, r)| r.reverse));
-            audio.iter().fold(false, |any, &r| p.set_region_reverse(r, on) || any)
+            // Not `any`: that would stop after the first one it changes.
+            let mut changed = false;
+            for &r in &audio {
+                changed |= p.set_region_reverse(r, on);
+            }
+            changed
         });
     }
 

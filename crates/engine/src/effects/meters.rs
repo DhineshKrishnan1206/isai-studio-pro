@@ -36,7 +36,7 @@ impl Default for Meters {
 }
 
 fn raise(a: &AtomicU32, v: f32) {
-    let _ = a.fetch_update(Relaxed, Relaxed, |old| (v > f32::from_bits(old)).then_some(v.to_bits()));
+    crate::processor::raise_peak(a, v);
 }
 
 fn peak(s: &[f32]) -> f32 {
@@ -63,7 +63,7 @@ impl Meters {
     pub fn record_output(&self, l: &[f32], r: &[f32], reduction: f32, scope: bool) {
         raise(&self.output[0], peak(l));
         raise(&self.output[1], peak(r));
-        let _ = self.reduction.fetch_update(Relaxed, Relaxed, |old| (reduction < f32::from_bits(old)).then_some(reduction.to_bits()));
+        crate::processor::swap_f32_while(&self.reduction, reduction, |new, old| new < old);
         if scope {
             let mut pos = self.scope_pos.load(Relaxed);
             for (a, b) in l.iter().zip(r) {

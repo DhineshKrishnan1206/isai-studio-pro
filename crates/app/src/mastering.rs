@@ -91,7 +91,7 @@ pub fn loudness(audio: &[f32], rate: u32) -> f32 {
     let step = (rate as usize) / 10; // 100 ms
     let mut sums: Vec<f64> = Vec::with_capacity(frames / step + 1);
     let mut acc = 0.0;
-    for (i, f) in audio.chunks_exact(2).enumerate() {
+    for (i, f) in audio.as_chunks::<2>().0.iter().enumerate() {
         for (ch, &x) in f.iter().enumerate() {
             let shelved = k[ch][0].tick(f64::from(x));
             let y = k[ch][1].tick(shelved);
@@ -121,7 +121,7 @@ pub fn analyse(audio: &[f32], rate: u32) -> Analysis {
     let mut low = Bq::low_pass(200.0, 0.707, r);
     let mut high = Bq::high_pass(4000.0, 0.707, r);
     let (mut total, mut lo, mut hi) = (0.0f64, 0.0f64, 0.0f64);
-    for f in audio.chunks_exact(2) {
+    for f in audio.as_chunks::<2>().0 {
         let m = f64::from(f[0] + f[1]) * 0.5;
         total += m * m;
         let l = low.tick(m);
@@ -153,7 +153,7 @@ fn run(chain: &[(EffectKind, [f32; MAX_PARAMS])], audio: &[f32], rate: u32) -> V
     for block in audio.chunks(1024) {
         l.clear();
         r.clear();
-        for f in block.chunks_exact(2) {
+        for f in block.as_chunks::<2>().0 {
             l.push(f[0]);
             r.push(f[1]);
         }
