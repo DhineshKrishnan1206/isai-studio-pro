@@ -77,7 +77,8 @@ impl AppController {
         let project = &session.project;
         let meter = project.tempo_map();
         // Exports always use full quality, whatever Eco mode is set to.
-        let arrangement = session.arrangement(&st.pool, false);
+        let mut arrangement = session.arrangement(&st.pool, false);
+        st.plugins.attach(&mut arrangement);
 
         // The range: the cycle region, or the whole song up to the end of the last region.
         let (start, end) = if cycle_only {
@@ -153,6 +154,7 @@ impl AppController {
         let paths = session.paths.clone();
         let thawed = crate::session::Session::new(project, paths.clone());
         let mut all = thawed.arrangement(&st.pool, false);
+        st.plugins.attach(&mut all);
         let bpm = all.bpm;
         let tempo_changes = std::mem::take(&mut all.tempo_changes);
         let mut solo = all.tracks.swap_remove(index);
@@ -232,6 +234,7 @@ impl AppController {
         let rate = engine.info().sample_rate;
         // The mix as it is, without master effects: the assistant builds those.
         let mut arrangement = session.arrangement(&st.pool, false);
+        st.plugins.attach(&mut arrangement);
         arrangement.master.clear();
         let end = content_end(&arrangement, rate);
         if end == 0 {

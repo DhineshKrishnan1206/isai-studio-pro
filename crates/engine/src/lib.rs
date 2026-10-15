@@ -18,6 +18,7 @@ pub mod instruments;
 pub mod mixer;
 mod processor;
 pub mod stretch;
+pub mod plugin;
 pub mod time;
 
 pub use arrangement::{Arrangement, AutoTarget, PlayBus, PlayLane, PlayRegion, PlayTrack};

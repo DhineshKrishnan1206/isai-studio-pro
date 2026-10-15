@@ -323,7 +323,7 @@ mod tests {
     fn exports_run_the_master_effects() {
         use crate::effects::{EffectKind, PlayInsert};
         let mut a = arrangement(1.5);
-        a.master = vec![PlayInsert { id: 1, kind: EffectKind::Limiter, enabled: true, params: EffectKind::Limiter.defaults() }];
+        a.master = vec![PlayInsert { plugin: None, id: 1, kind: EffectKind::Limiter, enabled: true, params: EffectKind::Limiter.defaults() }];
         let out = render(&a, 48_000, 0, 1200, 1.0, &ExportControl::default()).unwrap();
         let peak = out.iter().fold(0.0f32, |p, s| p.max(s.abs()));
         assert!(peak <= 10f32.powf(-1.0 / 20.0) + 1e-5 && peak > 0.5, "{peak}");

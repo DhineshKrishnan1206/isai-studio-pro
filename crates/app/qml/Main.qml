@@ -128,7 +128,7 @@ ApplicationWindow {
                 stepTimer.start()
             }
         }
-        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
+        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene === "plugin" || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
             app.newProject("Demo Song", 120, 4, 4, "C major")
         if (scene.startsWith("settings")) {
             settingsDialog.section = parseInt(scene.slice(8) || "0")
@@ -141,6 +141,7 @@ ApplicationWindow {
         if (scene === "stretch") stretchTimer.start()
         if (scene === "cycle") cycleTimer.start()
         if (scene === "tempo") tempoTimer.start()
+        if (scene === "plugin") pluginTimer.start()
         if (scene === "export") Qt.callLater(studio.exportAudio)
         if (scene.startsWith("export:")) exportRunTimer.start()
         if (app.devScreenshot !== "") shotTimer.start()
@@ -350,6 +351,26 @@ ApplicationWindow {
         }
     }
     Timer { id: zoomTimer; interval: 400; onTriggered: studio.zoomForTest(3) }
+    // Waits for the plugin scan, adds Pigments with a chord and plays it.
+    Timer {
+        id: pluginTimer
+        interval: 500
+        repeat: true
+        onTriggered: {
+            if (app.pluginScanning) return
+            stop()
+            const list = JSON.parse(app.pluginsJson || "[]")
+            const p = list.find(x => x.name === "Pigments") || list.find(x => x.instrument)
+            if (!p) return
+            const track = app.addPluginTrack(p.index)
+            const region = app.addMidiRegion(track, 0, 8)
+            for (const key of [60, 64, 67]) app.addNote(region, 0, 6, key, 100)
+            app.seekBeats(0)
+            app.togglePlay()
+            pluginMeter.start()
+        }
+    }
+    Timer { id: pluginMeter; interval: 1200; onTriggered: console.log("plugin-meter", app.meterL.toFixed(3), app.meterR.toFixed(3), app.trackMeters) }
     // A tempo change at bar 5 and 3/4 from bar 9, with the lanes shown, playing from bar 8.
     Timer { id: tempoTimer; interval: 1500; onTriggered: { app.addTempoChange(16, 90); app.addSignatureChange(9, 3, 4); studio.globalShown = true; app.seekBeats(29) } }
     Timer { id: cycleTimer; interval: 1500; onTriggered: { app.splitAtPlayhead(); app.seekBeats(20); app.selectAllRegions(); app.cycleSelection() } }
@@ -378,7 +399,7 @@ ApplicationWindow {
     }
     Timer {
         id: shotTimer
-        interval: app.devScene === "midirec" ? 5000 : 2800
+        interval: app.devScene === "midirec" ? 5000 : app.devScene === "plugin" ? 30000 : 2800
         onTriggered: {
             root.grabToImage(result => {
                 result.saveToFile(app.devScreenshot)

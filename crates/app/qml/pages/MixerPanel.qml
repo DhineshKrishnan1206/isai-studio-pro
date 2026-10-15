@@ -543,7 +543,7 @@ Item {
                     border.color: tag.modelData.enabled ? Theme.tint(Theme.accent, 0.5) : Theme.line
                 }
                 contentItem: DText {
-                    text: tags.shortNames[tag.modelData.kind] || "FX"
+                    text: tag.modelData.plugin ? tag.modelData.label.slice(0, 5).toUpperCase() : (tags.shortNames[tag.modelData.kind] || "FX")
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     font.pixelSize: 9

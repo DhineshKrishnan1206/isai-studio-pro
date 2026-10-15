@@ -24,6 +24,9 @@ Item {
         try { return JSON.parse(app.effectKindsJson || "[]") } catch (e) { return [] }
     }
     function kind(key) { return kinds.find(k => k.key === key) }
+    readonly property var plugins: {
+        try { return JSON.parse(app.pluginsJson || "[]") } catch (e) { return [] }
+    }
     function openAddMenu() { addMenu.open() }
     readonly property bool hasChain: chainType === "master" || chainId >= 0
 
@@ -122,6 +125,13 @@ Item {
                                 for (const k of found) { used[k.key] = true; out.push({ label: k.label, action: () => panel.add(k.key) }) }
                             }
                             for (const k of panel.kinds) if (!used[k.key]) out.push({ label: k.label, action: () => panel.add(k.key) })
+                            // Third-party effect plugins installed on this computer.
+                            const fx = panel.plugins.filter(p => !p.instrument)
+                            out.push({ separator: true }, { header: "PLUGINS" })
+                            for (const p of fx)
+                                out.push({ label: p.name, shortcut: p.format, action: () => panel.app.addPluginEffect(panel.chainType, panel.chainId, p.index) })
+                            out.push({ label: panel.app.pluginScanning ? "Looking for plugins…" : fx.length ? "Rescan plugins" : "Look for plugins (VST3)",
+                                       enabled: !panel.app.pluginScanning, action: () => panel.app.rescanPlugins() })
                             return out
                         }
                     }

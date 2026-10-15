@@ -28,6 +28,7 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | clang-format | 0.3.0 | MIT OR Apache-2.0 | https://github.com/KDAB/clang-format-rs/ |
 | codespan-reporting | 0.11.1 | Apache-2.0 | https://github.com/brendanzab/codespan |
 | codespan-reporting | 0.13.1 | Apache-2.0 | https://github.com/brendanzab/codespan |
+| com-scrape-types | 0.1.1 | MIT OR Apache-2.0 | https://github.com/coupler-rs/vst3-rs |
 | combine | 4.6.8 | MIT | https://github.com/Marwes/combine |
 | convert_case | 0.6.0 | MIT | https://github.com/rutrum/convert-case |
 | core-foundation | 0.10.1 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
@@ -39,6 +40,7 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | crc | 3.4.0 | MIT OR Apache-2.0 | https://github.com/mrhooray/crc-rs.git |
 | crc-catalog | 2.5.0 | MIT OR Apache-2.0 | https://github.com/akhilles/crc-catalog.git |
 | crossbeam-channel | 0.5.17 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam |
+| crossbeam-queue | 0.3.14 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam |
 | crossbeam-utils | 0.8.23 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam |
 | crypto-common | 0.1.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | cxx | 1.0.205 | MIT OR Apache-2.0 | https://github.com/dtolnay/cxx |
@@ -88,6 +90,7 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | lazy_static | 1.5.1 | MIT OR Apache-2.0 | https://github.com/rust-lang-nursery/lazy-static.rs |
 | libc | 0.2.190 | MIT OR Apache-2.0 | https://github.com/rust-lang/libc |
 | libloading | 0.7.4 | ISC | https://github.com/nagisa/rust_libloading/ |
+| libloading | 0.8.9 | ISC | https://github.com/nagisa/rust_libloading/ |
 | libredox | 0.1.25 | MIT | https://gitlab.redox-os.org/redox-os/libredox.git |
 | link-cplusplus | 1.0.12 | MIT OR Apache-2.0 | https://github.com/dtolnay/link-cplusplus |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
@@ -107,14 +110,23 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | num_enum | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | https://github.com/illicitonion/num_enum |
 | num_enum_derive | 0.7.6 | BSD-3-Clause OR MIT OR Apache-2.0 | https://github.com/illicitonion/num_enum |
 | objc2 | 0.6.5 | MIT | https://github.com/madsmtm/objc2 |
+| objc2-app-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | objc2-audio-toolbox | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | objc2-avf-audio | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-cloud-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | objc2-core-audio | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | objc2-core-audio-types | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-core-data | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | objc2-core-foundation | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-core-graphics | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-core-image | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-core-text | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-core-video | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | objc2-encode | 4.1.0 | MIT | https://github.com/madsmtm/objc2 |
 | objc2-foundation | 0.3.2 | MIT | https://github.com/madsmtm/objc2 |
 | objc2-io-kit | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-io-surface | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
+| objc2-quartz-core | 0.3.2 | Zlib OR Apache-2.0 OR MIT | https://github.com/madsmtm/objc2 |
 | once_cell | 1.21.4 | MIT OR Apache-2.0 | https://github.com/matklad/once_cell |
 | option-ext | 0.2.0 | MPL-2.0 | https://github.com/soc/option-ext.git |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
@@ -126,6 +138,7 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | https://github.com/dtolnay/proc-macro2 |
 | process_path | 0.1.4 | MIT/Apache-2.0 | https://github.com/wesleywiser/process_path |
 | qt-build-utils | 0.10.0 | MIT OR Apache-2.0 | https://github.com/KDAB/cxx-qt/ |
+| quick-xml | 0.41.0 | MIT | https://github.com/tafia/quick-xml |
 | quote | 1.0.47 | MIT OR Apache-2.0 | https://github.com/dtolnay/quote |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later | https://github.com/r-efi/r-efi |
 | realfft | 3.5.0 | MIT | https://github.com/HEnquist/realfft |
@@ -133,6 +146,7 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | redox_users | 0.5.3 | MIT | https://gitlab.redox-os.org/redox-os/users |
 | regex-lite | 0.1.9 | MIT OR Apache-2.0 | https://github.com/rust-lang/regex |
 | ron | 0.12.2 | MIT OR Apache-2.0 | https://github.com/ron-rs/ron |
+| rtrb | 0.3.5 | MIT OR Apache-2.0 | https://github.com/mgeier/rtrb |
 | rtrb | 0.4.0 | MIT OR Apache-2.0 | https://github.com/mgeier/rtrb |
 | rubato | 5.0.1 | MIT OR Apache-2.0 | https://github.com/HEnquist/rubato |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | https://github.com/djc/rustc-version-rs |
@@ -194,6 +208,8 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | unicode-width | 0.2.2 | MIT OR Apache-2.0 | https://github.com/unicode-rs/unicode-width |
 | version_check | 0.9.5 | MIT/Apache-2.0 | https://github.com/SergioBenitez/version_check |
 | visibility | 0.1.1 | Zlib OR MIT OR Apache-2.0 | https://github.com/danielhenrymantilla/visibility.rs |
+| vst3 | 0.3.0 | MIT OR Apache-2.0 | https://github.com/coupler-rs/vst3-rs |
+| vst3-host | 0.10.0 | MIT | https://github.com/HelgeSverre/rust-vst3-host/ |
 | walkdir | 2.5.0 | Unlicense/MIT | https://github.com/BurntSushi/walkdir |
 | wasm-bindgen | 0.2.129 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen |
 | wasm-bindgen-macro | 0.2.129 | MIT OR Apache-2.0 | https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro |
@@ -238,4 +254,5 @@ GPL-3.0-or-later. Generated from `cargo metadata`; regenerate it when dependenci
 | windows_x86_64_msvc | 0.42.2 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | windows_x86_64_msvc | 0.52.6 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 | winnow | 1.0.4 | MIT | https://github.com/winnow-rs/winnow |
+| xcb | 1.7.1 | MIT | https://github.com/rust-x-bindings/rust-xcb |
 | zmij | 1.0.23 | MIT | https://github.com/dtolnay/zmij |

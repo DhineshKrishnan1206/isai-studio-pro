@@ -5,6 +5,7 @@ mod export_ops;
 mod format;
 mod mastering;
 mod midi_input;
+mod plugin_ops;
 mod pool;
 mod project_ops;
 mod record_ops;
@@ -23,6 +24,20 @@ mod user_presets;
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QString, QUrl};
 
 fn main() {
+    // `isai --scan-plugins <file>`: write the installed plugins to <file> as JSON
+    // and quit. The app runs this as a separate process, so a plugin that crashes
+    // while loading can't take it down. (A file, not stdout: plugins print to stdout.)
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--scan-plugins") {
+        let json = isai_plugins::scan_json();
+        match args.get(i + 1) {
+            Some(out) => {
+                let _ = std::fs::write(out, json);
+            }
+            None => println!("{json}"),
+        }
+        return;
+    }
     let mut app = QGuiApplication::new();
     if let Some(mut app) = app.as_mut() {
         app.as_mut().set_application_name(&QString::from("Isai Studio Pro"));

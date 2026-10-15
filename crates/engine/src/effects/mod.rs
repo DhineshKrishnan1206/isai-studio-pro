@@ -52,6 +52,8 @@ pub enum EffectKind {
     Gate,
     DeEsser,
     PitchCorrect,
+    /// A third-party plugin (its own controls live in its window).
+    Plugin,
 }
 
 /// One knob or switch on an effect.
@@ -242,6 +244,7 @@ impl EffectKind {
             EffectKind::Gate => "gate",
             EffectKind::DeEsser => "deesser",
             EffectKind::PitchCorrect => "pitch",
+            EffectKind::Plugin => "plugin",
         }
     }
 
@@ -264,6 +267,7 @@ impl EffectKind {
             EffectKind::Gate => "Noise Gate",
             EffectKind::DeEsser => "De-esser",
             EffectKind::PitchCorrect => "Pitch Correct",
+            EffectKind::Plugin => "Plugin",
         }
     }
 
@@ -282,6 +286,7 @@ impl EffectKind {
             EffectKind::Gate => GATE_PARAMS,
             EffectKind::DeEsser => DEESSER_PARAMS,
             EffectKind::PitchCorrect => PITCH_PARAMS,
+            EffectKind::Plugin => &[],
         }
     }
 
@@ -319,6 +324,7 @@ pub enum Effect {
     Gate(Gate),
     DeEsser(DeEsser),
     PitchCorrect(PitchCorrect),
+    Plugin(crate::plugin::PluginEffect),
 }
 
 impl Effect {
@@ -339,6 +345,7 @@ impl Effect {
             EffectKind::Gate => Effect::Gate(Gate::new()),
             EffectKind::DeEsser => Effect::DeEsser(DeEsser::new()),
             EffectKind::PitchCorrect => Effect::PitchCorrect(PitchCorrect::new(rate)),
+            EffectKind::Plugin => Effect::Plugin(crate::plugin::PluginEffect::new(None, false)),
         }
     }
 
@@ -357,6 +364,7 @@ impl Effect {
             Effect::Gate(_) => EffectKind::Gate,
             Effect::DeEsser(_) => EffectKind::DeEsser,
             Effect::PitchCorrect(_) => EffectKind::PitchCorrect,
+            Effect::Plugin(_) => EffectKind::Plugin,
         }
     }
 
@@ -376,6 +384,7 @@ impl Effect {
             Effect::Gate(e) => e.process(params, ctx, l, r),
             Effect::DeEsser(e) => e.process(params, ctx, l, r),
             Effect::PitchCorrect(e) => e.process(params, ctx, l, r),
+            Effect::Plugin(e) => e.process(&crate::plugin::Transport { bpm: f64::from(ctx.bpm), playing: true, sample_rate: ctx.sample_rate }, l, r),
         }
     }
 
@@ -406,6 +415,7 @@ impl Effect {
             Effect::Gate(e) => e.reset(),
             Effect::DeEsser(e) => e.reset(),
             Effect::PitchCorrect(e) => e.reset(),
+            Effect::Plugin(_) => {}
         }
     }
 }
@@ -418,6 +428,8 @@ pub struct PlayInsert {
     pub kind: EffectKind,
     pub enabled: bool,
     pub params: [f32; MAX_PARAMS],
+    /// The loaded plugin, for `EffectKind::Plugin` inserts.
+    pub plugin: Option<crate::plugin::PluginRef>,
 }
 
 /// The effects the audio thread runs, keyed by insert id. Never grows past
@@ -439,7 +451,12 @@ impl EffectBank {
     pub fn for_inserts<'a>(inserts: impl IntoIterator<Item = &'a PlayInsert>, sample_rate: u32) -> Self {
         let mut bank = Self::default();
         for i in inserts {
-            let _ = bank.add(i.id, Box::new(Effect::new(i.kind, sample_rate)), None);
+            // Plugins render offline here, so they're waited for.
+            let effect = match (&i.plugin, i.kind) {
+                (Some(p), EffectKind::Plugin) => Effect::Plugin(crate::plugin::PluginEffect::new(Some(p.clone()), true)),
+                _ => Effect::new(i.kind, sample_rate),
+            };
+            let _ = bank.add(i.id, Box::new(effect), None);
         }
         bank
     }
@@ -680,7 +697,7 @@ mod tests {
     #[test]
     fn bank_runs_chains_in_order_and_skips_bypassed() {
         let mut bank = EffectBank::default();
-        let mut limiter = PlayInsert { id: 7, kind: EffectKind::Limiter, enabled: true, params: EffectKind::Limiter.defaults() };
+        let mut limiter = PlayInsert { plugin: None, id: 7, kind: EffectKind::Limiter, enabled: true, params: EffectKind::Limiter.defaults() };
         let meters = Arc::new(Meters::default());
         assert!(bank.add(7, Box::new(Effect::new(EffectKind::Limiter, 48_000)), Some(meters.clone())).is_ok());
         assert!(bank.add(7, Box::new(Effect::new(EffectKind::Limiter, 48_000)), None).is_err(), "ids are unique");

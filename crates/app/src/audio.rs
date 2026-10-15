@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use isai_engine::effects::{Effect, EffectKind, Meters};
 use isai_engine::instruments::{Instrument, InstrumentKind};
+use isai_engine::plugin::{PluginEffect, PluginInstrument, PluginRef};
 use isai_engine::{Engine, EngineConfig};
 use isai_settings::Settings;
 
@@ -15,10 +16,11 @@ pub struct Audio {
     pub engine: Option<Engine>,
     pub error: Option<String>,
     config: Option<EngineConfig>,
-    /// Effects the running engine has state for, by insert id, with their live meters.
-    effects: HashMap<u64, (EffectKind, Arc<Meters>)>,
+    /// Effects the running engine has state for, by insert id, with their live
+    /// meters (and which loaded plugin, for plugin inserts).
+    effects: HashMap<u64, (EffectKind, Arc<Meters>, usize)>,
     /// Instruments likewise, by instrument id.
-    instruments: HashMap<u64, InstrumentKind>,
+    instruments: HashMap<u64, (InstrumentKind, usize)>,
 }
 
 impl Audio {
@@ -56,46 +58,54 @@ impl Audio {
         }
     }
 
-    /// Makes the engine's effects match `wanted` (insert id, kind): builds
-    /// new ones here, off the audio thread, and drops ones no longer used.
-    pub fn sync_effects(&mut self, wanted: &[(u64, EffectKind)]) {
+    /// Makes the engine's effects match `wanted` (insert id, kind, plugin):
+    /// builds new ones here, off the audio thread, and drops ones no longer used.
+    pub fn sync_effects(&mut self, wanted: &[(u64, EffectKind, Option<PluginRef>)]) {
         let Some(engine) = &mut self.engine else { return };
         let rate = engine.info().sample_rate;
-        self.effects.retain(|id, (kind, _)| {
-            let keep = wanted.iter().any(|(w, k)| w == id && k == kind);
+        self.effects.retain(|id, (kind, _, plugin)| {
+            let keep = wanted.iter().any(|(w, k, p)| w == id && k == kind && plugin_id(p) == *plugin);
             if !keep {
                 engine.remove_effect(*id);
             }
             keep
         });
-        for &(id, kind) in wanted {
-            if let std::collections::hash_map::Entry::Vacant(slot) = self.effects.entry(id) {
+        for (id, kind, plugin) in wanted {
+            if let std::collections::hash_map::Entry::Vacant(slot) = self.effects.entry(*id) {
                 let meters = Arc::new(Meters::default());
-                engine.add_effect(id, Box::new(Effect::new(kind, rate)), Some(meters.clone()));
-                slot.insert((kind, meters));
+                let effect = match (kind, plugin) {
+                    (EffectKind::Plugin, Some(p)) => Effect::Plugin(PluginEffect::new(Some(p.clone()), false)),
+                    _ => Effect::new(*kind, rate),
+                };
+                engine.add_effect(*id, Box::new(effect), Some(meters.clone()));
+                slot.insert((*kind, meters, plugin_id(plugin)));
             }
         }
     }
 
     /// Live readings of a running effect.
     pub fn meters(&self, id: u64) -> Option<Arc<Meters>> {
-        self.effects.get(&id).map(|(_, m)| m.clone())
+        self.effects.get(&id).map(|(_, m, _)| m.clone())
     }
 
     /// Makes the engine's instruments match `wanted` (id, kind), like `sync_effects`.
-    pub fn sync_instruments(&mut self, wanted: &[(u64, InstrumentKind)]) {
+    pub fn sync_instruments(&mut self, wanted: &[(u64, InstrumentKind, Option<PluginRef>)]) {
         let Some(engine) = &mut self.engine else { return };
-        self.instruments.retain(|id, kind| {
-            let keep = wanted.iter().any(|(w, k)| w == id && k == kind);
+        self.instruments.retain(|id, (kind, plugin)| {
+            let keep = wanted.iter().any(|(w, k, p)| w == id && k == kind && plugin_id(p) == *plugin);
             if !keep {
                 engine.remove_instrument(*id);
             }
             keep
         });
-        for &(id, kind) in wanted {
-            if let std::collections::hash_map::Entry::Vacant(slot) = self.instruments.entry(id) {
-                engine.add_instrument(id, Box::new(Instrument::new(kind)));
-                slot.insert(kind);
+        for (id, kind, plugin) in wanted {
+            if let std::collections::hash_map::Entry::Vacant(slot) = self.instruments.entry(*id) {
+                let instrument = match (kind, plugin) {
+                    (InstrumentKind::Plugin, Some(p)) => Instrument::Plugin(PluginInstrument::new(Some(p.clone()), false)),
+                    _ => Instrument::new(*kind),
+                };
+                engine.add_instrument(*id, Box::new(instrument));
+                slot.insert((*kind, plugin_id(plugin)));
             }
         }
     }
@@ -106,4 +116,9 @@ impl Audio {
         self.error = None;
         self.ensure(config)
     }
+}
+
+/// Which loaded plugin a handle points at (0 for none), to notice a reload.
+fn plugin_id(plugin: &Option<PluginRef>) -> usize {
+    plugin.as_ref().map_or(0, |p| std::sync::Arc::as_ptr(&p.0) as *const () as usize)
 }

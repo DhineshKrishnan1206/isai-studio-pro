@@ -132,7 +132,18 @@ Item {
     function openInstrument(trackId) {
         app.selectTrack(trackId)
         const t = arrangement.tracks.find(x => x.id === trackId)
+        // A plugin instrument has its own window.
+        if (t && t.instrument && t.instrument.plugin) { app.openPlugin(t.instrument.id); return }
         if (t && t.instrument) instTrackId = trackId
+    }
+    // A plugin effect opens its own window instead of Isai's editor.
+    onFxEditChanged: if (fxEdit && fxEdit.plugin) { const id = fxEditId; fxEditId = -1; app.openPlugin(id) }
+    // While plugins are being scanned or their windows are open, keep them going.
+    Timer {
+        interval: 100
+        repeat: true
+        running: studio.app.pluginScanning || studio.app.pluginWindows > 0
+        onTriggered: studio.app.pollPlugins()
     }
     /// For dev scenes.
     readonly property Item roll: pianoRoll

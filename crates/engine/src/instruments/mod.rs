@@ -33,6 +33,8 @@ pub enum InstrumentKind {
     Piano,
     Drums,
     Sampler,
+    /// A third-party plugin instrument.
+    Plugin,
 }
 
 const fn p(key: &'static str, label: &'static str, min: f32, max: f32, default: f32, unit: &'static str, log: bool) -> ParamDef {
@@ -199,6 +201,7 @@ impl InstrumentKind {
             InstrumentKind::Piano => "piano",
             InstrumentKind::Drums => "drums",
             InstrumentKind::Sampler => "sampler",
+            InstrumentKind::Plugin => "plugin",
         }
     }
 
@@ -212,6 +215,7 @@ impl InstrumentKind {
             InstrumentKind::Piano => "Isai Piano",
             InstrumentKind::Drums => "Isai Drums",
             InstrumentKind::Sampler => "Isai Sampler",
+            InstrumentKind::Plugin => "Plugin",
         }
     }
 
@@ -221,6 +225,7 @@ impl InstrumentKind {
             InstrumentKind::Piano => PIANO_PARAMS,
             InstrumentKind::Drums => DRUM_PARAMS,
             InstrumentKind::Sampler => SAMPLER_PARAMS,
+            InstrumentKind::Plugin => &[],
         }
     }
 
@@ -243,12 +248,16 @@ pub struct PlayInstrument {
     pub sample: Option<Arc<Clip>>,
     /// Where the sampler's slices start, in samples.
     pub slices: Vec<u64>,
+    /// The loaded plugin, for `InstrumentKind::Plugin`.
+    pub plugin: Option<crate::plugin::PluginRef>,
+    /// The song's tempo where this block plays (for plugins' tempo-synced sounds).
+    pub bpm: f64,
 }
 
 impl PlayInstrument {
     /// An instrument with no sample (everything but the sampler).
     pub fn new(id: u64, kind: InstrumentKind, params: [f32; MAX_INST_PARAMS]) -> Self {
-        Self { id, kind, params, sample: None, slices: Vec::new() }
+        Self { id, kind, params, sample: None, slices: Vec::new(), plugin: None, bpm: 120.0 }
     }
 }
 
@@ -285,6 +294,7 @@ pub enum Instrument {
     Piano(Piano),
     Drums(Drums),
     Sampler(Sampler),
+    Plugin(crate::plugin::PluginInstrument),
 }
 
 impl Instrument {
@@ -295,6 +305,7 @@ impl Instrument {
             InstrumentKind::Piano => Instrument::Piano(Piano::new()),
             InstrumentKind::Drums => Instrument::Drums(Drums::new()),
             InstrumentKind::Sampler => Instrument::Sampler(Sampler::new()),
+            InstrumentKind::Plugin => Instrument::Plugin(crate::plugin::PluginInstrument::new(None, false)),
         }
     }
 
@@ -304,6 +315,7 @@ impl Instrument {
             Instrument::Piano(_) => InstrumentKind::Piano,
             Instrument::Drums(_) => InstrumentKind::Drums,
             Instrument::Sampler(_) => InstrumentKind::Sampler,
+            Instrument::Plugin(_) => InstrumentKind::Plugin,
         }
     }
 
@@ -326,6 +338,10 @@ impl Instrument {
             Instrument::Piano(s) => s.render(params, notes, positions, live, sample_rate, l, r),
             Instrument::Drums(s) => s.render(params, notes, positions, live, sample_rate, l, r),
             Instrument::Sampler(s) => s.render(params, inst.sample.as_deref(), &inst.slices, notes, positions, live, sample_rate, l, r),
+            Instrument::Plugin(p) => {
+                let transport = crate::plugin::Transport { bpm: inst.bpm, playing: positions.iter().any(|&p| p != crate::mixer::SILENT), sample_rate };
+                p.render(notes, positions, live, &transport, l, r)
+            }
         }
     }
 
@@ -337,6 +353,7 @@ impl Instrument {
             Instrument::Piano(s) => s.keys(),
             Instrument::Drums(s) => s.keys(),
             Instrument::Sampler(s) => s.keys(),
+            Instrument::Plugin(s) => s.keys(),
         }
     }
 
@@ -347,6 +364,7 @@ impl Instrument {
             Instrument::Piano(s) => s.velocities(),
             Instrument::Drums(s) => s.velocities(),
             Instrument::Sampler(s) => s.velocities(),
+            Instrument::Plugin(s) => s.velocities(),
         }
     }
 
@@ -357,6 +375,8 @@ impl Instrument {
             Instrument::Piano(s) => s.is_active(),
             Instrument::Drums(s) => s.is_active(),
             Instrument::Sampler(s) => s.is_active(),
+            // A plugin may ring on (reverb tails, arpeggiators): keep it running.
+            Instrument::Plugin(_) => true,
         }
     }
 
@@ -366,6 +386,7 @@ impl Instrument {
             Instrument::Piano(s) => s.reset(),
             Instrument::Drums(s) => s.reset(),
             Instrument::Sampler(s) => s.reset(),
+            Instrument::Plugin(s) => s.reset(),
         }
     }
 }
@@ -386,7 +407,11 @@ impl InstrumentBank {
     pub fn for_instruments<'a>(instruments: impl IntoIterator<Item = &'a PlayInstrument>) -> Self {
         let mut bank = Self::default();
         for i in instruments {
-            let _ = bank.add(i.id, Box::new(Instrument::new(i.kind)));
+            let instrument = match (&i.plugin, i.kind) {
+                (Some(p), InstrumentKind::Plugin) => Instrument::Plugin(crate::plugin::PluginInstrument::new(Some(p.clone()), true)),
+                _ => Instrument::new(i.kind),
+            };
+            let _ = bank.add(i.id, Box::new(instrument));
         }
         bank
     }

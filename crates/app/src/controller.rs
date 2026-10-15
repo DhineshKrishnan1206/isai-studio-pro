@@ -91,6 +91,11 @@ pub mod qobject {
         #[qproperty(QString, markers_json)]
         /// The tempo and time-signature map: {"tempos": [[beat, bpm]…], "sigs": [[beat, bar, num, den]…]}.
         #[qproperty(QString, tempo_json)]
+        /// Installed plugins: [{ index, name, vendor, format, instrument, category }].
+        #[qproperty(QString, plugins_json)]
+        #[qproperty(bool, plugin_scanning)]
+        /// How many plugin windows are open.
+        #[qproperty(i32, plugin_windows)]
         /// The tuner is open (and listening to the input).
         #[qproperty(bool, tuner_open)]
         /// The browser is playing a preview.
@@ -553,6 +558,21 @@ pub mod qobject {
         fn add_signature_change(self: Pin<&mut Self>, bar: i32, num: i32, den: i32);
         #[qinvokable]
         fn remove_signature_change(self: Pin<&mut Self>, bar: i32);
+        /// Scans this computer for plugins again (in the background).
+        #[qinvokable]
+        fn rescan_plugins(self: Pin<&mut Self>);
+        /// Checks on a scan and keeps plugin windows responsive (call while either is going).
+        #[qinvokable]
+        fn poll_plugins(self: Pin<&mut Self>);
+        /// Adds installed plugin `index` to a chain and opens it; returns the insert id.
+        #[qinvokable]
+        fn add_plugin_effect(self: Pin<&mut Self>, chain_type: &QString, chain_id: i32, index: i32) -> i32;
+        /// Adds a track playing installed plugin `index` and opens it; returns the track id.
+        #[qinvokable]
+        fn add_plugin_track(self: Pin<&mut Self>, index: i32) -> i32;
+        /// Opens a plugin's own window (by its insert or instrument id).
+        #[qinvokable]
+        fn open_plugin(self: Pin<&mut Self>, id: i32);
         #[qinvokable]
         fn set_project_key(self: Pin<&mut Self>, key: &QString);
         #[qinvokable]
@@ -603,6 +623,8 @@ const TONE_TICK: Duration = Duration::from_millis(1200);
 #[derive(Default)]
 pub(crate) struct State {
     pub settings: Settings,
+    /// Installed and loaded third-party plugins.
+    pub plugins: crate::plugin_ops::Plugins,
     /// The open song's tempo map, kept for turning playhead samples into beats.
     pub tempo_map: isai_engine::TempoMap,
     hardware: Hardware,
@@ -712,6 +734,9 @@ pub struct AppControllerRust {
     history_json: QString,
     markers_json: QString,
     tempo_json: QString,
+    plugins_json: QString,
+    plugin_scanning: bool,
+    plugin_windows: i32,
     tuner_open: bool,
     previewing: bool,
     recent_paths: QStringList,
@@ -816,6 +841,9 @@ impl qobject::AppController {
         self.as_mut().set_dev_scene(qs(&env("ISAI_SCENE")));
         self.as_mut().set_effect_kinds_json(qs(&crate::session::effect_kinds_json()));
         self.as_mut().set_instrument_kinds_json(qs(&crate::session::instrument_kinds_json()));
+        // The installed plugins: from the last scan, or scanned now in the background.
+        self.as_mut().st().plugins.start();
+        self.as_mut().publish_plugins();
         self.as_mut().refresh_midi();
         let mut hardware = Hardware::detect();
         if software_rendering {

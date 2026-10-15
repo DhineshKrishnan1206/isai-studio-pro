@@ -153,6 +153,24 @@ pub struct Note {
     pub velocity: u8,
 }
 
+/// A third-party plugin (VST3 now; CLAP and Audio Units next) on an insert
+/// or as an instrument, and its saved state.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+pub struct PluginSlot {
+    /// "vst3".
+    pub format: String,
+    /// Where the plugin is installed.
+    pub path: String,
+    /// Which plugin in the bundle.
+    pub uid: String,
+    pub name: String,
+    #[serde(default)]
+    pub vendor: String,
+    /// The plugin's own state (its sound and settings), base64, from the last save.
+    #[serde(default)]
+    pub state: Option<String>,
+}
+
 /// A track's software instrument (it makes the track an instrument track).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Instrument {
@@ -166,10 +184,16 @@ pub struct Instrument {
     /// Where each slice starts in the sample, in seconds (the sampler's slices mode).
     #[serde(default)]
     pub slices: Vec<f64>,
+    /// The plugin, when `kind` is "plugin".
+    #[serde(default)]
+    pub plugin: Option<PluginSlot>,
 }
 
 impl Instrument {
     pub fn instrument_kind(&self) -> Option<InstrumentKind> {
+        if self.kind == InstrumentKind::Plugin.key() {
+            return Some(InstrumentKind::Plugin);
+        }
         InstrumentKind::from_key(&self.kind)
     }
 
@@ -253,11 +277,26 @@ pub struct Insert {
     /// Parameter values by key. Missing ones use the effect's default, so
     /// effects can gain parameters without breaking old projects.
     pub params: BTreeMap<String, f32>,
+    /// The plugin, when `kind` is "plugin".
+    #[serde(default)]
+    pub plugin: Option<PluginSlot>,
 }
 
 impl Insert {
     pub fn effect_kind(&self) -> Option<EffectKind> {
+        if self.kind == EffectKind::Plugin.key() {
+            return Some(EffectKind::Plugin);
+        }
         EffectKind::from_key(&self.kind)
+    }
+
+    /// The name shown for it: the effect's, or the plugin's.
+    pub fn label(&self) -> String {
+        match (&self.plugin, self.effect_kind()) {
+            (Some(p), _) => p.name.clone(),
+            (None, Some(k)) => k.label().into(),
+            (None, None) => self.kind.clone(),
+        }
     }
 
     /// Values in the effect's parameter order, for the engine.
@@ -714,7 +753,7 @@ impl Project {
         let instrument_id = self.take_id();
         let params = kind.params().iter().map(|d| (d.key.to_owned(), d.default)).collect();
         if let Some(t) = self.track_mut(id) {
-            t.instrument = Some(Instrument { id: instrument_id, kind: kind.key().into(), params, sample: None, slices: Vec::new() });
+            t.instrument = Some(Instrument { id: instrument_id, kind: kind.key().into(), params, sample: None, slices: Vec::new(), plugin: None });
         }
         id
     }
@@ -1212,9 +1251,58 @@ impl Project {
             params.insert("key".into(), f32::from(root));
             params.insert("scale".into(), if minor { 2.0 } else { 1.0 });
         }
-        self.chain_mut(chain)?.push(Insert { id, kind: kind.key().into(), enabled: true, params });
+        self.chain_mut(chain)?.push(Insert { id, kind: kind.key().into(), enabled: true, params, plugin: None });
         self.next_id += 1;
         Some(id)
+    }
+
+    /// Adds a plugin to the end of a chain.
+    pub fn add_plugin_insert(&mut self, chain: Chain, plugin: PluginSlot) -> Option<u64> {
+        let id = self.next_id;
+        let insert = Insert { id, kind: EffectKind::Plugin.key().into(), enabled: true, params: BTreeMap::new(), plugin: Some(plugin) };
+        self.chain_mut(chain)?.push(insert);
+        self.next_id += 1;
+        Some(id)
+    }
+
+    /// Adds a track playing a plugin instrument; returns the track id.
+    pub fn add_plugin_track(&mut self, plugin: PluginSlot) -> u64 {
+        let id = self.add_track(Some(&plugin.name));
+        let instrument_id = self.take_id();
+        if let Some(t) = self.track_mut(id) {
+            t.instrument = Some(Instrument {
+                id: instrument_id,
+                kind: InstrumentKind::Plugin.key().into(),
+                params: BTreeMap::new(),
+                sample: None,
+                slices: Vec::new(),
+                plugin: Some(plugin),
+            });
+        }
+        id
+    }
+
+    /// Every plugin in the song, by its insert or instrument id.
+    pub fn plugins(&self) -> Vec<(u64, &PluginSlot)> {
+        let chains = self.tracks.iter().map(|t| &t.inserts).chain(self.buses.iter().map(|b| &b.inserts)).chain(std::iter::once(&self.master_inserts));
+        let mut out: Vec<(u64, &PluginSlot)> = chains.flatten().filter_map(|i| Some((i.id, i.plugin.as_ref()?))).collect();
+        out.extend(self.tracks.iter().filter_map(|t| t.instrument.as_ref()).filter_map(|i| Some((i.id, i.plugin.as_ref()?))));
+        out
+    }
+
+    /// Stores a plugin's state (from its insert or instrument id) for saving.
+    pub fn set_plugin_state(&mut self, id: u64, state: String) -> bool {
+        for chain in self.chains_mut() {
+            if let Some(slot) = chain.iter_mut().find(|i| i.id == id).and_then(|i| i.plugin.as_mut()) {
+                slot.state = Some(state);
+                return true;
+            }
+        }
+        if let Some(slot) = self.tracks.iter_mut().filter_map(|t| t.instrument.as_mut()).find(|i| i.id == id).and_then(|i| i.plugin.as_mut()) {
+            slot.state = Some(state);
+            return true;
+        }
+        false
     }
 
     pub fn insert_mut(&mut self, id: u64) -> Option<&mut Insert> {

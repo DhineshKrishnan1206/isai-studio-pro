@@ -34,6 +34,8 @@ licences. The notable ones:
 | [flacenc](https://github.com/yotarok/flacenc-rs) | Writing FLAC files | Apache-2.0 |
 | [midir](https://github.com/Boddlnagg/midir) | MIDI keyboards | MIT |
 | [rtrb](https://github.com/mgeier/rtrb) | Lock-free queues for the audio thread | MIT OR Apache-2.0 |
+| [vst3-host](https://github.com/HelgeSverre/rust-vst3-host) | Hosting VST3 plugins | MIT |
+| [vst3](https://github.com/coupler-rs/vst3-rs) | VST3 API bindings (the VST3 SDK is MIT-licensed) | MIT OR Apache-2.0 |
 
 The full list, with versions and sources, is in
 [licenses/RUST-LIBRARIES.md](licenses/RUST-LIBRARIES.md). Symphonia's MPL-2.0
@@ -66,6 +68,9 @@ The fonts are unmodified and are not sold on their own.
   recorded samples.
 
 ## Trademarks
+
+VST is a registered trademark of Steinberg Media Technologies GmbH. Isai hosts
+VST3 plugins through the MIT-licensed VST3 API; it does not use the VST logo.
 
 Logic Pro is a trademark of Apple Inc., FL Studio of Image-Line Software,
 Ableton Live of Ableton AG, Bitwig Studio of Bitwig GmbH, and Serum of Xfer

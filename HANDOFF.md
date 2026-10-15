@@ -281,3 +281,27 @@ work, crash recovery, and window dragging. Screenshots look right.
   points. The tempo/signature LCD shows the values at the playhead; editing it
   changes that section (`set_tempo_at`, `set_signature_at`).
 - Dev scene `tempo`.
+
+## Third-party plugins (VST3 now; CLAP and AU next)
+- **engine::plugin**: `ExternalPlugin` trait (process a block with timed
+  `NoteEvent`s, `wait` false on the audio thread = `try_lock`, skip the block if
+  busy). `PluginEffect` and `PluginInstrument` (turns song notes and live notes
+  into events; releases held notes on stop/jump). `EffectKind::Plugin` and
+  `InstrumentKind::Plugin` (not in `ALL`, so not in Isai's own menus).
+  `PlayInsert.plugin` / `PlayInstrument.plugin` carry the handle; export banks
+  build plugin effects with `wait = true`.
+- **crates/plugins** (`isai-plugins`): scan (`vst3_host::simple::discover_plugins`),
+  `Vst3Plugin` = UI-side owner (window) + `Core` (Arc, `Mutex<Plugin>`, bus
+  buffers resized per block within capacity). State as base64 in the song.
+- **app/plugin_ops.rs**: catalog cached in `plugins.json` next to settings;
+  rescans run `isai --scan-plugins <file>` as a child process (plugins print to
+  stdout, so results go to a file). `ensure()` loads every plugin the song uses
+  before each arrangement push; `attach()` gives the arrangement its handles;
+  `store_states()` before save/autosave. `pollPlugins` runs from a QML Timer
+  while scanning or a plugin window is open.
+- **Project**: `PluginSlot {format, path, uid, name, vendor, state}` on
+  `Insert.plugin` / `Instrument.plugin` (kind "plugin").
+- **UI**: plugin effects at the end of each add-effect menu, plugin instruments
+  in the new-track menu; clicking a plugin insert or instrument opens its window.
+- Dev scene `plugin` (needs Pigments or any instrument plugin installed).
+- Not yet: plugin parameter automation, latency compensation, CLAP, AU.

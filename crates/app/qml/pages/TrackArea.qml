@@ -38,7 +38,18 @@ Rectangle {
         { label: "Synth", shortcut: "Isai Synth", action: () => addInstrument("synth") },
         { label: "Drum machine", shortcut: "Isai Drums", action: () => addInstrument("drums") },
         { label: "Sampler", shortcut: "Isai Sampler", action: () => addInstrument("sampler") }
-    ]
+    ].concat(pluginTrackItems)
+    /// Instrument plugins installed on this computer (VST3), then a rescan.
+    readonly property var pluginList: {
+        try { return JSON.parse(app.pluginsJson || "[]") } catch (e) { return [] }
+    }
+    readonly property var pluginTrackItems: {
+        const out = [{ separator: true }, { header: "PLUGIN INSTRUMENTS" }]
+        for (const p of pluginList.filter(x => x.instrument))
+            out.push({ label: p.name, shortcut: p.vendor, action: () => app.addPluginTrack(p.index) })
+        out.push({ label: app.pluginScanning ? "Looking for plugins…" : "Rescan plugins", enabled: !app.pluginScanning, action: () => app.rescanPlugins() })
+        return out
+    }
     function addInstrument(kind) {
         app.addInstrumentTrack(kind)
         instrumentRequested(app.selectedTrack)

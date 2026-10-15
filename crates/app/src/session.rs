@@ -63,12 +63,14 @@ fn inserts_json(chain: &[Insert]) -> serde_json::Value {
     chain
         .iter()
         .map(|i| {
-            let label = i.effect_kind().map_or("Unknown effect", |k| k.label());
+            let label = i.label();
             let values: serde_json::Map<_, _> = i
                 .effect_kind()
                 .map(|k| k.params().iter().zip(i.values()).map(|(d, v)| (d.key.to_owned(), json!(v))).collect())
                 .unwrap_or_default();
-            json!({ "id": i.id, "kind": i.kind, "label": label, "enabled": i.enabled, "values": values })
+            // Plugins: their name and maker; their controls are in their own window.
+            let plugin = i.plugin.as_ref().map(|p| json!({ "name": p.name, "vendor": p.vendor }));
+            json!({ "id": i.id, "kind": i.kind, "label": label, "enabled": i.enabled, "values": values, "plugin": plugin })
         })
         .collect()
 }
@@ -179,7 +181,7 @@ impl Session {
         let inserts = |chain: &[Insert]| -> Vec<PlayInsert> {
             chain
                 .iter()
-                .filter_map(|i| Some(PlayInsert { id: i.id, kind: i.effect_kind()?, enabled: i.enabled, params: i.values() }))
+                .filter_map(|i| Some(PlayInsert { plugin: None, id: i.id, kind: i.effect_kind()?, enabled: i.enabled, params: i.values() }))
                 .collect()
         };
         let tracks = self
@@ -497,8 +499,11 @@ impl Session {
                             json!({ "source": path.display().to_string(), "name": name, "state": state, "seconds": secs })
                         });
                         json!({
-                            "id": i.id, "kind": i.kind, "label": kind.map_or("Instrument", |k| k.label()), "values": values,
+                            "id": i.id, "kind": i.kind,
+                            "label": i.plugin.as_ref().map_or_else(|| kind.map_or("Instrument", |k| k.label()).to_owned(), |p| p.name.clone()),
+                            "values": values,
                             "sample": sample, "slices": i.slices,
+                            "plugin": i.plugin.as_ref().map(|p| json!({ "name": p.name, "vendor": p.vendor })),
                         })
                     }),
                     "automationView": t.automation_view,

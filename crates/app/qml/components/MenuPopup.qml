@@ -9,6 +9,8 @@ import Isai
 Popup {
     id: menu
     property var items: []
+    /// Taller menus (a long list of plugins) scroll.
+    property real maxHeight: 520
     signal triggered()
 
     padding: 5
@@ -23,7 +25,7 @@ Popup {
     onAboutToShow: {
         // Lay the items out now, so the size (and the flip below) is right on
         // the first open; otherwise the menu could open cut short.
-        contentItem.forceLayout()
+        column.forceLayout()
         if (isNaN(preferredY)) preferredY = y
         y = preferredY
         if (!parent || preferredY <= 0) return
@@ -40,7 +42,17 @@ Popup {
     enter: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.fast } }
     exit: Transition { NumberAnimation { property: "opacity"; to: 0; duration: Theme.fast } }
 
-    contentItem: Column {
+    contentItem: Flickable {
+        implicitWidth: menu.availableWidth
+        implicitHeight: Math.min(column.implicitHeight, menu.maxHeight)
+        contentHeight: column.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        interactive: contentHeight > height
+        ScrollBar.vertical: ScrollBar { policy: column.implicitHeight > menu.maxHeight ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
+      Column {
+        id: column
+        width: parent.width
         spacing: 1
         Repeater {
             model: menu.items
@@ -96,5 +108,6 @@ Popup {
                 }
             }
         }
+      }
     }
 }

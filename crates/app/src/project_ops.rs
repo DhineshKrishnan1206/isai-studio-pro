@@ -120,19 +120,25 @@ impl AppController {
                 st.pool.request_stretch(&path, ratio);
             }
         }
-        let (Some(_), Some(s)) = (&st.audio.engine, &st.session) else { return };
-        let arrangement = s.arrangement(&st.pool, st.settings.audio.eco);
+        let (Some(engine), Some(s)) = (&st.audio.engine, &st.session) else { return };
+        // Plugins the song uses, loaded (and their sound restored) before they're needed.
+        let problems = st.plugins.ensure(&s.project, f64::from(engine.info().sample_rate));
+        let mut arrangement = s.arrangement(&st.pool, st.settings.audio.eco);
+        st.plugins.attach(&mut arrangement);
         // Effects first (commands arrive in order), so none is missing when the arrangement lands.
-        let wanted: Vec<_> = arrangement.inserts().map(|i| (i.id, i.kind)).collect();
+        let wanted: Vec<_> = arrangement.inserts().map(|i| (i.id, i.kind, i.plugin.clone())).collect();
         st.audio.sync_effects(&wanted);
-        let instruments: Vec<_> = arrangement.instruments().map(|i| (i.id, i.kind)).collect();
+        let instruments: Vec<_> = arrangement.instruments().map(|i| (i.id, i.kind, i.plugin.clone())).collect();
         st.audio.sync_instruments(&instruments);
         if let Some(engine) = &mut st.audio.engine {
             engine.set_arrangement(std::sync::Arc::new(arrangement));
         }
         // Track order may have changed: route live notes again.
         st.live_track = None;
-        self.route_live();
+        self.as_mut().route_live();
+        if let Some(problem) = problems.first() {
+            self.show_problem(problem);
+        }
     }
 
     /// Everything QML shows about the project.
@@ -1182,6 +1188,13 @@ impl AppController {
 
     fn save_to(mut self: Pin<&mut Self>, paths: ProjectPaths) -> bool {
         let file = paths.file.display().to_string();
+        // Plugins keep their sound in themselves: copy it into the song first.
+        {
+            let st = self.as_mut().st();
+            if let Some(s) = st.session.as_mut() {
+                st.plugins.store_states(&mut s.project);
+            }
+        }
         let result = match self.as_mut().st().session.as_mut() {
             Some(session) => session.save_to(paths),
             None => return false,
@@ -1266,10 +1279,12 @@ impl AppController {
 
     pub fn autosave(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
-        let Some(s) = &st.session else { return };
+        let Some(s) = st.session.as_mut() else { return };
         if !s.dirty {
             return;
         }
+        st.plugins.store_states(&mut s.project);
+        let s = &*s;
         if let Some(dir) = app_dir()
             && let Err(err) = Autosave::new(&s.project, s.paths.as_ref()).write(&dir)
         {
