@@ -1,0 +1,15 @@
+[package]
+name = "isai-settings"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+directories = "6.0.0"
+serde = { version = "1.0.229", features = ["derive"] }
+sysinfo = { version = "0.38.4", default-features = false, features = ["system"] }
+toml = "1.1.8"
+
+[lints.rust]
+unsafe_code = "forbid"

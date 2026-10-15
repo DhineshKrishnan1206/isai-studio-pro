@@ -1,0 +1,21 @@
+[package]
+name = "isai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+cxx = "1.0.205"
+cxx-qt = "0.10.0"
+cxx-qt-lib = { version = "0.10.0", features = ["qt_full"] }
+hound = "3.5.1"
+isai-engine = { version = "0.0.1", path = "../engine" }
+isai-project = { version = "0.0.1", path = "../project" }
+isai-settings = { version = "0.0.1", path = "../settings" }
+midir = "0.11"
+rtrb = "0.4"
+serde_json = "1.0.154"
+
+[build-dependencies]
+cxx-qt-build = "0.10.0"

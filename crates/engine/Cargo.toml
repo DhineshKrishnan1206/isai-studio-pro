@@ -1,0 +1,17 @@
+[package]
+name = "isai-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+cpal = "0.18.2"
+flacenc = "0.5"
+hound = "3.5"
+rtrb = "0.4.0"
+rubato = "5.0.1"
+symphonia = { version = "0.6.1", features = ["all"] }
+
+[lints.rust]
+unsafe_code = "forbid"

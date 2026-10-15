@@ -1,0 +1,5 @@
+/target
+*.toml.tmp
+.DS_Store
+tofix.txt
+.qmlls.ini
