@@ -134,6 +134,8 @@ crates/
 
 ## Rules for contributors
 
+New here? Read [CONTRIBUTING.md](CONTRIBUTING.md) for how to send a change.
+
 1. **The audio thread never allocates, frees, locks, prints or does I/O.**
    It talks to the UI only through lock-free queues and atomics; anything to free is
    handed back to the UI thread. See `crates/engine/src/processor.rs`.
