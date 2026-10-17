@@ -1,0 +1,42 @@
+name: Package
+
+# Ready-to-run builds, to try Isai without installing Rust or Qt.
+# Runs on main and on demand (Actions → Package → Run workflow); each run's
+# zip is under its "Artifacts".
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.9.*"
+          modules: qtshadertools
+          cache: true
+      - run: cargo build --release -p isai
+      - name: Bundle Qt and the C++ runtime
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist/Isai | Out-Null
+          Copy-Item target/release/isai.exe dist/Isai/
+          windeployqt --release --no-translations --qmldir crates/app/qml dist/Isai/isai.exe
+          # Microsoft's C++ runtime, app-local (redistributable), so it runs on a fresh Windows.
+          foreach ($dll in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll') {
+            Copy-Item "$env:WINDIR/System32/$dll" dist/Isai/
+          }
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.md dist/Isai/
+          Copy-Item -Recurse licenses dist/Isai/licenses
+          Copy-Item -Recurse crates/app/assets/fonts/licenses dist/Isai/licenses/fonts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Isai-windows-x64
+          path: dist/
