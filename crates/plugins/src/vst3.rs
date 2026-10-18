@@ -88,10 +88,8 @@ impl Vst3Plugin {
 
     /// Opens the plugin's own window (or brings it back if it's open).
     pub fn open_window(&mut self) -> Result<(), String> {
-        if self.window.as_ref().is_some_and(|w| w.is_open() && !w.closed_by_user()) {
-            return Ok(());
-        }
-        self.window = None;
+        // Already open: reopen it, which brings it in front (the host can't raise it otherwise).
+        self.close_window();
         let mut window = PluginWindow::new(self.core.plugin.clone());
         window.open().map_err(|e| e.to_string())?;
         self.window = Some(window);

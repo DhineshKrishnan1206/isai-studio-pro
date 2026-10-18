@@ -33,6 +33,9 @@ ApplicationWindow {
 
     AppController { id: app }
 
+    // The menu bar (macOS top bar, or the strip under the title bar elsewhere).
+    menuBar: AppMenuBar { studio: studio }
+
     // Settings drive the design tokens.
     Binding {
         target: Theme; property: "dark"
@@ -73,8 +76,8 @@ ApplicationWindow {
     Rectangle {
         id: root
         readonly property real uiScale: Math.max(75, app.uiScale) / 100
-        width: win.width / uiScale
-        height: win.height / uiScale
+        width: win.contentItem.width / uiScale
+        height: win.contentItem.height / uiScale
         transformOrigin: Item.TopLeft
         scale: uiScale
         color: Theme.bg
@@ -134,7 +137,7 @@ ApplicationWindow {
                 stepTimer.start()
             }
         }
-        if ((scene === "studio" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene === "stems" || scene.startsWith("plugin") || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
+        if ((scene === "studio" || scene === "learneq" || scene.startsWith("export") || scene.startsWith("edit") || scene === "multi" || scene === "mixer" || scene.startsWith("fx") || scene === "auto" || scene.startsWith("midi") || scene === "piano" || scene === "synth" || scene === "markers" || scene === "tuner" || scene === "rolltools" || scene === "drums" || scene === "sampler" || scene === "browser" || scene === "master" || scene === "stretch" || scene === "cycle" || scene === "tempo" || scene === "stems" || scene.startsWith("plugin") || scene.startsWith("palette") || scene.startsWith("settings")) && !app.projectOpen)
             app.newProject("Demo Song", 120, 4, 4, "C major")
         if (scene.startsWith("settings")) {
             settingsDialog.section = parseInt(scene.slice(8) || "0")
@@ -149,6 +152,7 @@ ApplicationWindow {
         if (scene === "tempo") tempoTimer.start()
         if (scene.startsWith("plugin")) pluginTimer.start()
         if (scene === "stems") stemsTimer.start()
+        if (scene === "learneq") learnTimer.start()
         if (scene === "export") Qt.callLater(studio.exportAudio)
         if (scene.startsWith("export:")) exportRunTimer.start()
         if (app.devScreenshot !== "") shotTimer.start()
@@ -355,6 +359,17 @@ ApplicationWindow {
                 app.seekBeats(4)
                 app.paste()
             }
+        }
+    }
+    // "learneq": a new track with an equalizer open, to check the lesson button.
+    Timer {
+        id: learnTimer
+        interval: 1000
+        onTriggered: {
+            app.addTrack()
+            const tracks = JSON.parse(app.tracksJson)
+            const id = app.addInsert("track", tracks[tracks.length - 1].id, "eq")
+            studio.openEffectEditor(id, "demo-song · track")
         }
     }
     Timer { id: zoomTimer; interval: 400; onTriggered: studio.zoomForTest(3) }

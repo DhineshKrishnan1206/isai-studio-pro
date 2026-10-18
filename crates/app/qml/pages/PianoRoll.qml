@@ -289,6 +289,7 @@ Item {
                 spacing: 8
                 Icon { glyph: Icons.pianoKeys; size: 15; color: roll.tint }
                 DText { text: "Piano Roll"; strong: true }
+                LearnButton { topic: "pianoroll"; backdrop: roll.backdrop; implicitWidth: 26; implicitHeight: 26; iconSize: 14 }
                 DText {
                     text: roll.region ? roll.region.name + " · " + roll.track.name : ""
                     faint: true

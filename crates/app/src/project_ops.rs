@@ -929,7 +929,11 @@ impl AppController {
 
     pub fn note_on(mut self: Pin<&mut Self>, key: i32, velocity: i32) {
         let note = LiveNote { on: true, key: key.clamp(0, 127) as u8, velocity: velocity.clamp(1, 127) as u8 };
+
         crate::midi_input::send(&self.as_mut().st().live_slot, note);
+        // Keep the meters running for a moment, even with the transport stopped.
+        self.as_mut().st().live_until = Some(Instant::now() + std::time::Duration::from_secs(2));
+        self.update_busy();
     }
 
     pub fn user_presets(&self, kind: &QString) -> QString {

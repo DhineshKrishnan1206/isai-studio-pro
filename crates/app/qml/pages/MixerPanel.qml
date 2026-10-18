@@ -109,6 +109,7 @@ Item {
                 spacing: 8
                 Icon { glyph: Icons.sliders; size: 15; color: Theme.textDim }
                 DText { text: "Mixer"; strong: true }
+                LearnButton { topic: "mixer"; backdrop: mixer.backdrop; implicitWidth: 26; implicitHeight: 26; iconSize: 14 }
                 DText { text: mixer.tracks.length + (mixer.tracks.length === 1 ? " track" : " tracks"); faint: true; font.pixelSize: Theme.textXs }
                 Item { Layout.fillWidth: true }
                 IconButton {

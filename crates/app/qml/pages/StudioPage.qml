@@ -478,6 +478,15 @@ Item {
     }
 
     ShortcutsOverlay { id: shortcuts; backdrop: studioContent }
+    // A guide for a new song (hidden once done or skipped).
+    StartHere {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 24
+        z: 5
+        app: studio.app
+        studio: studio
+    }
     MasteringDialog { id: masteringDialog; app: studio.app; backdrop: studioContent }
     StemsDialog { id: stemsDialog; app: studio.app; backdrop: studioContent }
     function splitStems() {
@@ -640,8 +649,17 @@ Item {
     property var heldPlayKeys: ({})
     function togglePlayKeys() {
         playKeys = !playKeys
-        if (playKeys) playKeysHandler.forceActiveFocus()
+        if (playKeys) Qt.callLater(() => playKeysHandler.forceActiveFocus())
         else releaseHeldKeys()
+    }
+    // Focus goes back to the key handler whenever the window is active again
+    // (after a plugin window or another app took the keys).
+    Connections {
+        target: studio.Window.window
+        function onActiveChanged() {
+            if (studio.playKeys && studio.Window.window && studio.Window.window.active)
+                Qt.callLater(() => playKeysHandler.forceActiveFocus())
+        }
     }
     function releaseHeldKeys() {
         for (const k in heldPlayKeys) app.noteOff(heldPlayKeys[k])

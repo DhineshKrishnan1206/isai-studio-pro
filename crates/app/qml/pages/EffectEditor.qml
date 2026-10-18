@@ -129,6 +129,7 @@ Item {
                 DText { text: editor.insert ? editor.insert.label : ""; strong: true; font.pixelSize: Theme.textLg }
                 DText { text: editor.chainName; faint: true; font.pixelSize: Theme.textSm }
                 Item { Layout.fillWidth: true }
+                LearnButton { topic: editor.kind; backdrop: editor.backdrop; implicitWidth: 28; implicitHeight: 28; iconSize: 15 }
                 IconButton {
                     implicitWidth: 28; implicitHeight: 28; iconSize: 15
                     glyph: Icons.x

@@ -659,6 +659,8 @@ pub(crate) struct State {
     track_peaks: Vec<(f32, f32)>,
     meter_at: Option<Instant>,
     tone_until: Option<Instant>,
+    /// A key was played recently: keep the meters running while the transport is stopped.
+    pub live_until: Option<Instant>,
     overruns_seen: u64,
     crackles: u64,
     crackle_dismissed: bool,
@@ -1253,6 +1255,7 @@ impl qobject::AppController {
     pub(crate) fn update_busy(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
         let tone = st.tone_until.is_some_and(|t| Instant::now() < t);
+        let live = st.live_until.is_some_and(|t| Instant::now() < t);
         let metering = st.meter.0.max(st.meter.1) > 0.001;
         let busy = st.bench.is_some()
             || st.recorder.is_some()
@@ -1268,6 +1271,7 @@ impl qobject::AppController {
             || st.preview_pending.is_some()
             || st.audio.engine.as_ref().is_some_and(|e| e.previewing())
             || tone
+            || live
             || metering
             || st.audio.engine.as_ref().is_some_and(|e| e.is_playing());
         let busy = busy || *self.playing();
