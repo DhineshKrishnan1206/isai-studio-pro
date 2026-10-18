@@ -678,18 +678,6 @@ Rectangle {
         }
     }
 
-    // Empty arrangement: quick ways to add the first track
-    Row {
-        visible: area.tracks.length === 0 && !area.app.loading
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: 30
-        spacing: 8
-        DButton { glyph: Icons.downloadSimple; text: "Import audio"; onClicked: area.importRequested() }
-        DButton { glyph: Icons.plus; text: "Audio track"; onClicked: area.app.addTrack() }
-        DButton { glyph: Icons.pianoKeys; text: "Piano track"; onClicked: area.addInstrument("piano") }
-        DButton { glyph: Icons.metronome; text: "Drum track"; onClicked: area.addInstrument("drums") }
-    }
-
     // ------------------------------------------------------------- playhead
     Item {
         x: area.timelineX
