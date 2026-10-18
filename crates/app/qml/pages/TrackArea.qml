@@ -678,37 +678,16 @@ Rectangle {
         }
     }
 
-    // Empty arrangement hint
-    Column {
+    // Empty arrangement: quick ways to add the first track
+    Row {
         visible: area.tracks.length === 0 && !area.app.loading
         anchors.centerIn: parent
         anchors.verticalCenterOffset: 30
-        spacing: 12
-        Icon {
-            anchors.horizontalCenter: parent.horizontalCenter
-            glyph: Icons.waveform
-            size: 34
-            color: Theme.textFaint
-        }
-        DText {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: "This project is empty"
-            strong: true
-            font.pixelSize: Theme.textLg
-        }
-        DText {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: "Import audio or add a track to begin. Press Play to hear the metronome."
-            dim: true
-        }
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 8
-            DButton { glyph: Icons.downloadSimple; text: "Import audio"; onClicked: area.importRequested() }
-            DButton { glyph: Icons.plus; text: "Audio track"; onClicked: area.app.addTrack() }
-            DButton { glyph: Icons.pianoKeys; text: "Piano track"; onClicked: area.addInstrument("piano") }
-            DButton { glyph: Icons.metronome; text: "Drum track"; onClicked: area.addInstrument("drums") }
-        }
+        spacing: 8
+        DButton { glyph: Icons.downloadSimple; text: "Import audio"; onClicked: area.importRequested() }
+        DButton { glyph: Icons.plus; text: "Audio track"; onClicked: area.app.addTrack() }
+        DButton { glyph: Icons.pianoKeys; text: "Piano track"; onClicked: area.addInstrument("piano") }
+        DButton { glyph: Icons.metronome; text: "Drum track"; onClicked: area.addInstrument("drums") }
     }
 
     // ------------------------------------------------------------- playhead
