@@ -281,6 +281,8 @@ Item {
             onOpenRecentRequested: path => studio.guard("recent:" + path)
             onPaletteRequested: palette.open()
             onExportRequested: studio.exportAudio()
+            playKeys: studio.playKeys
+            onPlayKeysToggled: studio.togglePlayKeys()
         }
 
         // Crackle warning slides in under the control bar.
@@ -329,7 +331,7 @@ Item {
                     app: studio.app
                     mixerShown: studio.mixerShown
                     pianoRollShown: studio.editorShown
-                    keysEnabled: studio.keysOn
+                    keysEnabled: studio.letterKeys
                     onPlaylistRequested: studio.showPlaylist()
                     onPianoRollToggled: studio.togglePianoRoll()
                     // Room to scroll the last tracks up above the docked mixer or piano roll.
@@ -624,15 +626,59 @@ Item {
                    .map(x => x[0])
     }
 
+    // Computer keys play the selected instrument track (A W S E D F T G Y H U J K O L P,
+    // Z/X change octave), so a plugin can be played without its own window.
+    property bool playKeys: false
+    property int playOctave: 4
+    readonly property bool letterKeys: keysOn && !playKeys
+    readonly property var playKeyMap: ({
+        [Qt.Key_A]: 0, [Qt.Key_W]: 1, [Qt.Key_S]: 2, [Qt.Key_E]: 3, [Qt.Key_D]: 4, [Qt.Key_F]: 5,
+        [Qt.Key_T]: 6, [Qt.Key_G]: 7, [Qt.Key_Y]: 8, [Qt.Key_H]: 9, [Qt.Key_U]: 10, [Qt.Key_J]: 11,
+        [Qt.Key_K]: 12, [Qt.Key_O]: 13, [Qt.Key_L]: 14, [Qt.Key_P]: 15
+    })
+    // The note each held key started, so releasing it stops that note even after an octave change.
+    property var heldPlayKeys: ({})
+    function togglePlayKeys() {
+        playKeys = !playKeys
+        if (playKeys) playKeysHandler.forceActiveFocus()
+        else releaseHeldKeys()
+    }
+    function releaseHeldKeys() {
+        for (const k in heldPlayKeys) app.noteOff(heldPlayKeys[k])
+        heldPlayKeys = ({})
+    }
+    Item {
+        id: playKeysHandler
+        focus: studio.playKeys
+        Keys.onPressed: e => {
+            if (!studio.playKeys) { e.accepted = false; return }
+            e.accepted = true
+            if (e.isAutoRepeat) return
+            if (e.key === Qt.Key_Z) { studio.playOctave = Math.max(0, studio.playOctave - 1); return }
+            if (e.key === Qt.Key_X) { studio.playOctave = Math.min(8, studio.playOctave + 1); return }
+            if (studio.playKeyMap[e.key] === undefined) { e.accepted = false; return }
+            const note = (studio.playOctave + 1) * 12 + studio.playKeyMap[e.key]
+            studio.heldPlayKeys[e.key] = note
+            studio.app.noteOn(note, 100)
+        }
+        Keys.onReleased: e => {
+            if (!studio.playKeys || e.isAutoRepeat) return
+            if (studio.heldPlayKeys[e.key] === undefined) return
+            studio.app.noteOff(studio.heldPlayKeys[e.key])
+            delete studio.heldPlayKeys[e.key]
+            e.accepted = true
+        }
+    }
+
     // Standard DAW keys. They only act while a project is on screen.
     readonly property bool keysOn: studio.visible && studio.app.projectOpen && !studio.choosing && !pianoRoll.typing && !pianoWindow.typing && !synthWindow.typing
     Shortcut { sequence: "Space"; enabled: studio.keysOn; onActivated: studio.app.togglePlay() }
     Shortcut { sequence: "Ctrl+I"; enabled: studio.keysOn; onActivated: studio.importAudio() }
     Shortcut { sequences: ["Return", "Home"]; enabled: studio.keysOn; onActivated: studio.app.rewind() }
-    Shortcut { sequence: "C"; enabled: studio.keysOn; onActivated: studio.app.toggleCycle() }
-    Shortcut { sequence: "K"; enabled: studio.keysOn; onActivated: studio.app.toggleMetronome() }
-    Shortcut { sequence: "T"; enabled: studio.keysOn; onActivated: studio.app.tapTempo() }
-    Shortcut { sequence: "N"; enabled: studio.keysOn; onActivated: studio.app.toggleSnap() }
+    Shortcut { sequence: "C"; enabled: studio.letterKeys; onActivated: studio.app.toggleCycle() }
+    Shortcut { sequence: "K"; enabled: studio.letterKeys; onActivated: studio.app.toggleMetronome() }
+    Shortcut { sequence: "T"; enabled: studio.letterKeys; onActivated: studio.app.tapTempo() }
+    Shortcut { sequence: "N"; enabled: studio.letterKeys; onActivated: studio.app.toggleSnap() }
     Shortcut { sequences: ["Backspace", "Delete"]; enabled: studio.keysOn && !pianoRoll.ownsKeys; onActivated: studio.app.deleteSelected() }
     Shortcut { sequences: [StandardKey.Undo]; enabled: studio.keysOn; onActivated: studio.app.undo() }
     Shortcut { sequences: [StandardKey.Redo, "Ctrl+Shift+Z"]; enabled: studio.keysOn; onActivated: studio.app.redo() }
@@ -640,10 +686,10 @@ Item {
     Shortcut { sequence: "Ctrl+Shift+S"; enabled: studio.keysOn; onActivated: studio.saveAs() }
     Shortcut { sequence: "Ctrl+Alt+N"; enabled: studio.keysOn; onActivated: studio.app.addTrack() }
     Shortcut { sequence: "Ctrl+T"; enabled: studio.keysOn; onActivated: studio.app.splitAtPlayhead() }
-    Shortcut { sequence: "X"; enabled: studio.keysOn; onActivated: studio.mixerShown = !studio.mixerShown }
+    Shortcut { sequence: "X"; enabled: studio.letterKeys; onActivated: studio.mixerShown = !studio.mixerShown }
     // Windows, FL Studio style: F5 playlist, F7 piano roll, F9 mixer
     // (P and X do the same, Logic style).
-    Shortcut { sequences: ["F7", "P"]; enabled: studio.keysOn; onActivated: studio.togglePianoRoll() }
+    Shortcut { sequences: ["F7", "P"]; enabled: studio.letterKeys; onActivated: studio.togglePianoRoll() }
     Shortcut { sequence: "F9"; enabled: studio.keysOn; onActivated: studio.mixerShown = !studio.mixerShown }
     Shortcut { sequence: "F5"; enabled: studio.keysOn; onActivated: studio.showPlaylist() }
     Shortcut { sequences: [StandardKey.Copy]; enabled: studio.keysOn; onActivated: studio.app.copySelected() }
@@ -652,17 +698,17 @@ Item {
     Shortcut { sequence: "Ctrl+D"; enabled: studio.keysOn; onActivated: studio.app.duplicateSelected() }
     Shortcut { sequences: [StandardKey.SelectAll]; enabled: studio.keysOn && !studio.editorShown; onActivated: studio.app.selectAllRegions() }
     Shortcut { sequence: "Ctrl+E"; enabled: studio.keysOn; onActivated: studio.exportAudio() }
-    Shortcut { sequence: "R"; enabled: studio.keysOn; onActivated: studio.app.record() }
+    Shortcut { sequence: "R"; enabled: studio.letterKeys; onActivated: studio.app.record() }
     Shortcut { sequence: "Ctrl+K"; enabled: studio.keysOn; onActivated: palette.shown ? palette.close() : palette.open() }
     Shortcut { sequence: "0"; enabled: studio.keysOn; onActivated: studio.app.stop() }
-    Shortcut { sequence: "B"; enabled: studio.keysOn; onActivated: studio.browserShown = !studio.browserShown }
-    Shortcut { sequence: "M"; enabled: studio.keysOn; onActivated: studio.app.addMarker(studio.app.positionBeats) }
+    Shortcut { sequence: "B"; enabled: studio.letterKeys; onActivated: studio.browserShown = !studio.browserShown }
+    Shortcut { sequence: "M"; enabled: studio.letterKeys; onActivated: studio.app.addMarker(studio.app.positionBeats) }
     Shortcut { sequence: "Alt+Right"; enabled: studio.keysOn; onActivated: studio.app.jumpMarker(true) }
     Shortcut { sequence: "Alt+Left"; enabled: studio.keysOn; onActivated: studio.app.jumpMarker(false) }
     Shortcut { sequence: "Ctrl+J"; enabled: studio.keysOn; onActivated: studio.app.joinSelected() }
     Shortcut { sequence: "Ctrl+U"; enabled: studio.keysOn; onActivated: studio.app.cycleSelection() }
-    Shortcut { sequence: "I"; enabled: studio.keysOn; onActivated: studio.inspectorShown = !studio.inspectorShown }
-    Shortcut { sequence: "G"; enabled: studio.keysOn; onActivated: studio.globalShown = !studio.globalShown }
+    Shortcut { sequence: "I"; enabled: studio.letterKeys; onActivated: studio.inspectorShown = !studio.inspectorShown }
+    Shortcut { sequence: "G"; enabled: studio.letterKeys; onActivated: studio.globalShown = !studio.globalShown }
     Shortcut { sequence: "Ctrl+Alt+Z"; enabled: studio.keysOn; onActivated: arrangement.openHistory() }
     Shortcut { sequences: ["?", "Shift+/"]; enabled: studio.keysOn; onActivated: shortcuts.opened ? shortcuts.close() : shortcuts.open() }
     // These also work from the project chooser.

@@ -16,6 +16,8 @@ Rectangle {
     signal openRecentRequested(string path)
     signal paletteRequested()
     signal exportRequested()
+    property bool playKeys: false
+    signal playKeysToggled()
 
     readonly property bool pro: app.view === "pro"
 
@@ -183,6 +185,12 @@ Rectangle {
                 active: bar.app.metronome
                 tip: bar.app.metronome ? "Metronome is on (K)" : "Metronome (K)"
                 onClicked: bar.app.toggleMetronome()
+            }
+            IconButton {
+                glyph: Icons.keyboard
+                active: bar.playKeys
+                tip: bar.playKeys ? "Computer keys play notes (click to stop)" : "Play notes with the computer keyboard (A–L, Z/X octave)"
+                onClicked: bar.playKeysToggled()
             }
             IconButton {
                 label: "1234"
