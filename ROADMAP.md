@@ -52,7 +52,7 @@ Sharing
 
 - [x] ⌘K command palette (search every command; type "128 bpm", "bar 17", "3/4", "A minor")
 
-Also in this phase: UI scale, keyboard shortcut list.
+Also in this phase: keyboard shortcut list. UI scale ✅ (Settings › Appearance, 75–200%).
 
 ## Phase 3: Arrangement extras
 

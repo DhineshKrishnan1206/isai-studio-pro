@@ -343,3 +343,14 @@ work, crash recovery, and window dragging. Screenshots look right.
   into the project's Audio folder (or `<app dir>/Stems`), then
   `Project::add_stem_tracks` adds coloured tracks below and mutes the original.
   Region menu "Split into Stems…", ⌘K, StemsDialog, status bar progress. Scene `stems`.
+
+## Interface size
+
+- Settings `ui_scale` (percent, 75–200, default 100): a look setting, not part of a profile.
+  `controller.rs` exposes it as `uiScale` (`set_int`, clamped).
+- **Main.qml**: `root` is laid out at window size ÷ scale and drawn with `scale` from the
+  top-left, so every page scales with no per-control changes. Popups attached to the window
+  overlay (dropdown menus) stay at 100%.
+- Settings › Appearance › "Interface size" (Segmented 75/100/125/150/200%).
+- Test: `cargo test -p isai-settings` (default is 100).
+

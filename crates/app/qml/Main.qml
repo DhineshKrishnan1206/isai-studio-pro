@@ -68,9 +68,15 @@ ApplicationWindow {
     }
 
     // Everything lives in `root` so the whole window can be captured as an image.
+    // The user's interface size scales the whole tree: root is laid out at the
+    // window size divided by the scale, then drawn scaled up to fill the window.
     Rectangle {
         id: root
-        anchors.fill: parent
+        readonly property real uiScale: Math.max(75, app.uiScale) / 100
+        width: win.width / uiScale
+        height: win.height / uiScale
+        transformOrigin: Item.TopLeft
+        scale: uiScale
         color: Theme.bg
         Component.onCompleted: Theme.backdrop = root
         Behavior on color { ColorAnimation { duration: Theme.slow } }

@@ -34,6 +34,7 @@ pub mod qobject {
         #[qproperty(QString, theme)]
         #[qproperty(QString, ui_style)]
         #[qproperty(QString, accent)]
+        #[qproperty(i32, ui_scale)]
         #[qproperty(QString, animations)]
         #[qproperty(i32, ui_fps)]
         #[qproperty(i32, meter_hz)]
@@ -704,6 +705,7 @@ pub struct AppControllerRust {
     theme: QString,
     ui_style: QString,
     accent: QString,
+    ui_scale: i32,
     animations: QString,
     ui_fps: i32,
     meter_hz: i32,
@@ -985,6 +987,7 @@ impl qobject::AppController {
         let s = &mut self.as_mut().st().settings;
         match key.to_string().as_str() {
             "uiFps" => s.visual.ui_fps = value,
+            "uiScale" => s.ui_scale = value.clamp(75, 200),
             "meterHz" => s.visual.meter_hz = value.max(1),
             "bufferSize" => s.audio.buffer_size = value.max(32),
             "clickVolume" => s.metronome.volume = value.min(150),
@@ -1040,6 +1043,7 @@ impl qobject::AppController {
         self.as_mut().set_theme(qs(s.theme.key()));
         self.as_mut().set_ui_style(qs(s.style.key()));
         self.as_mut().set_accent(qs(&s.accent));
+        self.as_mut().set_ui_scale(s.ui_scale as i32);
         self.as_mut().set_animations(qs(s.visual.animations.key()));
         self.as_mut().set_ui_fps(s.visual.ui_fps as i32);
         self.as_mut().set_meter_hz(s.visual.meter_hz as i32);

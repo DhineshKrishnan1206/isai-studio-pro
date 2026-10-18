@@ -214,7 +214,7 @@ its own open-source versions rather than copying products.
 | Search all commands (⌘K) | Isai | ✅ |
 | Keyboard shortcuts | L/F | ✅ |
 | Shortcut list and custom key commands | L/F | 🟡 (shortcut list with ?; custom keys later) |
-| UI scale (bigger/smaller) | L/F | ⬜ |
+| UI scale (bigger/smaller) | L/F | ✅ (75–200%, Settings › Appearance) |
 | Detachable windows / multiple monitors | F | ⬜ |
 | Inspector panel (details of the selected track/region) | L | 🟡 (track: instrument, effects, fader, pan, mute/solo; I) |
 | Quick help / tooltips everywhere | L | 🟡 |

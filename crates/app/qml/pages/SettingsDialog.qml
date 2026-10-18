@@ -232,6 +232,21 @@ Item {
                             }
                         }
                         SettingRow {
+                            title: "Interface size"
+                            description: "Makes buttons, text and panels bigger or smaller. Smaller fits more on a small screen."
+                            Segmented {
+                                options: [
+                                    { value: 75, label: "75%" },
+                                    { value: 100, label: "100%" },
+                                    { value: 125, label: "125%" },
+                                    { value: 150, label: "150%" },
+                                    { value: 200, label: "200%" }
+                                ]
+                                value: dialog.app.uiScale
+                                onActivated: v => dialog.app.setInt("uiScale", v)
+                            }
+                        }
+                        SettingRow {
                             title: "Theme"
                             description: "Follow your system, or always light or dark."
                             Segmented {

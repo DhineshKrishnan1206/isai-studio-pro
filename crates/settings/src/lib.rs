@@ -206,6 +206,8 @@ pub struct Settings {
     pub style: Style,
     /// "default" (the style's own accent) or a colour name such as "teal".
     pub accent: String,
+    /// Interface size in percent; 100 is the design size. Not part of a profile.
+    pub ui_scale: u32,
     pub visual: Visual,
     pub audio: Audio,
     pub metronome: Metronome,
@@ -247,6 +249,7 @@ impl Default for Settings {
             theme: Theme::System,
             style: Style::Studio,
             accent: "default".into(),
+            ui_scale: 100,
             visual: Visual::default(),
             audio: Audio::default(),
             metronome: Metronome::default(),
@@ -408,6 +411,7 @@ mod tests {
         assert_eq!(s.visual.ui_fps, 30);
         assert_eq!(s.audio, Audio::default());
         assert!(s.setup_done, "files written before setup tracking count as set up");
+        assert_eq!(s.ui_scale, 100, "interface size defaults to 100%");
     }
 
     #[test]
