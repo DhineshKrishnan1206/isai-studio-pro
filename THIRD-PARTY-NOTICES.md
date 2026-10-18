@@ -48,15 +48,19 @@ files are used unchanged; their source is at the link above.
 ## Fonts and icons
 
 Bundled in the app (`crates/app/assets/fonts/`) and the website (`docs/`).
-The full licence texts are in
-[crates/app/assets/fonts/licenses/](crates/app/assets/fonts/licenses/).
+The app's licence texts are in
+[crates/app/assets/fonts/licenses/](crates/app/assets/fonts/licenses/); the
+website's are in [docs/fonts/](docs/fonts/).
 
-| Font | Licence |
-|---|---|
-| [Inter](https://github.com/rsms/inter), © The Inter Project Authors | SIL Open Font License 1.1 |
-| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), © The JetBrains Mono Project Authors | SIL Open Font License 1.1 |
-| [Young Serif](https://github.com/noirblancrouge/YoungSerif), © The Young Serif Project Authors | SIL Open Font License 1.1 |
-| [Phosphor Icons](https://phosphoricons.com), © Phosphor Icons | MIT |
+| Font | Used in | Licence |
+|---|---|---|
+| [Inter](https://github.com/rsms/inter), © The Inter Project Authors | App | SIL Open Font License 1.1 |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono), © The JetBrains Mono Project Authors | App | SIL Open Font License 1.1 |
+| [Young Serif](https://github.com/noirblancrouge/YoungSerif), © The Young Serif Project Authors | App | SIL Open Font License 1.1 |
+| [Archivo](https://github.com/Omnibus-Type/Archivo), © The Archivo Project Authors | Website | SIL Open Font License 1.1 |
+| [Instrument Serif](https://github.com/Instrument/instrument-serif), © The Instrument Serif Project Authors | Website | SIL Open Font License 1.1 |
+| [Geist Mono](https://github.com/vercel/geist-font), © The Geist Project Authors | Website | SIL Open Font License 1.1 |
+| [Phosphor Icons](https://phosphoricons.com), © Phosphor Icons | App and website | MIT |
 
 The fonts are unmodified and are not sold on their own.
 
