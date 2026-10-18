@@ -47,19 +47,17 @@ Rectangle {
         spacing: 12
         Logo { size: 40 }
         Separator {}
-        // Project name; click for the project menu. A dot marks unsaved changes.
-        AbstractButton {
+        // Project name. A dot marks unsaved changes. File commands live in the menu bar.
+        Item {
             id: projectButton
             Layout.fillWidth: true
             Layout.maximumWidth: implicitWidth
             implicitHeight: 34
-            hoverEnabled: true
-            onClicked: projectMenu.open()
-            background: Rectangle {
-                radius: Theme.radiusMd
-                color: projectButton.hovered || projectMenu.visible ? Theme.raised : "transparent"
-            }
-            contentItem: RowLayout {
+            implicitWidth: projectRow.implicitWidth
+            HoverHandler { id: projectHover }
+            RowLayout {
+                id: projectRow
+                anchors.fill: parent
                 spacing: 6
                 DText {
                     Layout.leftMargin: 8
@@ -73,39 +71,11 @@ Rectangle {
                     implicitWidth: 7; implicitHeight: 7; radius: 3.5
                     color: Theme.textDim
                 }
-                Icon { Layout.rightMargin: 6; glyph: Icons.caretDown; size: 12; color: Theme.textDim }
             }
             DToolTip {
-                visible: projectButton.hovered && !projectMenu.visible
+                visible: projectHover.hovered
                 text: bar.app.projectPath !== "" ? bar.app.projectPath + (bar.app.dirty ? " · unsaved changes" : "")
                                                  : "Not saved yet"
-            }
-            MenuPopup {
-                id: projectMenu
-                y: projectButton.height + 6
-                items: {
-                    const mod = Qt.platform.os === "osx" ? "⌘" : "Ctrl+"
-                    const list = [
-                        { label: "New Project…", shortcut: mod + "N", action: () => bar.newProjectRequested() },
-                        { label: "Open…", shortcut: mod + "O", action: () => bar.openRequested() },
-                        { separator: true },
-                        { label: "Save", shortcut: mod + "S", action: () => bar.saveRequested() },
-                        { label: "Save As…", shortcut: "⇧" + mod + "S", action: () => bar.saveAsRequested() },
-                        { label: "Export Audio…", shortcut: mod + "E", action: () => bar.exportRequested() },
-                        { separator: true },
-                        { label: bar.app.undoLabel !== "" ? "Undo " + bar.app.undoLabel : "Undo", shortcut: mod + "Z",
-                          enabled: bar.app.undoLabel !== "", action: () => bar.app.undo() },
-                        { label: bar.app.redoLabel !== "" ? "Redo " + bar.app.redoLabel : "Redo", shortcut: "⇧" + mod + "Z",
-                          enabled: bar.app.redoLabel !== "", action: () => bar.app.redo() }
-                    ]
-                    const recent = []
-                    for (let i = 0; i < Math.min(5, bar.app.recentPaths.length); ++i) {
-                        const path = bar.app.recentPaths[i]
-                        if (path === bar.app.projectPath) continue
-                        recent.push({ label: bar.app.recentNames[i], action: () => bar.openRecentRequested(path) })
-                    }
-                    return recent.length > 0 ? list.concat([{ separator: true }, { header: "RECENT" }], recent) : list
-                }
             }
         }
         Item { Layout.fillWidth: true }
