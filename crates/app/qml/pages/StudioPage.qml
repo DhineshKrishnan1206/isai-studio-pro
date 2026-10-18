@@ -29,7 +29,6 @@ Item {
     Settings {
         category: "studio"
         property alias inspectorShown: studio.inspectorShown
-        property alias globalShown: studio.globalShown
     }
     onEditorShownChanged: if (editorShown) mixerShown = false
     function openEditor(regionId) { editorRegion = regionId; editorShown = true }
