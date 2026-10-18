@@ -359,6 +359,7 @@ Item {
                 font.pixelSize: 11
                 color: win.faint
             }
+            LearnButton { anchors.verticalCenter: parent.verticalCenter; topic: "synth"; backdrop: win.backdrop; implicitWidth: 24; implicitHeight: 24; iconSize: 13 }
         }
 
         // Preset field: click for the list, ◀ ▶ to step through.

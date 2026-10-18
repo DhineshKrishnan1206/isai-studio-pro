@@ -322,7 +322,7 @@ Rectangle {
                 iconSize: 16
                 glyph: Icons.magnet
                 active: area.app.snap
-                tip: area.app.snap ? "Snap to grid is on (N)" : "Snap to grid (N)"
+                tip: area.app.snap ? "Snap is on (N): things line up with the beat" : "Snap (N): line things up with the beat, instead of anywhere"
                 onClicked: area.app.toggleSnap()
             }
             Segmented {

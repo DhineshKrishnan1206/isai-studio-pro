@@ -150,7 +150,7 @@ Item {
         }
         DToolTip {
             visible: drag.containsMouse && !drag.pressed
-            text: "Double-click for 0 dB · ⇧ to fine-tune"
+            text: "Volume: how loud this track is. Double-click for 0 dB · hold ⇧ to fine-tune"
         }
     }
 }

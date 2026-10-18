@@ -108,6 +108,10 @@ Rectangle {
                 value: lcd.app.tempo.toFixed(1)
                 caption: "TEMPO"
             }
+            DToolTip {
+                visible: tempoArea.containsMouse && !tempoArea.pressed && !tempoBox.editing
+                text: "Tempo: how fast the song goes, in beats per minute. Drag up or down to change it, or double-click to type a number."
+            }
             TextInput {
                 id: tempoInput
                 visible: tempoBox.editing
@@ -127,6 +131,7 @@ Rectangle {
                 anchors.fill: parent
                 enabled: !tempoBox.editing
                 hoverEnabled: true
+                id: tempoArea
                 cursorShape: Qt.SizeVerCursor
                 property real startY: 0
                 property real startTempo: 0

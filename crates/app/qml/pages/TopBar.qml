@@ -170,7 +170,7 @@ Rectangle {
                 glyph: Icons.repeat
                 active: bar.app.cycle
                 activeColor: Theme.loopOn
-                tip: bar.app.cycle ? "Cycle is on (C)" : "Cycle (C)"
+                tip: bar.app.cycle ? "Cycle is on (C): the song repeats the loop you set" : "Cycle (C): repeat one section of the song over and over"
                 onClicked: bar.app.toggleCycle()
             }
 
@@ -183,7 +183,7 @@ Rectangle {
             IconButton {
                 glyph: Icons.metronome
                 active: bar.app.metronome
-                tip: bar.app.metronome ? "Metronome is on (K)" : "Metronome (K)"
+                tip: bar.app.metronome ? "Metronome is on (K): a click on every beat" : "Metronome (K): a click on every beat to help you keep time"
                 onClicked: bar.app.toggleMetronome()
             }
             IconButton {
@@ -196,8 +196,8 @@ Rectangle {
                 label: "1234"
                 active: bar.app.countIn
                 tip: bar.app.countIn
-                     ? "Count-in is on: " + bar.app.countInBars + (bar.app.countInBars === 1 ? " bar" : " bars")
-                     : "Count-in"
+                     ? "Count-in is on: " + bar.app.countInBars + (bar.app.countInBars === 1 ? " bar" : " bars") + " of clicks before recording starts"
+                     : "Count-in: play a bar of clicks before you start recording"
                 onClicked: bar.app.toggleCountIn()
             }
         }

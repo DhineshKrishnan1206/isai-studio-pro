@@ -499,6 +499,14 @@ Item {
             font.letterSpacing: 2.5
             color: win.label
         }
+        LearnButton {
+            anchors.right: parent.right
+            anchors.rightMargin: 64
+            anchors.verticalCenter: parent.verticalCenter
+            implicitWidth: 26; implicitHeight: 26; iconSize: 14
+            topic: "piano"
+            backdrop: win.backdrop
+        }
         AbstractButton {
             id: closeButton
             anchors.right: parent.right

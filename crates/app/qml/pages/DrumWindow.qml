@@ -208,6 +208,7 @@ Item {
             Rectangle { anchors.verticalCenter: parent.verticalCenter; width: 16; height: 16; radius: 4; color: "transparent"; border.color: win.text; border.width: 1.5 }
             DText { anchors.verticalCenter: parent.verticalCenter; text: "Isai Drums"; font.pixelSize: 13; font.weight: Font.Bold; color: win.text }
             DText { anchors.verticalCenter: parent.verticalCenter; text: win.track ? "·  " + win.track.name : ""; font.pixelSize: 11; color: win.faint }
+            LearnButton { anchors.verticalCenter: parent.verticalCenter; topic: "drums"; backdrop: win.backdrop; implicitWidth: 24; implicitHeight: 24; iconSize: 13 }
         }
         Row {
             anchors.centerIn: parent

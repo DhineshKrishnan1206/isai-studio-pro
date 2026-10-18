@@ -392,14 +392,14 @@ Item {
                     label: "M"
                     on: strip.track.mute
                     onColor: Theme.accent
-                    tip: "Mute"
+                    tip: "Mute (M): silence this track. Click again to hear it."
                     onClicked: mixer.app.toggleMute(strip.track.id)
                 }
                 MiniToggle {
                     label: "S"
                     on: strip.track.solo
                     onColor: Theme.loopOn
-                    tip: "Solo"
+                    tip: "Solo (S): hear only the soloed tracks, to check one part on its own."
                     onClicked: mixer.app.toggleSolo(strip.track.id)
                 }
             }

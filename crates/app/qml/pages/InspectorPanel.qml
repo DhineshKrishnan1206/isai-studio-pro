@@ -30,6 +30,7 @@ Rectangle {
 
         RowLayout {
             DText { text: "INSPECTOR"; faint: true; font.pixelSize: Theme.textXs; font.weight: Font.DemiBold; font.letterSpacing: 1.2 }
+            LearnButton { topic: "inspector"; backdrop: inspector.backdrop; implicitWidth: 24; implicitHeight: 24; iconSize: 13 }
             Item { Layout.fillWidth: true }
             IconButton {
                 glyph: Icons.x

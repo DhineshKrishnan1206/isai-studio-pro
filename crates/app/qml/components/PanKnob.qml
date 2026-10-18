@@ -65,7 +65,7 @@ Item {
             visible: parent.containsMouse && !parent.pressed
             text: "Pan " + (Math.abs(knob.shownValue) < 0.01 ? "centre"
                   : (knob.shownValue < 0 ? "L" : "R") + Math.round(Math.abs(knob.shownValue) * 100))
-                  + " · double-click to centre"
+                  + " · pan: where the sound sits, left or right · double-click to centre"
         }
     }
 }
