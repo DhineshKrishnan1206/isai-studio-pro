@@ -10,7 +10,7 @@ use std::time::Instant;
 use isai_engine::effects::PlayInsert;
 use isai_engine::instruments::{PlayInstrument, PlayNote};
 use isai_engine::{Arrangement, AutoTarget, PlayBus, PlayLane, PlayRegion, PlayTrack};
-use isai_project::{EffectKind, History, Insert, InstrumentKind, Project, ProjectPaths, Track, db_to_gain};
+use isai_project::{BeatNote, EffectKind, History, Insert, InstrumentKind, Project, ProjectPaths, Track, apply_midi_fx, db_to_gain};
 use serde_json::json;
 
 use crate::pool::{AudioPool, AudioState};
@@ -310,7 +310,7 @@ impl Session {
     fn play_notes(&self, track: &Track, rate: u32) -> Vec<PlayNote> {
         let map = self.project.tempo_map();
         let meter = &map;
-        let mut notes: Vec<PlayNote> = track
+        let beats: Vec<BeatNote> = track
             .regions
             .iter()
             .filter_map(|r| Some((r, r.midi.as_ref()?)))
@@ -327,14 +327,24 @@ impl Session {
                             return None;
                         }
                         let end = (start + n.length).min(pass_end);
-                        Some(PlayNote {
-                            start: meter.beats_to_samples(start, rate),
-                            end: meter.beats_to_samples(end, rate),
-                            key: n.key,
-                            velocity: n.velocity,
-                        })
+                        Some(BeatNote { start, end, key: n.key, velocity: n.velocity })
                     })
                 })
+            })
+            .collect();
+        // A MIDI effect (arpeggio, chord) changes the notes here, before they are timed.
+        let mut beats = match &track.midi_fx {
+            Some(fx) => apply_midi_fx(fx, &beats),
+            None => beats,
+        };
+        beats.sort_by(|a, b| a.start.total_cmp(&b.start).then(a.key.cmp(&b.key)));
+        let mut notes: Vec<PlayNote> = beats
+            .iter()
+            .map(|n| PlayNote {
+                start: meter.beats_to_samples(n.start, rate),
+                end: meter.beats_to_samples(n.end, rate),
+                key: n.key,
+                velocity: n.velocity,
             })
             .collect();
         notes.sort_by_key(|n| (n.start, n.key));
@@ -475,6 +485,7 @@ impl Session {
                     "name": t.name,
                     "frozen": t.frozen.is_some(),
                     "folder": t.folder,
+                    "midiFx": t.midi_fx.as_ref().map(|f| f.kind.clone()),
                     "group": t.group,
                     "color": t.color,
                     "volume": t.volume_db,

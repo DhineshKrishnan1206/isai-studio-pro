@@ -256,6 +256,144 @@ pub struct Track {
     /// The folder this track is in, if any.
     #[serde(default)]
     pub group: Option<u64>,
+    /// A MIDI effect that changes this instrument track's notes before they play.
+    #[serde(default)]
+    pub midi_fx: Option<MidiFx>,
+}
+
+/// A MIDI effect for an instrument track. It changes the notes before the
+/// instrument plays them, so the notes in the piano roll stay as you wrote them.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct MidiFx {
+    /// "arp" (arpeggiator) or "chord" (chord trigger).
+    pub kind: String,
+    /// Arpeggio: beats between steps (0.25 is a sixteenth note).
+    #[serde(default = "default_rate")]
+    pub rate: f64,
+    /// Arpeggio: "up", "down" or "updown".
+    #[serde(default = "default_pattern")]
+    pub pattern: String,
+    /// Arpeggio: how many octaves the arpeggio climbs (1 to 4).
+    #[serde(default = "default_octaves")]
+    pub octaves: u8,
+    /// Chord trigger: "major", "minor", "seventh" or "octave".
+    #[serde(default = "default_chord")]
+    pub chord: String,
+}
+
+fn default_rate() -> f64 {
+    0.25
+}
+fn default_pattern() -> String {
+    "up".into()
+}
+fn default_octaves() -> u8 {
+    1
+}
+fn default_chord() -> String {
+    "major".into()
+}
+
+impl MidiFx {
+    /// An arpeggiator: sixteenth notes going up over one octave.
+    pub fn arpeggio() -> Self {
+        Self { kind: "arp".into(), rate: 0.25, pattern: "up".into(), octaves: 1, chord: default_chord() }
+    }
+
+    /// A chord trigger: each key plays a major chord.
+    pub fn chord() -> Self {
+        Self { kind: "chord".into(), rate: default_rate(), pattern: default_pattern(), octaves: 1, chord: "major".into() }
+    }
+}
+
+/// A note with its position in beats (what MIDI effects work on).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BeatNote {
+    pub start: f64,
+    pub end: f64,
+    pub key: u8,
+    pub velocity: u8,
+}
+
+/// Applies a MIDI effect to notes (sorted by start). Returns the notes to play.
+pub fn apply_midi_fx(fx: &MidiFx, notes: &[BeatNote]) -> Vec<BeatNote> {
+    match fx.kind.as_str() {
+        "chord" => chord_notes(&fx.chord, notes),
+        "arp" => arpeggio_notes(fx, notes),
+        _ => notes.to_vec(),
+    }
+}
+
+fn chord_notes(kind: &str, notes: &[BeatNote]) -> Vec<BeatNote> {
+    let intervals: &[u8] = match kind {
+        "minor" => &[0, 3, 7],
+        "seventh" => &[0, 4, 7, 10],
+        "octave" => &[0, 12],
+        _ => &[0, 4, 7],
+    };
+    let mut out = Vec::with_capacity(notes.len() * intervals.len());
+    for n in notes {
+        for &step in intervals {
+            if let Some(key) = n.key.checked_add(step).filter(|&k| k <= 127) {
+                out.push(BeatNote { key, ..*n });
+            }
+        }
+    }
+    out
+}
+
+/// Most steps one held chord can make, so a stray long note cannot freeze the app.
+const MAX_ARP_STEPS: usize = 4096;
+
+fn arpeggio_notes(fx: &MidiFx, notes: &[BeatNote]) -> Vec<BeatNote> {
+    if fx.rate.is_nan() || fx.rate <= 0.0 || notes.is_empty() {
+        return notes.to_vec();
+    }
+    // Notes that start together form one chord, which is arpeggiated over its length.
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < notes.len() {
+        let start = notes[i].start;
+        let mut j = i;
+        while j < notes.len() && (notes[j].start - start).abs() < 1e-9 {
+            j += 1;
+        }
+        let chord = &notes[i..j];
+        let end = chord.iter().map(|n| n.end).fold(start, f64::max);
+        let velocity = chord.iter().map(|n| n.velocity).max().unwrap_or(100);
+        let mut keys: Vec<u8> = chord.iter().map(|n| n.key).collect();
+        keys.sort_unstable();
+        keys.dedup();
+        let mut pool: Vec<u8> = Vec::new();
+        for o in 0..fx.octaves.clamp(1, 4) {
+            for &k in &keys {
+                if let Some(key) = k.checked_add(12 * o).filter(|&k| k <= 127) {
+                    pool.push(key);
+                }
+            }
+        }
+        let order: Vec<u8> = match fx.pattern.as_str() {
+            "down" => pool.iter().rev().copied().collect(),
+            "updown" if pool.len() > 2 => {
+                let mut v = pool.clone();
+                v.extend(pool[1..pool.len() - 1].iter().rev());
+                v
+            }
+            _ => pool.clone(),
+        };
+        if !order.is_empty() {
+            let mut t = start;
+            let mut step = 0;
+            while t < end - 1e-9 && step < MAX_ARP_STEPS {
+                let next = (t + fx.rate).min(end);
+                out.push(BeatNote { start: t, end: t + (next - t) * 0.9, key: order[step % order.len()], velocity });
+                t = next;
+                step += 1;
+            }
+        }
+        i = j;
+    }
+    out
 }
 
 /// A point on an automation lane.
@@ -711,6 +849,7 @@ impl Project {
             regions: Vec::new(),
             folder: false,
             group: None,
+            midi_fx: None,
         });
         id
     }
@@ -2541,6 +2680,57 @@ mod folder_tests {
         assert!(p.remove_track(folder));
         assert!(p.track(a).is_some());
         assert_eq!(p.track(a).unwrap().group, None);
+    }
+}
+
+#[cfg(test)]
+mod midi_fx_tests {
+    use super::*;
+
+    fn note(start: f64, length: f64, key: u8) -> BeatNote {
+        BeatNote { start, end: start + length, key, velocity: 100 }
+    }
+
+    #[test]
+    fn a_chord_trigger_plays_the_chord_on_every_key() {
+        let fx = MidiFx::chord();
+        let out = apply_midi_fx(&fx, &[note(0.0, 1.0, 60)]);
+        let keys: Vec<u8> = out.iter().map(|n| n.key).collect();
+        assert_eq!(keys, vec![60, 64, 67]);
+        assert!(out.iter().all(|n| n.start == 0.0 && n.end == 1.0));
+    }
+
+    #[test]
+    fn an_arpeggio_steps_through_a_held_chord_in_sixteenths() {
+        let fx = MidiFx::arpeggio();
+        let chord = [note(0.0, 1.0, 60), note(0.0, 1.0, 64), note(0.0, 1.0, 67)];
+        let out = apply_midi_fx(&fx, &chord);
+        let keys: Vec<u8> = out.iter().map(|n| n.key).collect();
+        assert_eq!(keys, vec![60, 64, 67, 60], "four sixteenths over one beat");
+        assert!((out[1].start - 0.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_down_pattern_reverses_the_order() {
+        let fx = MidiFx { pattern: "down".into(), ..MidiFx::arpeggio() };
+        let chord = [note(0.0, 1.0, 60), note(0.0, 1.0, 64)];
+        let keys: Vec<u8> = apply_midi_fx(&fx, &chord).iter().map(|n| n.key).collect();
+        assert_eq!(keys, vec![64, 60, 64, 60]);
+    }
+
+    #[test]
+    fn separate_notes_each_get_their_own_arpeggio() {
+        let fx = MidiFx::arpeggio();
+        let out = apply_midi_fx(&fx, &[note(0.0, 0.5, 60), note(1.0, 0.5, 67)]);
+        assert_eq!(out.len(), 4);
+        assert_eq!(out.iter().filter(|n| n.start >= 1.0).count(), 2);
+    }
+
+    #[test]
+    fn a_zero_rate_leaves_the_notes_alone() {
+        let fx = MidiFx { rate: 0.0, ..MidiFx::arpeggio() };
+        let input = [note(0.0, 1.0, 60)];
+        assert_eq!(apply_midi_fx(&fx, &input), input.to_vec());
     }
 }
 

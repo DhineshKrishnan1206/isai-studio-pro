@@ -225,6 +225,9 @@ pub mod qobject {
         fn toggle_mute(self: Pin<&mut Self>, id: i32);
         #[qinvokable]
         fn toggle_solo(self: Pin<&mut Self>, id: i32);
+        /// Sets a MIDI effect on an instrument track: "off", "arp" or "chord".
+        #[qinvokable]
+        fn set_midi_fx(self: Pin<&mut Self>, id: i32, kind: &QString);
         /// Puts the track in a new folder, which then controls its level and mute.
         #[qinvokable]
         fn group_track(self: Pin<&mut Self>, id: i32);

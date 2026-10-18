@@ -542,9 +542,24 @@ impl AppController {
         self.edit("Solo", true, |p| p.track_mut(id(track)).map(|t| t.solo = !t.solo).is_some());
     }
 
+    pub fn set_midi_fx(self: Pin<&mut Self>, track: i32, kind: &QString) {
+        let fx = match kind.to_string().as_str() {
+            "arp" => Some(isai_project::MidiFx::arpeggio()),
+            "chord" => Some(isai_project::MidiFx::chord()),
+            _ => None,
+        };
+        self.edit("MIDI Effect", true, |p| match p.track_mut(id(track)) {
+            Some(t) if t.instrument.is_some() => {
+                t.midi_fx = fx;
+                true
+            }
+            _ => false,
+        });
+    }
+
     pub fn group_track(self: Pin<&mut Self>, track: i32) {
         self.edit("New Folder", true, |p| {
-            if !p.track(id(track)).is_some_and(|t| !t.folder) {
+            if p.track(id(track)).is_none_or(|t| t.folder) {
                 return false;
             }
             let folder = p.add_folder(None);

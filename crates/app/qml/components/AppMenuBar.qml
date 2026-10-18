@@ -86,6 +86,22 @@ MenuBar {
                 enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
                 onTriggered: bar.studio.app.groupTrack(bar.studio.app.selectedTrack)
             }
+            MenuSeparator {}
+            MenuItem {
+                text: "MIDI effect: arpeggiator (16ths)"
+                enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
+                onTriggered: bar.studio.app.setMidiFx(bar.studio.app.selectedTrack, "arp")
+            }
+            MenuItem {
+                text: "MIDI effect: chord trigger"
+                enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
+                onTriggered: bar.studio.app.setMidiFx(bar.studio.app.selectedTrack, "chord")
+            }
+            MenuItem {
+                text: "MIDI effect: off"
+                enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
+                onTriggered: bar.studio.app.setMidiFx(bar.studio.app.selectedTrack, "off")
+            }
             MenuItem {
                 text: "Take selected track out of its folder"
                 enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
