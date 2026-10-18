@@ -542,6 +542,20 @@ impl AppController {
         self.edit("Solo", true, |p| p.track_mut(id(track)).map(|t| t.solo = !t.solo).is_some());
     }
 
+    pub fn group_track(self: Pin<&mut Self>, track: i32) {
+        self.edit("New Folder", true, |p| {
+            if !p.track(id(track)).is_some_and(|t| !t.folder) {
+                return false;
+            }
+            let folder = p.add_folder(None);
+            p.set_group(id(track), Some(folder))
+        });
+    }
+
+    pub fn ungroup_track(self: Pin<&mut Self>, track: i32) {
+        self.edit("Ungroup", true, |p| p.set_group(id(track), None));
+    }
+
     pub fn set_track_volume(self: Pin<&mut Self>, track: i32, db: f64, commit: bool) {
         let db = (db as f32).clamp(isai_project::Track::MIN_DB, isai_project::Track::MAX_DB);
         self.edit("Volume", commit, |p| p.track_mut(id(track)).map(|t| t.volume_db = db).is_some());

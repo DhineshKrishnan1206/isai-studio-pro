@@ -249,6 +249,13 @@ pub struct Track {
     #[serde(default)]
     pub frozen: Option<String>,
     pub regions: Vec<Region>,
+    /// A folder groups tracks. It has no sound of its own: its fader and mute
+    /// apply to the tracks inside it.
+    #[serde(default)]
+    pub folder: bool,
+    /// The folder this track is in, if any.
+    #[serde(default)]
+    pub group: Option<u64>,
 }
 
 /// A point on an automation lane.
@@ -702,8 +709,41 @@ impl Project {
             instrument: None,
             frozen: None,
             regions: Vec::new(),
+            folder: false,
+            group: None,
         });
         id
+    }
+
+    /// Adds an empty folder track at the end and returns its id.
+    pub fn add_folder(&mut self, name: Option<&str>) -> u64 {
+        let id = self.add_track(Some(name.unwrap_or("Folder")));
+        if let Some(t) = self.track_mut(id) {
+            t.folder = true;
+        }
+        id
+    }
+
+    /// Puts a track in a folder, or takes it out with `None`. Only folders can
+    /// hold tracks, and a folder cannot go inside another folder.
+    pub fn set_group(&mut self, track: u64, folder: Option<u64>) -> bool {
+        if let Some(f) = folder
+            && (f == track || !self.track(f).is_some_and(|t| t.folder))
+        {
+            return false;
+        }
+        match self.track_mut(track) {
+            Some(t) if !t.folder => {
+                t.group = folder;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The level a track's folder adds to it (1 when it is not in a folder).
+    pub fn group_gain(&self, track: &Track) -> f32 {
+        track.group.and_then(|g| self.track(g)).map_or(1.0, Track::gain)
     }
 
     pub fn track(&self, id: u64) -> Option<&Track> {
@@ -717,6 +757,12 @@ impl Project {
     pub fn remove_track(&mut self, id: u64) -> bool {
         let before = self.tracks.len();
         self.tracks.retain(|t| t.id != id);
+        // Tracks inside a removed folder are kept, just no longer grouped.
+        for t in &mut self.tracks {
+            if t.group == Some(id) {
+                t.group = None;
+            }
+        }
         self.tracks.len() != before
     }
 
@@ -741,7 +787,8 @@ impl Project {
     /// Whether a track should be heard, taking every track's solo into account.
     pub fn audible(&self, track: &Track) -> bool {
         let any_solo = self.tracks.iter().any(|t| t.solo);
-        !track.mute && (!any_solo || track.solo)
+        let folder_muted = track.group.and_then(|g| self.track(g)).is_some_and(|f| f.mute);
+        !track.mute && !folder_muted && (!any_solo || track.solo)
     }
 
     // ------------------------------------------------- instruments and MIDI
@@ -2453,3 +2500,47 @@ mod tests {
         assert!(p.join_regions(&[r, a]).is_none(), "different tracks");
     }
 }
+
+#[cfg(test)]
+mod folder_tests {
+    use super::*;
+
+    #[test]
+    fn a_folder_sets_the_level_and_mute_of_the_tracks_inside() {
+        let mut p = Project::new("Folders", Meter::default(), "C major");
+        let a = p.add_track(Some("Drums"));
+        let folder = p.add_folder(Some("Band"));
+        assert!(p.set_group(a, Some(folder)));
+        p.track_mut(folder).unwrap().volume_db = -6.0;
+        let track = p.track(a).unwrap().clone();
+        assert!((p.group_gain(&track) - db_to_gain(-6.0)).abs() < 1e-6);
+        assert!(p.audible(&track));
+        p.track_mut(folder).unwrap().mute = true;
+        assert!(!p.audible(p.track(a).unwrap()));
+    }
+
+    #[test]
+    fn only_folders_hold_tracks_and_folders_do_not_nest() {
+        let mut p = Project::new("Folders", Meter::default(), "C major");
+        let a = p.add_track(Some("Bass"));
+        let f1 = p.add_folder(Some("One"));
+        let f2 = p.add_folder(Some("Two"));
+        assert!(!p.set_group(a, Some(a)), "a track cannot be its own folder");
+        assert!(!p.set_group(f2, Some(f1)), "a folder cannot go inside a folder");
+        assert!(p.set_group(a, Some(f1)));
+        assert!(p.set_group(a, None), "a track can leave its folder");
+        assert_eq!(p.track(a).unwrap().group, None);
+    }
+
+    #[test]
+    fn removing_a_folder_keeps_its_tracks() {
+        let mut p = Project::new("Folders", Meter::default(), "C major");
+        let a = p.add_track(Some("Keys"));
+        let folder = p.add_folder(None);
+        p.set_group(a, Some(folder));
+        assert!(p.remove_track(folder));
+        assert!(p.track(a).is_some());
+        assert_eq!(p.track(a).unwrap().group, None);
+    }
+}
+

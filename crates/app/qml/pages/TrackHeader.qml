@@ -62,7 +62,7 @@ Rectangle {
     // Colour strip; click to choose another colour.
     Rectangle {
         id: strip
-        x: 6; y: 8
+        x: header.track && header.track.group ? 22 : 6; y: 8
         width: 5
         height: parent.height - 16
         radius: 2.5
@@ -77,7 +77,7 @@ Rectangle {
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.leftMargin: 20
+        anchors.leftMargin: header.track && header.track.group ? 36 : 20
         anchors.rightMargin: 8
         anchors.topMargin: 6
         anchors.bottomMargin: 5

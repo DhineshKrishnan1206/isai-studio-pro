@@ -251,7 +251,7 @@ impl Session {
                     }
                 }
                 let mut play = PlayTrack {
-                    gain: track.gain(),
+                    gain: track.gain() * self.project.group_gain(track),
                     pan: track.pan,
                     audible: self.project.audible(track),
                     sends,
@@ -474,6 +474,8 @@ impl Session {
                     "id": t.id,
                     "name": t.name,
                     "frozen": t.frozen.is_some(),
+                    "folder": t.folder,
+                    "group": t.group,
                     "color": t.color,
                     "volume": t.volume_db,
                     "pan": t.pan,

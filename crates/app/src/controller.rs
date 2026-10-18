@@ -225,6 +225,12 @@ pub mod qobject {
         fn toggle_mute(self: Pin<&mut Self>, id: i32);
         #[qinvokable]
         fn toggle_solo(self: Pin<&mut Self>, id: i32);
+        /// Puts the track in a new folder, which then controls its level and mute.
+        #[qinvokable]
+        fn group_track(self: Pin<&mut Self>, id: i32);
+        /// Takes the track out of its folder.
+        #[qinvokable]
+        fn ungroup_track(self: Pin<&mut Self>, id: i32);
         /// While dragging, call with `commit` false; once more with true on release.
         #[qinvokable]
         fn set_track_volume(self: Pin<&mut Self>, id: i32, db: f64, commit: bool);

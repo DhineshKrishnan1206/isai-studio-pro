@@ -80,6 +80,17 @@ MenuBar {
                 enabled: bar.studio.app.projectOpen || bar.worksWithoutProject(modelData.title)
                 onTriggered: modelData.action()
             }
+            MenuSeparator {}
+            MenuItem {
+                text: "New folder with selected track"
+                enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
+                onTriggered: bar.studio.app.groupTrack(bar.studio.app.selectedTrack)
+            }
+            MenuItem {
+                text: "Take selected track out of its folder"
+                enabled: bar.studio.app.projectOpen && bar.studio.app.selectedTrack >= 0
+                onTriggered: bar.studio.app.ungroupTrack(bar.studio.app.selectedTrack)
+            }
         }
     }
     Menu {
