@@ -414,6 +414,17 @@ QtObject {
         latency: "The short delay between playing a sound and hearing it."
     })
 
+    /// The lesson list, grouped the way a beginner looks for things.
+    readonly property var groups: [
+        { title: "Effects", ids: ["eq", "compressor", "limiter", "reverb", "delay", "chorus", "flanger", "phaser",
+                                  "distortion", "bitcrusher", "gate", "deesser", "pitch", "plugin"] },
+        { title: "Instruments", ids: ["synth", "piano", "drums", "sampler"] },
+        { title: "Windows", ids: ["playlist", "mixer", "pianoroll", "inspector"] },
+        { title: "Mixing controls", ids: ["fader", "pan", "mute", "solo", "send", "arm"] },
+        { title: "Transport and timing", ids: ["metronome", "countin", "cycle", "snap", "tempo", "key", "signature", "latency"] },
+        { title: "Working with songs", ids: ["markers", "freeze", "bounce"] }
+    ]
+
     /// The lesson for a topic id, or null when there is none.
     function get(id) {
         return topics[id] || null

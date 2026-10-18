@@ -94,4 +94,15 @@ MenuBar {
             }
         }
     }
+
+    // The lesson list, opened from the Help menu.
+    LearnBrowser { id: learnBrowser; backdrop: bar.studio }
+
+    Menu {
+        title: "Help"
+        MenuItem {
+            text: "Learn: browse every lesson…"
+            onTriggered: learnBrowser.open()
+        }
+    }
 }
