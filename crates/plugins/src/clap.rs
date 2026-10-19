@@ -9,7 +9,9 @@ use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use clack_extensions::gui::{GuiApiType, GuiConfiguration, PluginGui, Window as ClapWindow};
+use clack_extensions::gui::{GuiApiType, GuiConfiguration, PluginGui};
+#[cfg(target_os = "macos")]
+use clack_extensions::gui::Window as ClapWindow;
 use clack_extensions::state::PluginState;
 use clack_host::events::event_types::{NoteOffEvent, NoteOnEvent};
 use clack_host::events::Match;
