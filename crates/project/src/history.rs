@@ -41,14 +41,16 @@ impl History {
     /// Restores the project from before the last edit. Returns its label.
     pub fn undo(&mut self, project: &mut Project) -> Option<String> {
         let (label, before) = self.undo.pop()?;
-        self.redo.push((label.clone(), std::mem::replace(project, before)));
+        self.redo
+            .push((label.clone(), std::mem::replace(project, before)));
         self.last = None;
         Some(label)
     }
 
     pub fn redo(&mut self, project: &mut Project) -> Option<String> {
         let (label, after) = self.redo.pop()?;
-        self.undo.push((label.clone(), std::mem::replace(project, after)));
+        self.undo
+            .push((label.clone(), std::mem::replace(project, after)));
         self.last = None;
         Some(label)
     }
@@ -97,7 +99,10 @@ mod tests {
         assert!(p.tracks.is_empty());
         assert_eq!(h.undo(&mut p), None);
 
-        assert_eq!(h.redo_labels().collect::<Vec<_>>(), vec!["Add Track", "Rename"]);
+        assert_eq!(
+            h.redo_labels().collect::<Vec<_>>(),
+            vec!["Add Track", "Rename"]
+        );
         assert_eq!(h.redo(&mut p).as_deref(), Some("Add Track"));
         assert_eq!(h.undo_labels().collect::<Vec<_>>(), vec!["Add Track"]);
         assert_eq!(h.redo(&mut p).as_deref(), Some("Rename"));

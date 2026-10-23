@@ -1,7 +1,9 @@
 //! The tuner: finds the pitch of the live input (the YIN method) and names
 //! the nearest note.
 
-const NAMES: [&str; 12] = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+const NAMES: [&str; 12] = [
+    "C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B",
+];
 /// Quieter input than this (RMS) shows no reading.
 const GATE: f32 = 0.003;
 /// Lower is stricter about what counts as a clear pitch.
@@ -28,7 +30,15 @@ pub fn detect(samples: &[f32], rate: f32) -> Option<Reading> {
     }
     // Halve high sample rates: the same accuracy for a quarter of the work.
     let (x, rate): (Vec<f32>, f32) = if rate > 32_000.0 {
-        (samples.as_chunks::<2>().0.iter().map(|[a, b]| (a + b) * 0.5).collect(), rate / 2.0)
+        (
+            samples
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|[a, b]| (a + b) * 0.5)
+                .collect(),
+            rate / 2.0,
+        )
     } else {
         (samples.to_vec(), rate)
     };
@@ -48,7 +58,11 @@ pub fn detect(samples: &[f32], rate: f32) -> Option<Reading> {
     d[0] = 1.0;
     for (tau, v) in d.iter_mut().enumerate().skip(1) {
         sum += *v;
-        *v = if sum > 0.0 { *v * tau as f32 / sum } else { 1.0 };
+        *v = if sum > 0.0 {
+            *v * tau as f32 / sum
+        } else {
+            1.0
+        };
     }
 
     // The first dip under the threshold, followed to the bottom of its valley.
@@ -59,9 +73,16 @@ pub fn detect(samples: &[f32], rate: f32) -> Option<Reading> {
     // Parabolic interpolation for a finer estimate between samples.
     let (a, b, c) = (d[tau - 1], d[tau], d[tau + 1]);
     let denom = a - 2.0 * b + c;
-    let shift = if denom.abs() > 1e-9 { (0.5 * (a - c) / denom).clamp(-1.0, 1.0) } else { 0.0 };
+    let shift = if denom.abs() > 1e-9 {
+        (0.5 * (a - c) / denom).clamp(-1.0, 1.0)
+    } else {
+        0.0
+    };
     let hz = rate / (tau as f32 + shift);
-    Some(Reading { hz, clarity: (1.0 - b).clamp(0.0, 1.0) })
+    Some(Reading {
+        hz,
+        clarity: (1.0 - b).clamp(0.0, 1.0),
+    })
 }
 
 /// The nearest note to `hz` with A4 at `a4` Hz: (name, octave, cents off, MIDI note).
@@ -69,7 +90,12 @@ pub fn note(hz: f32, a4: f32) -> (&'static str, i32, f32, i32) {
     let semis = 12.0 * (hz / a4).log2() + 69.0;
     let midi = semis.round() as i32;
     let cents = (semis - midi as f32) * 100.0;
-    (NAMES[midi.rem_euclid(12) as usize], midi.div_euclid(12) - 1, cents, midi)
+    (
+        NAMES[midi.rem_euclid(12) as usize],
+        midi.div_euclid(12) - 1,
+        cents,
+        midi,
+    )
 }
 
 #[cfg(test)]
@@ -77,7 +103,9 @@ mod tests {
     use super::*;
 
     fn tone(hz: f32, rate: f32, n: usize, shape: fn(f32) -> f32) -> Vec<f32> {
-        (0..n).map(|i| 0.4 * shape((i as f32 * hz / rate).fract())).collect()
+        (0..n)
+            .map(|i| 0.4 * shape((i as f32 * hz / rate).fract()))
+            .collect()
     }
 
     fn sine(t: f32) -> f32 {
@@ -90,10 +118,21 @@ mod tests {
 
     #[test]
     fn finds_the_pitch_of_tones_across_the_range() {
-        for (hz, shape) in [(82.41, saw as fn(f32) -> f32), (110.0, sine), (440.0, sine), (329.63, saw), (987.77, sine)] {
-            let r = detect(&tone(hz, 48_000.0, 4096, shape), 48_000.0).unwrap_or_else(|| panic!("no pitch at {hz}"));
+        for (hz, shape) in [
+            (82.41, saw as fn(f32) -> f32),
+            (110.0, sine),
+            (440.0, sine),
+            (329.63, saw),
+            (987.77, sine),
+        ] {
+            let r = detect(&tone(hz, 48_000.0, 4096, shape), 48_000.0)
+                .unwrap_or_else(|| panic!("no pitch at {hz}"));
             let cents = 1200.0 * (r.hz / hz).log2();
-            assert!(cents.abs() < 3.0, "{hz} Hz read as {} ({cents:.1} cents)", r.hz);
+            assert!(
+                cents.abs() < 3.0,
+                "{hz} Hz read as {} ({cents:.1} cents)",
+                r.hz
+            );
             assert!(r.clarity > 0.8);
         }
     }

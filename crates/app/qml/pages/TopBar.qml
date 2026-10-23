@@ -8,6 +8,7 @@ Rectangle {
     id: bar
     property var app
     signal importRequested()
+    signal importVideoRequested()
     signal settingsRequested()
     signal newProjectRequested()
     signal openRequested()
@@ -225,6 +226,12 @@ Rectangle {
             text: "Import"
             onClicked: bar.importRequested()
             DToolTip { visible: parent.hovered; text: "Import audio (⌘I)" }
+        }
+        DButton {
+            glyph: Icons.fileAudio
+            text: "Video"
+            onClicked: bar.importVideoRequested()
+            DToolTip { visible: parent.hovered; text: "Import a video for scoring" }
         }
         IconButton {
             glyph: Icons.magnifyingGlass

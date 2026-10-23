@@ -493,7 +493,7 @@ Item {
             Rectangle {
                 width: 30; height: 16; radius: 8
                 color: tg.on ? win.text : "#26282D"
-                Rectangle { x: tg.on ? 16 : 2; y: 2; width: 12; height: 12; radius: 6; color: tg.on ? "#0A0A0C" : "#80848D"; Behavior on x { NumberAnimation { duration: 90 } } }
+                Rectangle { x: tg.on ? 16 : 2; y: 2; width: 12; height: 12; radius: 6; color: tg.on ? "#0A0A0C" : "#80848D"; Behavior on x { NumberAnimation { duration: Theme.fast } } }
             }
             DText { anchors.verticalCenter: parent.verticalCenter; text: tg.label; font.pixelSize: 11; color: tg.hovered ? win.text : "#B5B8BF" }
         }
@@ -518,7 +518,7 @@ Item {
                 radius: 3
                 color: win.hit
                 opacity: k.held ? 0.85 : 0
-                Behavior on opacity { NumberAnimation { duration: k.held ? 20 : 220 } }
+                Behavior on opacity { NumberAnimation { duration: k.held ? 20 : Theme.slow } }
             }
         }
         DText {

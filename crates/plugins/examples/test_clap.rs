@@ -24,13 +24,19 @@ impl Plugin for TestTone {
 
 impl DefaultPluginFactory for TestTone {
     fn get_descriptor() -> PluginDescriptor {
-        PluginDescriptor::new("org.isai.test-tone", "Isai Test Tone").with_features([clack_plugin::plugin::features::INSTRUMENT])
+        PluginDescriptor::new("org.isai.test-tone", "Isai Test Tone")
+            .with_features([clack_plugin::plugin::features::INSTRUMENT])
     }
     fn new_shared(_host: HostSharedHandle<'_>) -> Result<(), PluginError> {
         Ok(())
     }
-    fn new_main_thread<'a>(_host: HostMainThreadHandle<'a>, _shared: &'a ()) -> Result<Main, PluginError> {
-        Ok(Main { state: Mutex::new(b"isai-test-state".to_vec()) })
+    fn new_main_thread<'a>(
+        _host: HostMainThreadHandle<'a>,
+        _shared: &'a (),
+    ) -> Result<Main, PluginError> {
+        Ok(Main {
+            state: Mutex::new(b"isai-test-state".to_vec()),
+        })
     }
 }
 
@@ -61,11 +67,26 @@ pub struct Tone {
 }
 
 impl<'a> PluginAudioProcessor<'a, (), Main> for Tone {
-    fn activate(_host: HostAudioProcessorHandle<'a>, _main: &Main, _shared: &'a (), config: PluginAudioConfiguration) -> Result<Self, PluginError> {
-        Ok(Self { phase: 0.0, freq: 440.0, on: false, rate: config.sample_rate as f32 })
+    fn activate(
+        _host: HostAudioProcessorHandle<'a>,
+        _main: &Main,
+        _shared: &'a (),
+        config: PluginAudioConfiguration,
+    ) -> Result<Self, PluginError> {
+        Ok(Self {
+            phase: 0.0,
+            freq: 440.0,
+            on: false,
+            rate: config.sample_rate as f32,
+        })
     }
 
-    fn process(&mut self, _process: Process, mut audio: Audio, events: Events) -> Result<ProcessStatus, PluginError> {
+    fn process(
+        &mut self,
+        _process: Process,
+        mut audio: Audio,
+        events: Events,
+    ) -> Result<ProcessStatus, PluginError> {
         for e in events.input {
             if let Some(n) = e.as_event::<NoteOnEvent>() {
                 let key = n.key().into_specific().unwrap_or(60) as f32;
@@ -76,7 +97,9 @@ impl<'a> PluginAudioProcessor<'a, (), Main> for Tone {
             }
         }
         for mut port in &mut audio {
-            let Some(channels) = port.channels()?.into_f32() else { continue };
+            let Some(channels) = port.channels()?.into_f32() else {
+                continue;
+            };
             let (start, freq, on, rate) = (self.phase, self.freq, self.on, self.rate);
             let mut end = start;
             for pair in channels {
@@ -88,7 +111,11 @@ impl<'a> PluginAudioProcessor<'a, (), Main> for Tone {
                 };
                 let mut ph = start;
                 for s in buf.iter_mut() {
-                    *s = if on { (ph * std::f32::consts::TAU).sin() * 0.3 } else { 0.0 };
+                    *s = if on {
+                        (ph * std::f32::consts::TAU).sin() * 0.3
+                    } else {
+                        0.0
+                    };
                     ph = (ph + freq / rate).fract();
                 }
                 end = ph;

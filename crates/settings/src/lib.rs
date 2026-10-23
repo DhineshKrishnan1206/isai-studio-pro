@@ -43,9 +43,13 @@ impl Profile {
 
     pub fn description(self) -> &'static str {
         match self {
-            Profile::Smooth => "All animations, high frame rate and detailed waveforms. For modern computers.",
+            Profile::Smooth => {
+                "All animations, high frame rate and detailed waveforms. For modern computers."
+            }
             Profile::Balanced => "Short animations and medium detail. Good for most laptops.",
-            Profile::Lightweight => "No animations, lower frame rate and simple visuals. For older or low-spec computers.",
+            Profile::Lightweight => {
+                "No animations, lower frame rate and simple visuals. For older or low-spec computers."
+            }
             Profile::Custom => "Your own mix of options.",
         }
     }
@@ -179,7 +183,10 @@ pub struct Metronome {
 
 impl Default for Metronome {
     fn default() -> Self {
-        Self { volume: 80, count_in_bars: 1 }
+        Self {
+            volume: 80,
+            count_in_bars: 1,
+        }
     }
 }
 
@@ -229,13 +236,19 @@ impl Default for Visual {
 
 impl Default for Audio {
     fn default() -> Self {
-        Self { device_id: None, buffer_size: buffer_for(Profile::Balanced), eco: false }
+        Self {
+            device_id: None,
+            buffer_size: buffer_for(Profile::Balanced),
+            eco: false,
+        }
     }
 }
 
 impl Default for Helpers {
     fn default() -> Self {
-        Self { suggest_lighter_profile: true }
+        Self {
+            suggest_lighter_profile: true,
+        }
     }
 }
 
@@ -396,7 +409,12 @@ mod tests {
 
     #[test]
     fn keys_match_the_settings_file() {
-        for p in [Profile::Smooth, Profile::Balanced, Profile::Lightweight, Profile::Custom] {
+        for p in [
+            Profile::Smooth,
+            Profile::Balanced,
+            Profile::Lightweight,
+            Profile::Custom,
+        ] {
             assert_eq!(Profile::from_key(p.key()), Some(p));
             assert_eq!(toml::Value::try_from(p).unwrap().as_str(), Some(p.key()));
         }
@@ -406,11 +424,15 @@ mod tests {
     #[test]
     fn missing_fields_use_defaults() {
         // Files written by older versions lack newer fields and must still load.
-        let s: Settings = toml::from_str("profile = \"lightweight\"\n[visual]\nui_fps = 30\n").unwrap();
+        let s: Settings =
+            toml::from_str("profile = \"lightweight\"\n[visual]\nui_fps = 30\n").unwrap();
         assert_eq!(s.profile, Profile::Lightweight);
         assert_eq!(s.visual.ui_fps, 30);
         assert_eq!(s.audio, Audio::default());
-        assert!(s.setup_done, "files written before setup tracking count as set up");
+        assert!(
+            s.setup_done,
+            "files written before setup tracking count as set up"
+        );
         assert_eq!(s.ui_scale, 100, "interface size defaults to 100%");
     }
 

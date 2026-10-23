@@ -18,7 +18,8 @@ static PEAKS: Mutex<Option<HashMap<String, Arc<WavePeaks>>>> = Mutex::new(None);
 
 pub fn set_peaks(path: &Path, peaks: Arc<WavePeaks>) {
     if let Ok(mut map) = PEAKS.lock() {
-        map.get_or_insert_with(HashMap::new).insert(path.display().to_string(), peaks);
+        map.get_or_insert_with(HashMap::new)
+            .insert(path.display().to_string(), peaks);
     }
 }
 

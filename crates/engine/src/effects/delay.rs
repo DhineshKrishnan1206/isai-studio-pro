@@ -21,7 +21,12 @@ const SYNC_BEATS: [f32; 7] = [0.0, 1.0, 0.5, 0.75, 0.25, 2.0 / 3.0, 2.0];
 impl Delay {
     pub fn new(rate: f32) -> Self {
         let len = (MAX_SECONDS * rate) as usize + 2;
-        Self { buf: [vec![0.0; len], vec![0.0; len]], pos: 0, current: 0.0, tone: [0.0; 2] }
+        Self {
+            buf: [vec![0.0; len], vec![0.0; len]],
+            pos: 0,
+            current: 0.0,
+            tone: [0.0; 2],
+        }
     }
 
     /// Delay time in seconds for these settings.
@@ -51,7 +56,8 @@ impl Delay {
             self.current = target;
         }
         let feedback = (p[2] / 100.0).clamp(0.0, 0.95);
-        let tone = 1.0 - (-std::f32::consts::TAU * p[3].clamp(200.0, 20_000.0) / ctx.sample_rate).exp();
+        let tone =
+            1.0 - (-std::f32::consts::TAU * p[3].clamp(200.0, 20_000.0) / ctx.sample_rate).exp();
         let ping_pong = p[4] >= 0.5;
         let wet = (p[5] / 100.0).clamp(0.0, 1.0);
         let dry = 1.0 - wet * 0.5;
@@ -115,7 +121,9 @@ mod tests {
         l[0] = 1.0;
         r[0] = 1.0;
         d.process(&p, &CTX, &mut l, &mut r);
-        let loudest = (1..9600).max_by(|&a, &b| l[a].abs().total_cmp(&l[b].abs())).unwrap();
+        let loudest = (1..9600)
+            .max_by(|&a, &b| l[a].abs().total_cmp(&l[b].abs()))
+            .unwrap();
         assert!((loudest as i64 - 4800).abs() <= 2, "{loudest}");
     }
 }

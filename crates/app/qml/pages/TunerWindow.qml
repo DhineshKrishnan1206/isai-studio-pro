@@ -190,7 +190,7 @@ Item {
             transform: Rotation {
                 origin.x: 1.5; origin.y: dial.r
                 angle: tuner.hasPitch ? Math.max(-50, Math.min(50, tuner.cents)) * 1.2 : 0
-                Behavior on angle { NumberAnimation { duration: 90 } }
+                Behavior on angle { NumberAnimation { duration: Theme.fast } }
             }
         }
         Rectangle { x: dial.cx - 6; y: dial.cy - 6; width: 12; height: 12; radius: 6; color: tuner.needleColor }

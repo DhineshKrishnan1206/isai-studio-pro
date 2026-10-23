@@ -1,7 +1,8 @@
 # Feature checklist: Logic Pro × FL Studio → Isai
 
 What the two reference DAWs offer, grouped by area, and where Isai stands.
-We add them one by one, roughly top to bottom within each priority group.
+This is a feature inventory, not a delivery schedule; see [ROADMAP.md](ROADMAP.md)
+for current priorities.
 
 **Source:** L = Logic Pro, F = FL Studio, L/F = both.
 **Isai:** ✅ done · 🟡 partly · ⬜ not yet
@@ -19,11 +20,12 @@ its own open-source versions rather than copying products.
 | Save, Save As, Open, recent projects | L/F | ✅ |
 | Autosave and crash recovery | L/F | ✅ |
 | Self-contained project folder (audio copied in) | L | ✅ |
-| Project alternatives (versions of the same song) | L | ⬜ |
-| Automatic backups (restore an earlier save) | L/F | ⬜ |
+| Project alternatives (versions of the same song) | L | ✅ ("Save as alternative" writes another `.isai` in the project folder, sharing its audio; "Open alternative" switches) |
+| Automatic backups (restore an earlier save) | L/F | ✅ (each save keeps the previous version in `Backups/`, newest 20; File → Restore earlier version…, undoable) |
 | Project settings: tempo, time signature, key, sample rate | L/F | 🟡 (sample rate follows the device) |
 | Clean up unused audio files / consolidate | L | ⬜ |
-| Import/export MIDI files | L/F | ⬜ |
+| Import/export MIDI files | L/F | ✅ (Standard MIDI Files: each MIDI track becomes its own instrument track, at the playhead; export writes the open piano-roll region) |
+| Video for scoring: import a video onto the timeline, saved with the project (copied into `Video/`) | F | 🟡 (player window with dock and snap, follows the playhead, muted by default; all common formats through FFmpeg, see HANDOFF; player not yet tested in the app) |
 | Import projects from other DAWs (AAF/OMF, DAWproject) | L | ⬜ |
 
 ## 2. Transport & time
@@ -42,7 +44,7 @@ its own open-source versions rather than copying products.
 | Time signature changes over time | L/F | ✅ (signature lane; bars, grid, metronome follow) |
 | Markers (Intro, Verse, Chorus…) | L/F | ✅ (marker lane, M, ⌥←/→, cycle a section) |
 | Arrangement sections you can move/copy as blocks | L/F | ⬜ |
-| Punch in/out recording (autopunch) | L/F | ⬜ |
+| Punch in/out recording (autopunch) | L/F | 🟡 (Punch Recording keeps only the part of a take inside the cycle region; takes are still recorded whole to disk) |
 | Varispeed (play everything faster/slower) | L | ⬜ |
 | Smart Tempo: detect tempo of recordings/imports | L | 🟡 (detect a region's tempo when following) |
 | Metronome settings: sound, subdivisions, only while recording | L/F | 🟡 (volume, count-in length) |
@@ -230,5 +232,5 @@ its own open-source versions rather than copying products.
 | Adjustable buffer, animations, frame rate | L/F | ✅ |
 | Only draw what's on screen | Isai | ✅ |
 | Crackle detection and suggestions | Isai | ✅ |
-| Track freeze, eco modes, disk streaming | L/F | ⬜ |
+| Disk streaming for long recordings | Isai | ⬜ |
 | Multi-core audio processing | L/F | ⬜ |

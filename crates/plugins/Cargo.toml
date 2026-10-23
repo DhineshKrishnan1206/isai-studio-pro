@@ -19,7 +19,9 @@ clack-extensions = { version = "=0.2.0", features = ["clack-host", "state", "gui
 [target.'cfg(target_os = "macos")'.dependencies]
 # A plain window to hold a CLAP plugin's view (the same versions vst3-host uses).
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3.2", features = ["NSWindow", "NSResponder", "NSView", "NSGraphics"] }
+objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSWindow", "NSResponder", "NSView", "NSGraphics", "NSEvent"] }
+# Block for the key filter (already in the lock file, MIT).
+block2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry", "NSBundle", "NSURL"] }
 # Audio Units, through Apple's C API.
 objc2-audio-toolbox = { version = "0.3.2", features = ["AUComponent", "AudioComponent", "MusicDevice", "objc2-core-foundation", "objc2-core-audio-types"] }

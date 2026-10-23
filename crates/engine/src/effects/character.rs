@@ -16,7 +16,11 @@ pub struct Distortion {
 
 impl Distortion {
     pub fn new() -> Self {
-        Self { tone: Biquad::new(), dc: Biquad::new(), last: (f32::NAN, f32::NAN) }
+        Self {
+            tone: Biquad::new(),
+            dc: Biquad::new(),
+            last: (f32::NAN, f32::NAN),
+        }
     }
 
     #[inline]
@@ -51,7 +55,9 @@ impl Distortion {
         }
         for (a, b) in l.iter_mut().zip(r.iter_mut()) {
             for (ch, x) in [a, b].into_iter().enumerate() {
-                let wet = self.dc.tick(ch, self.tone.tick(ch, Self::shape(kind, *x * drive)));
+                let wet = self
+                    .dc
+                    .tick(ch, self.tone.tick(ch, Self::shape(kind, *x * drive)));
                 *x = flush((*x + (wet - *x) * mix) * out);
             }
         }
@@ -78,7 +84,10 @@ pub struct Bitcrusher {
 
 impl Bitcrusher {
     pub fn new() -> Self {
-        Self { held: [0.0; 2], count: f32::MAX }
+        Self {
+            held: [0.0; 2],
+            count: f32::MAX,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -94,7 +103,10 @@ impl Bitcrusher {
                 if self.count >= hold {
                     self.count = 0.0;
                 }
-                self.held = [(*a * levels).round() / levels, (*b * levels).round() / levels];
+                self.held = [
+                    (*a * levels).round() / levels,
+                    (*b * levels).round() / levels,
+                ];
             }
             *a = (*a + (self.held[0] - *a) * mix) * out;
             *b = (*b + (self.held[1] - *b) * mix) * out;

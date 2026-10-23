@@ -13,18 +13,24 @@ use std::sync::{Arc, Mutex};
 
 use isai_engine::mixer::BLOCK;
 use isai_engine::plugin::{ExternalPlugin, NoteEvent, PluginRef, Transport};
+use objc2::msg_send;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject};
-use objc2::msg_send;
 use objc2_app_kit::NSView;
 use objc2_audio_toolbox::{
-    AURenderCallbackStruct, AudioComponent, AudioComponentCopyName, AudioComponentDescription, AudioComponentFindNext,
-    AudioComponentGetDescription, AudioComponentInstanceDispose, AudioComponentInstanceNew, AudioUnit, AudioUnitGetProperty,
-    AudioUnitGetPropertyInfo, AudioUnitInitialize, AudioUnitRender, AudioUnitRenderActionFlags, AudioUnitSetProperty,
+    AURenderCallbackStruct, AudioComponent, AudioComponentCopyName, AudioComponentDescription,
+    AudioComponentFindNext, AudioComponentGetDescription, AudioComponentInstanceDispose,
+    AudioComponentInstanceNew, AudioUnit, AudioUnitGetProperty, AudioUnitGetPropertyInfo,
+    AudioUnitInitialize, AudioUnitRender, AudioUnitRenderActionFlags, AudioUnitSetProperty,
     AudioUnitUninitialize, MusicDeviceMIDIEvent,
 };
-use objc2_core_audio_types::{AudioBuffer, AudioBufferList, AudioStreamBasicDescription, AudioTimeStamp, AudioTimeStampFlags};
-use objc2_core_foundation::{CFData, CFPropertyList, CFPropertyListCreateData, CFPropertyListCreateWithData, CFPropertyListFormat, CFRetained, CFString, CFType};
+use objc2_core_audio_types::{
+    AudioBuffer, AudioBufferList, AudioStreamBasicDescription, AudioTimeStamp, AudioTimeStampFlags,
+};
+use objc2_core_foundation::{
+    CFData, CFPropertyList, CFPropertyListCreateData, CFPropertyListCreateWithData,
+    CFPropertyListFormat, CFRetained, CFString, CFType,
+};
 use objc2_foundation::{NSBundle, NSSize, NSString, NSURL};
 
 use crate::macwin::HostWindow;
@@ -49,25 +55,54 @@ const SCOPE_INPUT: u32 = 1;
 const SCOPE_OUTPUT: u32 = 2;
 
 fn fourcc(v: u32) -> String {
-    v.to_be_bytes().iter().map(|&b| if b.is_ascii_graphic() || b == b' ' { b as char } else { '?' }).collect()
+    v.to_be_bytes()
+        .iter()
+        .map(|&b| {
+            if b.is_ascii_graphic() || b == b' ' {
+                b as char
+            } else {
+                '?'
+            }
+        })
+        .collect()
 }
 
 /// "aumu:subt:manu", the id saved in songs.
 fn uid(d: &AudioComponentDescription) -> String {
-    format!("{}:{}:{}", fourcc(d.componentType), fourcc(d.componentSubType), fourcc(d.componentManufacturer))
+    format!(
+        "{}:{}:{}",
+        fourcc(d.componentType),
+        fourcc(d.componentSubType),
+        fourcc(d.componentManufacturer)
+    )
 }
 
 fn parse_uid(uid: &str) -> Option<AudioComponentDescription> {
     let parts: Vec<&str> = uid.split(':').collect();
-    let code = |s: &str| -> Option<u32> { <[u8; 4]>::try_from(s.as_bytes()).ok().map(|b| four(&b)) };
-    let [t, s, m] = parts.as_slice() else { return None };
-    Some(AudioComponentDescription { componentType: code(t)?, componentSubType: code(s)?, componentManufacturer: code(m)?, componentFlags: 0, componentFlagsMask: 0 })
+    let code =
+        |s: &str| -> Option<u32> { <[u8; 4]>::try_from(s.as_bytes()).ok().map(|b| four(&b)) };
+    let [t, s, m] = parts.as_slice() else {
+        return None;
+    };
+    Some(AudioComponentDescription {
+        componentType: code(t)?,
+        componentSubType: code(s)?,
+        componentManufacturer: code(m)?,
+        componentFlags: 0,
+        componentFlagsMask: 0,
+    })
 }
 
 pub(crate) fn scan() -> Vec<PluginInfo> {
     let mut out = Vec::new();
     for kind in [MUSIC_DEVICE, EFFECT, MUSIC_EFFECT] {
-        let mut want = AudioComponentDescription { componentType: kind, componentSubType: 0, componentManufacturer: 0, componentFlags: 0, componentFlagsMask: 0 };
+        let mut want = AudioComponentDescription {
+            componentType: kind,
+            componentSubType: 0,
+            componentManufacturer: 0,
+            componentFlags: 0,
+            componentFlagsMask: 0,
+        };
         let mut comp: AudioComponent = std::ptr::null_mut();
         loop {
             // SAFETY: plain Audio Component lookups; nothing is loaded.
@@ -87,17 +122,26 @@ pub(crate) fn scan() -> Vec<PluginInfo> {
                 String::new()
             } else {
                 // SAFETY: CopyName returns a +1 CFString, released here.
-                let s = unsafe { CFRetained::from_raw(NonNull::new_unchecked(name as *mut CFString)) };
+                let s =
+                    unsafe { CFRetained::from_raw(NonNull::new_unchecked(name as *mut CFString)) };
                 s.to_string()
             };
-            let (vendor, plugin) = full.split_once(": ").map_or((String::new(), full.clone()), |(v, p)| (v.to_owned(), p.to_owned()));
+            let (vendor, plugin) = full
+                .split_once(": ")
+                .map_or((String::new(), full.clone()), |(v, p)| {
+                    (v.to_owned(), p.to_owned())
+                });
             out.push(PluginInfo {
                 format: Format::Au,
                 path: PathBuf::from(format!("AudioUnit/{}", uid(&desc))),
                 uid: uid(&desc),
                 name: plugin,
                 vendor,
-                category: if kind == MUSIC_DEVICE { "Instrument".into() } else { "Fx".into() },
+                category: if kind == MUSIC_DEVICE {
+                    "Instrument".into()
+                } else {
+                    "Fx".into()
+                },
                 instrument: kind == MUSIC_DEVICE,
                 has_gui: true,
             });
@@ -107,7 +151,9 @@ pub(crate) fn scan() -> Vec<PluginInfo> {
 }
 
 pub(crate) fn exists(uid: &str) -> bool {
-    let Some(mut desc) = parse_uid(uid) else { return false };
+    let Some(mut desc) = parse_uid(uid) else {
+        return false;
+    };
     // SAFETY: a lookup only.
     !unsafe { AudioComponentFindNext(std::ptr::null_mut(), NonNull::from(&mut desc)) }.is_null()
 }
@@ -163,7 +209,12 @@ unsafe extern "C-unwind" fn input_proc(
         let inputs = &*(*(refcon.as_ptr() as *const Inputs)).0.get();
         let list = &mut *(data as *mut StereoBufferList);
         let n = (frames as usize).min(inputs[0].len());
-        for (i, buf) in list.buffers.iter_mut().take(list.count.min(2) as usize).enumerate() {
+        for (i, buf) in list
+            .buffers
+            .iter_mut()
+            .take(list.count.min(2) as usize)
+            .enumerate()
+        {
             if !buf.mData.is_null() {
                 std::ptr::copy_nonoverlapping(inputs[i].as_ptr(), buf.mData as *mut f32, n);
             }
@@ -173,7 +224,11 @@ unsafe extern "C-unwind" fn input_proc(
 }
 
 fn check(status: i32, what: &str) -> Result<(), String> {
-    if status == 0 { Ok(()) } else { Err(format!("{what} failed ({status})")) }
+    if status == 0 {
+        Ok(())
+    } else {
+        Err(format!("{what} failed ({status})"))
+    }
 }
 
 impl AuPlugin {
@@ -186,7 +241,10 @@ impl AuPlugin {
                 return Err("this Audio Unit isn't installed".into());
             }
             let mut unit: AudioUnit = std::ptr::null_mut();
-            check(AudioComponentInstanceNew(comp, NonNull::from(&mut unit)), "opening the Audio Unit")?;
+            check(
+                AudioComponentInstanceNew(comp, NonNull::from(&mut unit)),
+                "opening the Audio Unit",
+            )?;
             let effect = desc.componentType != MUSIC_DEVICE;
             let format = AudioStreamBasicDescription {
                 mSampleRate: sample_rate,
@@ -201,29 +259,74 @@ impl AuPlugin {
                 mReserved: 0,
             };
             let size = std::mem::size_of::<AudioStreamBasicDescription>() as u32;
-            let set = |prop: u32, scope: u32, data: *const c_void, len: u32| AudioUnitSetProperty(unit, prop, scope, 0, data, len);
-            check(set(PROP_STREAM_FORMAT, SCOPE_OUTPUT, &format as *const _ as *const c_void, size), "setting the output format")?;
+            let set = |prop: u32, scope: u32, data: *const c_void, len: u32| {
+                AudioUnitSetProperty(unit, prop, scope, 0, data, len)
+            };
+            check(
+                set(
+                    PROP_STREAM_FORMAT,
+                    SCOPE_OUTPUT,
+                    &format as *const _ as *const c_void,
+                    size,
+                ),
+                "setting the output format",
+            )?;
             if effect {
-                check(set(PROP_STREAM_FORMAT, SCOPE_INPUT, &format as *const _ as *const c_void, size), "setting the input format")?;
+                check(
+                    set(
+                        PROP_STREAM_FORMAT,
+                        SCOPE_INPUT,
+                        &format as *const _ as *const c_void,
+                        size,
+                    ),
+                    "setting the input format",
+                )?;
             }
             let max = BLOCK as u32;
-            let _ = set(PROP_MAX_FRAMES, SCOPE_GLOBAL, &max as *const _ as *const c_void, 4);
+            let _ = set(
+                PROP_MAX_FRAMES,
+                SCOPE_GLOBAL,
+                &max as *const _ as *const c_void,
+                4,
+            );
 
-            let inputs = Box::new(Inputs(UnsafeCell::new([vec![0.0; BLOCK], vec![0.0; BLOCK]])));
+            let inputs = Box::new(Inputs(UnsafeCell::new([
+                vec![0.0; BLOCK],
+                vec![0.0; BLOCK],
+            ])));
             // The callback reads the boxed inputs, which never move.
             let refcon = &*inputs as *const Inputs as *mut c_void;
             let core = Arc::new(Core {
-                audio: Mutex::new(Audio { unit: Unit(unit), effect, inputs, out_bufs: [vec![0.0; BLOCK], vec![0.0; BLOCK]], frames: 0, sample_time: 0.0 }),
+                audio: Mutex::new(Audio {
+                    unit: Unit(unit),
+                    effect,
+                    inputs,
+                    out_bufs: [vec![0.0; BLOCK], vec![0.0; BLOCK]],
+                    frames: 0,
+                    sample_time: 0.0,
+                }),
             });
             if effect {
-                let callback = AURenderCallbackStruct { inputProc: Some(input_proc), inputProcRefCon: refcon };
+                let callback = AURenderCallbackStruct {
+                    inputProc: Some(input_proc),
+                    inputProcRefCon: refcon,
+                };
                 check(
-                    set(PROP_SET_RENDER_CALLBACK, SCOPE_INPUT, &callback as *const _ as *const c_void, std::mem::size_of::<AURenderCallbackStruct>() as u32),
+                    set(
+                        PROP_SET_RENDER_CALLBACK,
+                        SCOPE_INPUT,
+                        &callback as *const _ as *const c_void,
+                        std::mem::size_of::<AURenderCallbackStruct>() as u32,
+                    ),
                     "connecting the effect's input",
                 )?;
             }
             check(AudioUnitInitialize(unit), "starting the Audio Unit")?;
-            Ok(Self { core, unit, window: None })
+            Ok(Self {
+                core,
+                unit,
+                window: None,
+            })
         }
     }
 
@@ -238,11 +341,27 @@ impl AuPlugin {
         let mut size = std::mem::size_of::<*const CFType>() as u32;
         // SAFETY: ClassInfo returns a +1 property list.
         unsafe {
-            if AudioUnitGetProperty(self.unit, PROP_CLASS_INFO, SCOPE_GLOBAL, 0, NonNull::from(&mut plist).cast(), NonNull::from(&mut size)) != 0 || plist.is_null() {
+            if AudioUnitGetProperty(
+                self.unit,
+                PROP_CLASS_INFO,
+                SCOPE_GLOBAL,
+                0,
+                NonNull::from(&mut plist).cast(),
+                NonNull::from(&mut size),
+            ) != 0
+                || plist.is_null()
+            {
                 return None;
             }
-            let plist: CFRetained<CFPropertyList> = CFRetained::from_raw(NonNull::new_unchecked(plist as *mut CFPropertyList));
-            let data = CFPropertyListCreateData(None, Some(&plist), CFPropertyListFormat::BinaryFormat_v1_0, 0, std::ptr::null_mut())?;
+            let plist: CFRetained<CFPropertyList> =
+                CFRetained::from_raw(NonNull::new_unchecked(plist as *mut CFPropertyList));
+            let data = CFPropertyListCreateData(
+                None,
+                Some(&plist),
+                CFPropertyListFormat::BinaryFormat_v1_0,
+                0,
+                std::ptr::null_mut(),
+            )?;
             Some(data.to_vec())
         }
     }
@@ -252,10 +371,24 @@ impl AuPlugin {
         // SAFETY: the property list is valid for the call; the unit copies it.
         unsafe {
             let bytes = CFData::from_bytes(data);
-            let plist = CFPropertyListCreateWithData(None, Some(&bytes), 0, std::ptr::null_mut(), std::ptr::null_mut()).ok_or("not a saved Audio Unit state")?;
+            let plist = CFPropertyListCreateWithData(
+                None,
+                Some(&bytes),
+                0,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+            .ok_or("not a saved Audio Unit state")?;
             let raw: *const CFType = CFRetained::as_ptr(&plist).as_ptr();
             check(
-                AudioUnitSetProperty(self.unit, PROP_CLASS_INFO, SCOPE_GLOBAL, 0, &raw as *const _ as *const c_void, std::mem::size_of::<*const CFType>() as u32),
+                AudioUnitSetProperty(
+                    self.unit,
+                    PROP_CLASS_INFO,
+                    SCOPE_GLOBAL,
+                    0,
+                    &raw as *const _ as *const c_void,
+                    std::mem::size_of::<*const CFType>() as u32,
+                ),
                 "restoring the Audio Unit's sound",
             )
         }
@@ -267,19 +400,38 @@ impl AuPlugin {
         unsafe {
             let mut size = 0u32;
             let mut writable = 0u8;
-            if AudioUnitGetPropertyInfo(self.unit, PROP_COCOA_UI, SCOPE_GLOBAL, 0, &mut size, &mut writable) == 0 && size > 0 {
+            if AudioUnitGetPropertyInfo(
+                self.unit,
+                PROP_COCOA_UI,
+                SCOPE_GLOBAL,
+                0,
+                &mut size,
+                &mut writable,
+            ) == 0
+                && size > 0
+            {
                 // AudioUnitCocoaViewInfo: a bundle URL, then one or more class names.
                 let mut info = vec![0u8; size as usize];
                 let mut len = size;
-                if AudioUnitGetProperty(self.unit, PROP_COCOA_UI, SCOPE_GLOBAL, 0, NonNull::new_unchecked(info.as_mut_ptr()).cast(), NonNull::from(&mut len)) == 0 {
+                if AudioUnitGetProperty(
+                    self.unit,
+                    PROP_COCOA_UI,
+                    SCOPE_GLOBAL,
+                    0,
+                    NonNull::new_unchecked(info.as_mut_ptr()).cast(),
+                    NonNull::from(&mut len),
+                ) == 0
+                {
                     let url = *(info.as_ptr() as *const *const NSURL);
-                    let class_name = *(info.as_ptr().add(std::mem::size_of::<*const c_void>()) as *const *const NSString);
+                    let class_name = *(info.as_ptr().add(std::mem::size_of::<*const c_void>())
+                        as *const *const NSString);
                     if !url.is_null() && !class_name.is_null() {
                         let bundle = NSBundle::bundleWithURL(&*url);
                         if let Some(bundle) = bundle {
                             let class: Option<&AnyClass> = bundle.classNamed(&*class_name);
                             if let Some(class) = class {
-                                let factory: Retained<AnyObject> = msg_send![msg_send![class, alloc], init];
+                                let factory: Retained<AnyObject> =
+                                    msg_send![msg_send![class, alloc], init];
                                 let view: Option<Retained<NSView>> = msg_send![&factory, uiViewForAudioUnit: self.unit, withSize: NSSize::new(800.0, 500.0)];
                                 if view.is_some() {
                                     return view;
@@ -291,7 +443,8 @@ impl AuPlugin {
             }
             // Apple's generic view, from CoreAudioKit.
             let class = AnyClass::get(c"AUGenericView")?;
-            let view: Option<Retained<NSView>> = msg_send![msg_send![class, alloc], initWithAudioUnit: self.unit];
+            let view: Option<Retained<NSView>> =
+                msg_send![msg_send![class, alloc], initWithAudioUnit: self.unit];
             view
         }
     }
@@ -300,7 +453,9 @@ impl AuPlugin {
         if self.window_open() {
             return Ok(());
         }
-        let view = self.make_view().ok_or("this Audio Unit has no window Isai can show")?;
+        let view = self
+            .make_view()
+            .ok_or("this Audio Unit has no window Isai can show")?;
         let window = HostWindow::new("Audio Unit", (800.0, 500.0))?;
         // SAFETY: `view` is a valid NSView.
         unsafe { window.set_view(&view) };
@@ -335,9 +490,20 @@ impl Drop for AuPlugin {
 }
 
 impl ExternalPlugin for Core {
-    fn process(&self, l: &mut [f32], r: &mut [f32], events: &[NoteEvent], _transport: &Transport, wait: bool) -> bool {
+    fn process(
+        &self,
+        l: &mut [f32],
+        r: &mut [f32],
+        events: &[NoteEvent],
+        _transport: &Transport,
+        wait: bool,
+    ) -> bool {
         let n = l.len().min(r.len()).min(BLOCK);
-        let mut guard = match if wait { self.audio.lock().ok() } else { self.audio.try_lock().ok() } {
+        let mut guard = match if wait {
+            self.audio.lock().ok()
+        } else {
+            self.audio.try_lock().ok()
+        } {
             Some(g) => g,
             None => return false,
         };
@@ -348,7 +514,11 @@ impl ExternalPlugin for Core {
         // SAFETY: the unit is valid while `a.unit` isn't null; buffers outlive the render.
         unsafe {
             for e in events {
-                let (status, vel) = if e.velocity > 0 { (0x90, u32::from(e.velocity)) } else { (0x80, 0) };
+                let (status, vel) = if e.velocity > 0 {
+                    (0x90, u32::from(e.velocity))
+                } else {
+                    (0x80, 0)
+                };
                 MusicDeviceMIDIEvent(a.unit.0, status, u32::from(e.key), vel, e.offset);
             }
             if a.effect {
@@ -361,15 +531,30 @@ impl ExternalPlugin for Core {
             let mut list = StereoBufferList {
                 count: 2,
                 buffers: [
-                    AudioBuffer { mNumberChannels: 1, mDataByteSize: bytes, mData: a.out_bufs[0].as_mut_ptr() as *mut c_void },
-                    AudioBuffer { mNumberChannels: 1, mDataByteSize: bytes, mData: a.out_bufs[1].as_mut_ptr() as *mut c_void },
+                    AudioBuffer {
+                        mNumberChannels: 1,
+                        mDataByteSize: bytes,
+                        mData: a.out_bufs[0].as_mut_ptr() as *mut c_void,
+                    },
+                    AudioBuffer {
+                        mNumberChannels: 1,
+                        mDataByteSize: bytes,
+                        mData: a.out_bufs[1].as_mut_ptr() as *mut c_void,
+                    },
                 ],
             };
             let mut ts: AudioTimeStamp = std::mem::zeroed();
             ts.mSampleTime = a.sample_time;
             ts.mFlags = AudioTimeStampFlags::SampleTimeValid;
             let mut flags = AudioUnitRenderActionFlags(0);
-            let status = AudioUnitRender(a.unit.0, &mut flags, NonNull::from(&ts), 0, n as u32, NonNull::from(&mut list).cast());
+            let status = AudioUnitRender(
+                a.unit.0,
+                &mut flags,
+                NonNull::from(&ts),
+                0,
+                n as u32,
+                NonNull::from(&mut list).cast(),
+            );
             a.sample_time += n as f64;
             if status != 0 {
                 return false;

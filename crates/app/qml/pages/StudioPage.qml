@@ -1,4 +1,5 @@
 import QtCore
+import QtMultimedia
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Dialogs
@@ -51,30 +52,21 @@ Item {
     /// Just the tracks: closes the piano roll and the mixer (F5).
     function showPlaylist() { editorShown = false; mixerShown = false }
 
-    /// F7 / the piano-roll button: open the selected MIDI region; else the
-    /// instrument track's region under the playhead; else make a 4-bar region
-    /// there (and an instrument track first, if there is none).
+    /// Opens the piano roll on the selected MIDI region, or on the instrument
+    /// track's region under the playhead. It never makes a new region.
     function togglePianoRoll() {
         if (editorShown) { editorShown = false; return }
         const a = studio.app
-        let tracks = arrangement.tracks
+        const tracks = arrangement.tracks
         for (const t of tracks) {
             const r = t.regions.find(x => x.id === a.selectedRegion && x.midi)
             if (r) { openEditor(r.id); return }
         }
-        let track = tracks.find(t => t.id === a.selectedTrack && t.instrument) || tracks.find(t => t.instrument)
-        if (!track) {
-            a.addInstrumentTrack("piano")
-            tracks = JSON.parse(a.tracksJson)
-            track = tracks[tracks.length - 1]
-        }
-        a.selectTrack(track.id)
         const pos = a.positionBeats
-        const here = track.regions.find(x => x.midi && x.start <= pos && pos < x.start + x.beats)
-        if (here) { openEditor(here.id); return }
-        const bar = TimeMap.barAt(pos)
-        const id = a.addMidiRegion(track.id, TimeMap.barStart(bar), TimeMap.barStart(bar + 4) - TimeMap.barStart(bar))
-        if (id >= 0) openEditor(id)
+        for (const t of tracks.filter(t => t.instrument)) {
+            const here = t.regions.find(x => x.midi && x.start <= pos && pos < x.start + x.beats)
+            if (here) { a.selectTrack(t.id); openEditor(here.id); return }
+        }
     }
     function openEffect(id) { mixerPanel.openInsert(id) }
     // Which keys the selected instrument is playing, read once and shared by
@@ -161,6 +153,37 @@ Item {
     signal settingsRequested()
 
     function importAudio() { fileDialog.open() }
+    function importMidi() { midiImportDialog.open() }
+    /// The video track the next import goes to (-1: the first video track).
+    property int videoTrackTarget: -1
+    function importVideo(track) {
+        videoTrackTarget = track === undefined || track < 0 ? -1 : track
+        videoImportDialog.open()
+    }
+    /// Adds a video track and goes straight to choosing its video.
+    function newVideoTrack() {
+        studio.app.addVideoTrack()
+        importVideo(studio.app.selectedTrack)
+    }
+    property bool videoShown: false
+    /// Where the video panel sits in the window, and its size across that side (px).
+    property string videoDock: "right"
+    property real videoSize: 380
+    function openRestoreMenu() {
+        const list = JSON.parse(studio.app.backupsJson() || "[]")
+        restoreMenu.items = list.length
+            ? list.map(b => ({ label: b.label, action: () => studio.app.restoreBackup(b.path) }))
+            : [{ label: "No earlier versions yet", enabled: false, action: () => {} }]
+        restoreMenu.open()
+    }
+    function openAlternativesMenu() {
+        const list = JSON.parse(studio.app.alternativesJson() || "[]")
+        alternativesMenu.items = list.length
+            ? list.map(a => ({ label: a.label, action: () => studio.guard("alt:" + a.path) }))
+            : [{ label: "No other versions in this folder", enabled: false, action: () => {} }]
+        alternativesMenu.open()
+    }
+    function exportMidi() { if (studio.editorRegion >= 0) midiExportDialog.open() }
     function zoomForTest(factor) { arrangement.zoomBy(factor, 0) }
     function openPalette(query) { palette.open(); palette.setQuery(query || "") }
 
@@ -188,6 +211,7 @@ Item {
         else if (action === "recover") app.recoverAutosave()
         else if (action.startsWith("recent:")) app.openRecent(action.slice(7))
         else if (action.startsWith("url:")) app.openProject(action.slice(4))
+        else if (action.startsWith("alt:")) app.openAlternative(action.slice(4))
     }
 
     /// Save; asks for a location the first time. Runs `then` after saving.
@@ -226,6 +250,63 @@ Item {
         title: "Import audio"
         nameFilters: ["Audio files (*.wav *.flac *.mp3 *.ogg *.m4a *.aac *.aif *.aiff *.caf)", "All files (*)"]
         onAccepted: studio.app.importUrl(selectedFile)
+    }
+
+    FileDialog {
+        id: alternativeDialog
+        title: "Save an alternative (kept in this project's folder)"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "isai"
+        nameFilters: ["Isai projects (*.isai)"]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.MusicLocation)
+        onAccepted: studio.app.saveAlternative(selectedFile)
+    }
+
+    MenuPopup { id: restoreMenu; width: 340; x: (studio.width - width) / 2; y: 96; preferredY: 96 }
+    MenuPopup { id: alternativesMenu; width: 340; x: (studio.width - width) / 2; y: 96; preferredY: 96 }
+
+    FileDialog {
+        id: midiImportDialog
+        title: "Import MIDI"
+        nameFilters: ["MIDI files (*.mid *.midi)", "All files (*)"]
+        onAccepted: studio.app.importMidi(selectedFile)
+    }
+
+    FileDialog {
+        id: videoImportDialog
+        title: "Import video"
+        nameFilters: ["Video files (*.mp4 *.m4v *.mov *.mkv *.webm *.avi *.wmv *.mpg *.mpeg *.m2ts *.mts *.ts *.ogv *.3gp *.flv *.mxf)", "All files (*)"]
+        onAccepted: {
+            videoProbe.pending = selectedFile
+            videoProbe.source = selectedFile
+        }
+    }
+
+    // Reads a video's length before it is imported, so its block is the right size.
+    MediaPlayer {
+        id: videoProbe
+        property url pending
+        onMediaStatusChanged: {
+            if (mediaStatus === MediaPlayer.LoadedMedia) {
+                studio.app.importVideo(pending, duration / 1000, studio.videoTrackTarget)
+                source = ""
+            } else if (mediaStatus === MediaPlayer.InvalidMedia) {
+                // Unreadable: import it anyway, so the video window can say why it won't play.
+                studio.app.importVideo(pending, 0, studio.videoTrackTarget)
+                source = ""
+            }
+        }
+    }
+
+    FileDialog {
+        id: midiExportDialog
+        title: "Export MIDI"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "mid"
+        nameFilters: ["MIDI files (*.mid)"]
+        currentFolder: StandardPaths.writableLocation(StandardPaths.MusicLocation)
+        selectedFile: currentFolder + "/" + studio.app.projectName + ".mid"
+        onAccepted: studio.app.exportMidi(selectedFile, studio.editorRegion)
     }
 
     FileDialog {
@@ -273,6 +354,7 @@ Item {
             Layout.fillWidth: true
             app: studio.app
             onImportRequested: studio.importAudio()
+            onImportVideoRequested: studio.importVideo()
             onSettingsRequested: studio.settingsRequested()
             onNewProjectRequested: studio.guard("new")
             onOpenRequested: studio.guard("open")
@@ -311,9 +393,10 @@ Item {
 
             InspectorPanel {
                 visible: studio.inspectorShown
-                Layout.preferredWidth: 244
+                Layout.preferredWidth: 268
                 Layout.fillHeight: true
                 app: studio.app
+                backdrop: studioContent
                 tracks: arrangement.tracks
                 meters: arrangement.meters
                 onInstrumentRequested: id => studio.openInstrument(id)
@@ -325,9 +408,29 @@ Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
+                // The video panel docks inside the window, beside the arrangement.
+                VideoPanel {
+                    id: videoPanel
+                    app: studio.app
+                    visible: studio.videoShown
+                    dock: studio.videoDock
+                    size: studio.videoSize
+                    x: dock === "right" ? parent.width - width : 0
+                    y: dock === "bottom" ? parent.height - height : 0
+                    width: dock === "left" || dock === "right" ? size : parent.width
+                    height: dock === "top" || dock === "bottom" ? size : parent.height
+                    onCloseRequested: studio.videoShown = false
+                    onDockRequested: side => studio.videoDock = side
+                    onResizeRequested: px => studio.videoSize = Math.max(240, Math.min(px, 900))
+                }
+
                 TrackArea {
                     id: arrangement
                     anchors.fill: parent
+                    anchors.leftMargin: studio.videoShown && studio.videoDock === "left" ? studio.videoSize : 0
+                    anchors.rightMargin: studio.videoShown && studio.videoDock === "right" ? studio.videoSize : 0
+                    anchors.topMargin: studio.videoShown && studio.videoDock === "top" ? studio.videoSize : 0
+                    anchors.bottomMargin: studio.videoShown && studio.videoDock === "bottom" ? studio.videoSize : 0
                     app: studio.app
                     mixerShown: studio.mixerShown
                     pianoRollShown: studio.editorShown
@@ -341,6 +444,9 @@ Item {
                 onStemsRequested: (id, name) => stemsDialog.openFor(id, name)
                     onInstrumentRequested: id => studio.openInstrument(id)
                     onImportRequested: studio.importAudio()
+                    onImportVideoRequested: studio.importVideo()
+                    onVideoTrackRequested: studio.newVideoTrack()
+                    onVideoOpened: studio.videoShown = true
                     onMixerToggled: studio.mixerShown = !studio.mixerShown
                     tunerShown: studio.tunerShown
                 globalShown: studio.globalShown
@@ -574,7 +680,7 @@ Item {
         }
         add("View", studio.mixerShown ? "Hide mixer" : "Show mixer", () => studio.mixerShown = !studio.mixerShown, "F9", Icons.sliders, "faders channel strips volume")
         add("View", studio.editorShown ? "Hide piano roll" : "Piano roll", () => studio.togglePianoRoll(), "F7", Icons.pianoKeys, "midi notes editor pattern")
-        add("View", "Playlist (just the tracks)", () => studio.showPlaylist(), "F5", Icons.waveform, "arrangement tracks")
+        add("View", "Hide the drawers (just the arrangement)", () => studio.showPlaylist(), "F5", Icons.waveform, "arrangement tracks")
         add("View", studio.globalShown ? "Hide tempo & signature lanes" : "Tempo & signature changes", () => studio.globalShown = !studio.globalShown, "G", Icons.metronome, "tempo track change bpm ritardando accelerando time signature global tracks")
         add("View", studio.inspectorShown ? "Hide inspector" : "Show inspector", () => studio.inspectorShown = !studio.inspectorShown, "I", Icons.sliders, "channel track details fader effects")
         add("Tracks", "New piano track", () => { a.addInstrumentTrack("piano"); studio.openInstrument(a.selectedTrack) }, "", Icons.pianoKeys, "piano instrument midi keys")
@@ -594,6 +700,15 @@ Item {
 
         add("Tracks", "New track", () => a.addTrack(), "⌥" + mod + "N", Icons.plus, "add audio")
         add("Tracks", "Import audio…", () => studio.importAudio(), mod + "I", Icons.downloadSimple, "file wav mp3 add")
+        add("Tracks", "Import MIDI file…", () => studio.importMidi(), "", Icons.downloadSimple, "midi mid notes file import")
+        add("Tracks", "Import video…", () => studio.importVideo(), "", Icons.fileAudio, "video movie film mp4 mov scoring picture import")
+        add("Tracks", "New video track", () => studio.newVideoTrack(), "", Icons.fileAudio, "video picture scoring track")
+        add("View", studio.videoShown ? "Hide video window" : "Show video window", () => studio.videoShown = !studio.videoShown, "", Icons.desktop, "video movie film picture window dock")
+        add("Transport", "Punch recording" + on(a.punch), () => a.togglePunch(), "", Icons.microphoneStage, "punch in out cycle record range")
+        add("File", "Restore earlier version…", () => studio.openRestoreMenu(), "", Icons.arrowCounterClockwise, "backup restore undo older saved")
+        add("File", "Save as alternative…", () => alternativeDialog.open(), "", Icons.downloadSimple, "alternative version mix experiment copy")
+        add("File", "Open alternative…", () => studio.openAlternativesMenu(), "", Icons.musicNote, "alternative version mix switch open")
+        add("Tracks", "Export MIDI file (open a MIDI region first)…", () => studio.exportMidi(), "", Icons.downloadSimple, "midi mid notes file export")
         if (a.selectedTrack >= 0) {
             add("Tracks", "Mute selected track", () => a.toggleMute(a.selectedTrack), "", Icons.speakerX)
             add("Tracks", "Solo selected track", () => a.toggleSolo(a.selectedTrack), "", Icons.headphones)
@@ -639,6 +754,8 @@ Item {
     // Z/X change octave), so a plugin can be played without its own window.
     property bool playKeys: false
     property int playOctave: 4
+    onPlayKeysChanged: app.setPluginKeyboard(playKeys, playOctave)
+    onPlayOctaveChanged: app.setPluginKeyboard(playKeys, playOctave)
     readonly property bool letterKeys: keysOn && !playKeys
     readonly property var playKeyMap: ({
         [Qt.Key_A]: 0, [Qt.Key_W]: 1, [Qt.Key_S]: 2, [Qt.Key_E]: 3, [Qt.Key_D]: 4, [Qt.Key_F]: 5,
@@ -657,8 +774,11 @@ Item {
     Connections {
         target: studio.Window.window
         function onActiveChanged() {
-            if (studio.playKeys && studio.Window.window && studio.Window.window.active)
+            if (studio.playKeys && studio.Window.window && studio.Window.window.active) {
+                studio.app.releasePluginKeys()
+                studio.playOctave = studio.app.pluginKeyboardOctave()
                 Qt.callLater(() => playKeysHandler.forceActiveFocus())
+            }
         }
     }
     function releaseHeldKeys() {
@@ -669,12 +789,14 @@ Item {
         id: playKeysHandler
         focus: studio.playKeys
         Keys.onPressed: e => {
-            if (!studio.playKeys) { e.accepted = false; return }
+            // Off: the key is still consumed, so it doesn't reach macOS and beep.
+            if (!studio.playKeys) { e.accepted = true; return }
             e.accepted = true
             if (e.isAutoRepeat) return
             if (e.key === Qt.Key_Z) { studio.playOctave = Math.max(0, studio.playOctave - 1); return }
             if (e.key === Qt.Key_X) { studio.playOctave = Math.min(8, studio.playOctave + 1); return }
-            if (studio.playKeyMap[e.key] === undefined) { e.accepted = false; return }
+            // Other keys are consumed here too: an unaccepted key makes macOS play its error beep.
+            if (studio.playKeyMap[e.key] === undefined) return
             const note = (studio.playOctave + 1) * 12 + studio.playKeyMap[e.key]
             studio.heldPlayKeys[e.key] = note
             studio.app.noteOn(note, 100)
@@ -725,7 +847,8 @@ Item {
     Shortcut { sequence: "Alt+Left"; enabled: studio.keysOn; onActivated: studio.app.jumpMarker(false) }
     Shortcut { sequence: "Ctrl+J"; enabled: studio.keysOn; onActivated: studio.app.joinSelected() }
     Shortcut { sequence: "Ctrl+U"; enabled: studio.keysOn; onActivated: studio.app.cycleSelection() }
-    Shortcut { sequence: "I"; enabled: studio.letterKeys; onActivated: studio.inspectorShown = !studio.inspectorShown }
+    // Not a note key, so it works in play-keys mode too.
+    Shortcut { sequence: "I"; enabled: studio.keysOn; onActivated: studio.inspectorShown = !studio.inspectorShown }
     Shortcut { sequence: "G"; enabled: studio.letterKeys; onActivated: studio.globalShown = !studio.globalShown }
     Shortcut { sequence: "Ctrl+Alt+Z"; enabled: studio.keysOn; onActivated: arrangement.openHistory() }
     Shortcut { sequences: ["?", "Shift+/"]; enabled: studio.keysOn; onActivated: shortcuts.opened ? shortcuts.close() : shortcuts.open() }

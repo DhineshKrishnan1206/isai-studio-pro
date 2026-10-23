@@ -724,7 +724,7 @@ Item {
                         y: modeSwitch.pan ? 4 : parent.height - height - 4
                         width: 14; height: 14; radius: 7
                         color: "#C9CEE6"
-                        Behavior on y { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                        Behavior on y { NumberAnimation { duration: Theme.fast; easing.type: Easing.OutCubic } }
                     }
                 }
                 DToolTip { visible: modeSwitch.hovered; text: modeSwitch.pan ? "Tremolo sweeps left and right (auto-pan) · click for volume pulse" : "Tremolo pulses the volume · click for auto-pan" }
@@ -885,7 +885,7 @@ Item {
                         GradientStop { position: 1; color: win.pedal ? "#3A4260" : "#1C2030" }
                     }
                     border.color: win.pedal ? win.glow : "#3A4258"
-                    Behavior on border.color { ColorAnimation { duration: 120 } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.fast } }
                 }
                 contentItem: DText {
                     horizontalAlignment: Text.AlignHCenter
@@ -1185,7 +1185,7 @@ Item {
                 radius: k.black ? 4 : 6
                 color: k.black ? "#2E3445" : "#B3B9D0"
             }
-            Behavior on anchors.topMargin { NumberAnimation { duration: 50 } }
+            Behavior on anchors.topMargin { NumberAnimation { duration: Theme.fast } }
             // Glow while the note plays (brighter when harder), fading out after.
             Rectangle {
                 anchors.fill: parent
@@ -1195,7 +1195,7 @@ Item {
                     GradientStop { position: 1; color: win.glowFor(k.vel, k.black ? 0.35 : 0.15) }
                 }
                 opacity: k.held ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: k.held ? 40 : 260; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: k.held ? 40 : Theme.slow; easing.type: Easing.OutCubic } }
             }
             Rectangle {
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -1205,7 +1205,7 @@ Item {
                 radius: 1.5
                 color: k.black ? "#C9CFFF" : "#6E78C8"
                 opacity: k.held ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: k.held ? 40 : 260 } }
+                Behavior on opacity { NumberAnimation { duration: k.held ? 40 : Theme.slow } }
             }
         }
         // In the song's key: a small dot.
@@ -1260,7 +1260,7 @@ Item {
             radius: 13
             color: ob.down ? "#3A4260" : ob.hovered ? "#2A3044" : "#1C2030"
             border.color: ob.hint ? win.glow : "#2E3448"
-            Behavior on border.color { ColorAnimation { duration: 150 } }
+            Behavior on border.color { ColorAnimation { duration: Theme.fast } }
         }
         contentItem: Icon { glyph: ob.glyph; size: 11; color: ob.hint ? win.glow : win.label }
     }

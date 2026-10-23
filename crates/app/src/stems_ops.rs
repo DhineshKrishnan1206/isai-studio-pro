@@ -9,14 +9,14 @@
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering::Relaxed};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering::Relaxed};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
 use cxx_qt_lib::QString;
 use isai_engine::clip::Clip;
-use isai_stems::{model, Separator, Weights, SAMPLE_RATE, STEMS};
+use isai_stems::{SAMPLE_RATE, STEMS, Separator, Weights, model};
 
 use crate::controller::qobject;
 use crate::project_ops::app_dir;
@@ -65,13 +65,21 @@ fn fetch_model(dest: &Path, control: &StemControl) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let part = dir.join("4stems.tar.gz.part");
     let mut child = Command::new("curl")
-        .args(["--location", "--fail", "--silent", "--show-error", "--output"])
+        .args([
+            "--location",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--output",
+        ])
         .arg(&part)
         .arg(model::MODEL_URL)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|_| "Couldn't start the download: curl isn't available on this computer".to_string())?;
+        .map_err(|_| {
+            "Couldn't start the download: curl isn't available on this computer".to_string()
+        })?;
     loop {
         if control.cancelled() {
             let _ = child.kill();
@@ -100,7 +108,14 @@ fn fetch_model(dest: &Path, control: &StemControl) -> Result<(), String> {
 }
 
 /// The whole job, on a background thread: the model if needed, then the split.
-fn run(source: PathBuf, offset: f64, length: f64, name: String, out_dir: PathBuf, control: Arc<StemControl>) -> Result<Stems, String> {
+fn run(
+    source: PathBuf,
+    offset: f64,
+    length: f64,
+    name: String,
+    out_dir: PathBuf,
+    control: Arc<StemControl>,
+) -> Result<Stems, String> {
     let model_file = model_path().ok_or("no settings folder for the stem model")?;
     if !model_file.exists() {
         fetch_model(&model_file, &control)?;
@@ -110,23 +125,35 @@ fn run(source: PathBuf, offset: f64, length: f64, name: String, out_dir: PathBuf
     let weights = Weights::load(&std::fs::read(&model_file).map_err(|e| e.to_string())?)?;
     let separator = Separator::new(&weights)?;
     drop(weights);
-    let clip = Clip::load(&source, SAMPLE_RATE).map_err(|e| format!("Couldn't read the audio: {e:#}"))?;
+    let clip =
+        Clip::load(&source, SAMPLE_RATE).map_err(|e| format!("Couldn't read the audio: {e:#}"))?;
     let rate = f64::from(SAMPLE_RATE);
     let from = ((offset * rate) as usize).min(clip.left.len());
     let to = (((offset + length) * rate) as usize).clamp(from, clip.left.len());
     let (left, right) = (&clip.left[from..to], &clip.right[from..to]);
 
     std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
-    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    let spec = hound::WavSpec { channels: 2, sample_rate: SAMPLE_RATE, bits_per_sample: 32, sample_format: hound::SampleFormat::Float };
-    let paths: Vec<PathBuf> = STEMS.iter().map(|s| out_dir.join(format!("{name} - {s} {stamp}.wav"))).collect();
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: SAMPLE_RATE,
+        bits_per_sample: 32,
+        sample_format: hound::SampleFormat::Float,
+    };
+    let paths: Vec<PathBuf> = STEMS
+        .iter()
+        .map(|s| out_dir.join(format!("{name} - {s} {stamp}.wav")))
+        .collect();
     let mut writers = Vec::new();
     for p in &paths {
         writers.push(hound::WavWriter::create(p, spec).map_err(|e| e.to_string())?);
     }
     control.stage.store(2, Relaxed);
     // Leave a core for the audio, so playback keeps going smoothly.
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get().saturating_sub(1).max(1));
+    let threads =
+        std::thread::available_parallelism().map_or(1, |n| n.get().saturating_sub(1).max(1));
     let mut failed = None;
     let done = separator.separate(
         left,
@@ -134,7 +161,10 @@ fn run(source: PathBuf, offset: f64, length: f64, name: String, out_dir: PathBuf
         threads,
         |stem, l, r| {
             for (a, b) in l.iter().zip(r) {
-                if let Err(e) = writers[stem].write_sample(*a).and_then(|_| writers[stem].write_sample(*b)) {
+                if let Err(e) = writers[stem]
+                    .write_sample(*a)
+                    .and_then(|_| writers[stem].write_sample(*b))
+                {
                     failed = Some(e.to_string());
                 }
             }
@@ -142,19 +172,36 @@ fn run(source: PathBuf, offset: f64, length: f64, name: String, out_dir: PathBuf
         |p| control.set_progress(p),
         || control.cancelled(),
     );
-    let finish: Result<(), String> = writers.into_iter().try_for_each(|w| w.finalize().map_err(|e| e.to_string()));
+    let finish: Result<(), String> = writers
+        .into_iter()
+        .try_for_each(|w| w.finalize().map_err(|e| e.to_string()));
     if !done || failed.is_some() || finish.is_err() {
         for p in &paths {
             let _ = std::fs::remove_file(p);
         }
-        return Err(failed.or(finish.err()).unwrap_or_else(|| "cancelled".into()));
+        return Err(failed
+            .or(finish.err())
+            .unwrap_or_else(|| "cancelled".into()));
     }
     let secs = left.len() as f64 / rate;
-    Ok(STEMS.iter().zip(paths).map(|(s, p)| ((*s).to_owned(), p, secs)).collect())
+    Ok(STEMS
+        .iter()
+        .zip(paths)
+        .map(|(s, p)| ((*s).to_owned(), p, secs))
+        .collect())
 }
 
 fn safe_name(name: &str) -> String {
-    let s: String = name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' }).collect();
+    let s: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
     let s = s.trim().to_owned();
     if s.is_empty() { "Stems".into() } else { s }
 }
@@ -171,7 +218,9 @@ impl qobject::AppController {
             return;
         }
         let Some(session) = &st.session else { return };
-        let Some((_, r)) = session.project.find_region(region as u64) else { return };
+        let Some((_, r)) = session.project.find_region(region as u64) else {
+            return;
+        };
         if r.midi.is_some() {
             self.show_problem("Stems come from audio: pick an audio region");
             return;
@@ -188,10 +237,19 @@ impl qobject::AppController {
         let control = Arc::new(StemControl::default());
         let worker = control.clone();
         let handle = std::thread::spawn(move || run(source, offset, length, name, out_dir, worker));
-        st.stems = Some(StemJob { region: region as u64, control, handle });
+        st.stems = Some(StemJob {
+            region: region as u64,
+            control,
+            handle,
+        });
         self.as_mut().set_stem_region(region);
         self.as_mut().set_stem_progress(0.0);
-        self.as_mut().set_stem_stage(QString::from(if model_ready() { "Preparing…" } else { "Downloading the stem model…" }));
+        self.as_mut()
+            .set_stem_stage(QString::from(if model_ready() {
+                "Preparing…"
+            } else {
+                "Downloading the stem model…"
+            }));
         self.update_busy();
     }
 
@@ -205,7 +263,10 @@ impl qobject::AppController {
         let st = self.as_mut().st();
         let Some(job) = &st.stems else { return };
         if !job.handle.is_finished() {
-            let (p, stage) = (f64::from(job.control.progress()), job.control.stage.load(Relaxed));
+            let (p, stage) = (
+                f64::from(job.control.progress()),
+                job.control.stage.load(Relaxed),
+            );
             let label = match stage {
                 0 => "Downloading the stem model…",
                 1 => "Preparing…",
@@ -226,9 +287,16 @@ impl qobject::AppController {
                 for (_, path, _) in &files {
                     self.as_mut().st().pool.request(path);
                 }
-                let stems: Vec<(String, String, f64)> = files.iter().map(|(n, p, s)| (n.clone(), p.display().to_string(), *s)).collect();
-                self.as_mut().edit("Split into Stems", true, |p| p.add_stem_tracks(job.region, &stems));
-                self.as_mut().show_info("Split into vocals, drums, bass and other (the original track is muted)");
+                let stems: Vec<(String, String, f64)> = files
+                    .iter()
+                    .map(|(n, p, s)| (n.clone(), p.display().to_string(), *s))
+                    .collect();
+                self.as_mut().edit("Split into Stems", true, |p| {
+                    p.add_stem_tracks(job.region, &stems)
+                });
+                self.as_mut().show_info(
+                    "Split into vocals, drums, bass and other (the original track is muted)",
+                );
             }
             Ok(Err(e)) if e == "cancelled" => {}
             Ok(Err(e)) => self.as_mut().show_problem(&e),

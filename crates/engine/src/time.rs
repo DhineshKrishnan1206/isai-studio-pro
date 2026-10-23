@@ -20,7 +20,11 @@ pub struct Meter {
 
 impl Default for Meter {
     fn default() -> Self {
-        Self { bpm: 120.0, numerator: 4, denominator: 4 }
+        Self {
+            bpm: 120.0,
+            numerator: 4,
+            denominator: 4,
+        }
     }
 }
 
@@ -39,7 +43,8 @@ impl Meter {
 
     /// Length of one beat (one denominator note) in seconds.
     pub fn beat_secs(&self) -> f64 {
-        60.0 / self.bpm.clamp(Self::MIN_BPM, Self::MAX_BPM) * 4.0 / f64::from(self.denominator.max(1))
+        60.0 / self.bpm.clamp(Self::MIN_BPM, Self::MAX_BPM) * 4.0
+            / f64::from(self.denominator.max(1))
     }
 
     pub fn samples_per_beat(&self, sample_rate: u32) -> f64 {
@@ -59,7 +64,9 @@ impl Meter {
     }
 
     pub fn beats_to_samples(&self, beats: f64, sample_rate: u32) -> u64 {
-        (beats * self.samples_per_beat(sample_rate)).round().max(0.0) as u64
+        (beats * self.samples_per_beat(sample_rate))
+            .round()
+            .max(0.0) as u64
     }
 
     /// Splits a position in beats into bar.beat.division.tick. Divisions are
@@ -86,7 +93,11 @@ impl Meter {
 
 impl std::fmt::Display for BarBeat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {} {:>3}", self.bar, self.beat, self.division, self.tick)
+        write!(
+            f,
+            "{} {} {} {:>3}",
+            self.bar, self.beat, self.division, self.tick
+        )
     }
 }
 
@@ -140,7 +151,11 @@ impl TempoMap {
         let clamp = |bpm: f64| bpm.clamp(Meter::MIN_BPM, Meter::MAX_BPM);
         let beat_secs = |bpm: f64| 60.0 / bpm * 4.0 / f64::from(base_den);
 
-        let mut changes: Vec<TempoPoint> = tempo_changes.iter().copied().filter(|t| t.beat > 1e-9 && t.bpm.is_finite()).collect();
+        let mut changes: Vec<TempoPoint> = tempo_changes
+            .iter()
+            .copied()
+            .filter(|t| t.beat > 1e-9 && t.bpm.is_finite())
+            .collect();
         changes.sort_by(|a, b| a.beat.total_cmp(&b.beat));
         let mut tempos: Vec<(f64, f64, f64)> = vec![(0.0, clamp(base.bpm), 0.0)];
         for t in changes {
@@ -151,10 +166,18 @@ impl TempoMap {
                 }
                 continue;
             }
-            tempos.push((t.beat, clamp(t.bpm), secs + (t.beat - beat) * beat_secs(bpm)));
+            tempos.push((
+                t.beat,
+                clamp(t.bpm),
+                secs + (t.beat - beat) * beat_secs(bpm),
+            ));
         }
 
-        let mut bars: Vec<SigChange> = sig_changes.iter().copied().filter(|c| c.bar > 1 && c.numerator > 0 && c.denominator > 0).collect();
+        let mut bars: Vec<SigChange> = sig_changes
+            .iter()
+            .copied()
+            .filter(|c| c.bar > 1 && c.numerator > 0 && c.denominator > 0)
+            .collect();
         bars.sort_by_key(|c| c.bar);
         let mut sigs: Vec<(f64, i64, u32, u32)> = vec![(0.0, 1, base.numerator.max(1), base_den)];
         for c in bars {
@@ -168,9 +191,18 @@ impl TempoMap {
                 continue;
             }
             let bar_len = f64::from(num) * f64::from(base_den) / f64::from(den);
-            sigs.push((beat + (at - bar) as f64 * bar_len, at, c.numerator, c.denominator));
+            sigs.push((
+                beat + (at - bar) as f64 * bar_len,
+                at,
+                c.numerator,
+                c.denominator,
+            ));
         }
-        Self { base_den, tempos, sigs }
+        Self {
+            base_den,
+            tempos,
+            sigs,
+        }
     }
 
     fn beat_secs(&self, bpm: f64) -> f64 {
@@ -178,11 +210,15 @@ impl TempoMap {
     }
 
     fn tempo_index(&self, beat: f64) -> usize {
-        self.tempos.partition_point(|t| t.0 <= beat).saturating_sub(1)
+        self.tempos
+            .partition_point(|t| t.0 <= beat)
+            .saturating_sub(1)
     }
 
     fn sig_index(&self, beat: f64) -> usize {
-        self.sigs.partition_point(|s| s.0 <= beat + 1e-9).saturating_sub(1)
+        self.sigs
+            .partition_point(|s| s.0 <= beat + 1e-9)
+            .saturating_sub(1)
     }
 
     /// The tempo at a position.
@@ -193,12 +229,20 @@ impl TempoMap {
     /// The tempo and time signature in force at a position.
     pub fn meter_at(&self, beat: f64) -> Meter {
         let s = self.sigs[self.sig_index(beat)];
-        Meter { bpm: self.bpm_at(beat), numerator: s.2, denominator: s.3 }
+        Meter {
+            bpm: self.bpm_at(beat),
+            numerator: s.2,
+            denominator: s.3,
+        }
     }
 
     /// The opening tempo and time signature.
     pub fn base(&self) -> Meter {
-        Meter { bpm: self.tempos[0].1, numerator: self.sigs[0].2, denominator: self.base_den }
+        Meter {
+            bpm: self.tempos[0].1,
+            numerator: self.sigs[0].2,
+            denominator: self.base_den,
+        }
     }
 
     pub fn has_changes(&self) -> bool {
@@ -217,13 +261,18 @@ impl TempoMap {
         if secs <= 0.0 {
             return secs / self.beat_secs(self.tempos[0].1);
         }
-        let i = self.tempos.partition_point(|t| t.2 <= secs).saturating_sub(1);
+        let i = self
+            .tempos
+            .partition_point(|t| t.2 <= secs)
+            .saturating_sub(1);
         let (b, bpm, s) = self.tempos[i];
         b + (secs - s) / self.beat_secs(bpm)
     }
 
     pub fn beats_to_samples(&self, beats: f64, sample_rate: u32) -> u64 {
-        (self.beats_to_secs(beats) * f64::from(sample_rate)).round().max(0.0) as u64
+        (self.beats_to_secs(beats) * f64::from(sample_rate))
+            .round()
+            .max(0.0) as u64
     }
 
     pub fn samples_to_beats(&self, samples: u64, sample_rate: u32) -> f64 {
@@ -248,7 +297,11 @@ impl TempoMap {
         let beats = beats.max(0.0);
         let (start, first, num, den) = self.sigs[self.sig_index(beats)];
         let unit = f64::from(self.base_den) / f64::from(den);
-        let local = Meter { bpm: 120.0, numerator: num, denominator: den };
+        let local = Meter {
+            bpm: 120.0,
+            numerator: num,
+            denominator: den,
+        };
         let mut bb = local.bar_beat((beats - start).max(0.0) / unit);
         bb.bar += first - 1;
         bb
@@ -291,7 +344,11 @@ mod tests {
         assert_eq!(m.beat_secs(), 0.5);
         assert_eq!(m.bar_secs(), 2.0);
         // In 6/8 at 120 quarter-note BPM, an eighth lasts a quarter second.
-        let m = Meter { bpm: 120.0, numerator: 6, denominator: 8 };
+        let m = Meter {
+            bpm: 120.0,
+            numerator: 6,
+            denominator: 8,
+        };
         assert_eq!(m.beat_secs(), 0.25);
         assert_eq!(m.bar_secs(), 1.5);
     }
@@ -299,9 +356,33 @@ mod tests {
     #[test]
     fn bar_beat_positions() {
         let m = Meter::default();
-        assert_eq!(m.bar_beat(0.0), BarBeat { bar: 1, beat: 1, division: 1, tick: 0 });
-        assert_eq!(m.bar_beat(4.0), BarBeat { bar: 2, beat: 1, division: 1, tick: 0 });
-        assert_eq!(m.bar_beat(5.25), BarBeat { bar: 2, beat: 2, division: 2, tick: 0 });
+        assert_eq!(
+            m.bar_beat(0.0),
+            BarBeat {
+                bar: 1,
+                beat: 1,
+                division: 1,
+                tick: 0
+            }
+        );
+        assert_eq!(
+            m.bar_beat(4.0),
+            BarBeat {
+                bar: 2,
+                beat: 1,
+                division: 1,
+                tick: 0
+            }
+        );
+        assert_eq!(
+            m.bar_beat(5.25),
+            BarBeat {
+                bar: 2,
+                beat: 2,
+                division: 2,
+                tick: 0
+            }
+        );
         // Half a sixteenth (0.125 beats) is tick 120 of 240.
         assert_eq!(m.bar_beat(5.25 + 0.125).tick, 120);
         let three = Meter { numerator: 3, ..m };
@@ -311,7 +392,14 @@ mod tests {
     #[test]
     fn tempo_changes_move_everything_after_them() {
         // 120 BPM for 4 bars, then 60 BPM: bar 5 starts at 8 s, and a beat after it lasts 1 s.
-        let map = TempoMap::new(Meter::default(), &[TempoPoint { beat: 16.0, bpm: 60.0 }], &[]);
+        let map = TempoMap::new(
+            Meter::default(),
+            &[TempoPoint {
+                beat: 16.0,
+                bpm: 60.0,
+            }],
+            &[],
+        );
         assert_eq!(map.beats_to_secs(16.0), 8.0);
         assert_eq!(map.beats_to_secs(17.0), 9.0);
         assert_eq!(map.secs_to_beats(9.0), 17.0);
@@ -322,21 +410,51 @@ mod tests {
         assert_eq!(map.samples_to_beats(9 * 48_000, 48_000), 17.0);
         // No changes: the same as a plain Meter.
         let plain = TempoMap::constant(Meter::default());
-        assert_eq!(plain.beats_to_secs(10.0), Meter::default().beats_to_secs(10.0));
+        assert_eq!(
+            plain.beats_to_secs(10.0),
+            Meter::default().beats_to_secs(10.0)
+        );
     }
 
     #[test]
     fn time_signature_changes_shift_the_bars() {
         // Two bars of 4/4, then 3/4 from bar 3, then 6/8 from bar 5.
-        let sigs = [SigChange { bar: 3, numerator: 3, denominator: 4 }, SigChange { bar: 5, numerator: 6, denominator: 8 }];
+        let sigs = [
+            SigChange {
+                bar: 3,
+                numerator: 3,
+                denominator: 4,
+            },
+            SigChange {
+                bar: 5,
+                numerator: 6,
+                denominator: 8,
+            },
+        ];
         let map = TempoMap::new(Meter::default(), &[], &sigs);
         assert_eq!(map.bar_start(3), 8.0);
         assert_eq!(map.bar_start(4), 11.0);
         assert_eq!(map.bar_start(5), 14.0);
         // A 6/8 bar is six eighths: three quarter-note beats.
         assert_eq!(map.bar_start(6), 17.0);
-        assert_eq!(map.bar_beat(11.0), BarBeat { bar: 4, beat: 1, division: 1, tick: 0 });
-        assert_eq!(map.bar_beat(15.5), BarBeat { bar: 5, beat: 4, division: 1, tick: 0 });
+        assert_eq!(
+            map.bar_beat(11.0),
+            BarBeat {
+                bar: 4,
+                beat: 1,
+                division: 1,
+                tick: 0
+            }
+        );
+        assert_eq!(
+            map.bar_beat(15.5),
+            BarBeat {
+                bar: 5,
+                beat: 4,
+                division: 1,
+                tick: 0
+            }
+        );
         assert_eq!(map.meter_at(15.0).numerator, 6);
         // Clicks: every eighth in 6/8, with the downbeat on each bar.
         assert_eq!(map.next_click(14.0), (14.0, true));

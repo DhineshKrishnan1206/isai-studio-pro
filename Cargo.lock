@@ -865,6 +865,7 @@ dependencies = [
 name = "isai-plugins"
 version = "0.0.1"
 dependencies = [
+ "block2",
  "clack-extensions",
  "clack-host",
  "clack-plugin",

@@ -32,11 +32,16 @@ Item {
     property bool globalShown: false
     readonly property int sigHeight: globalShown ? 20 : 0
     readonly property int tempoHeight: globalShown ? 44 : 0
-    readonly property int sigY: markerHeight
-    readonly property int tempoY: markerHeight + sigHeight
-    /// Where the cycle strip starts (under the markers and global lanes).
-    readonly property int cycleY: markerHeight + sigHeight + tempoHeight
+    /// Top tier: the cycle strip. Drag it to draw a loop, as Logic's ribbon.
+    readonly property int cycleY: 0
     readonly property int stripHeight: 14
+    /// Bottom tier: the time scale with bars, beats and divisions.
+    readonly property int scaleY: stripHeight
+    readonly property int scaleHeight: 26
+    /// Markers sit under the time scale, then the global lanes.
+    readonly property int markerY: scaleY + scaleHeight
+    readonly property int sigY: markerY + markerHeight
+    readonly property int tempoY: sigY + sigHeight
     implicitHeight: 58 + sigHeight + tempoHeight
     readonly property var markers: {
         try { return JSON.parse(app.markersJson || "[]") } catch (e) { return [] }
@@ -54,6 +59,7 @@ Item {
     // ------------------------------------------------------------ markers
     MouseArea {
         id: markerLane
+        y: ruler.markerY
         width: parent.width
         height: ruler.markerHeight
         acceptedButtons: Qt.LeftButton
@@ -70,6 +76,7 @@ Item {
             property bool dragging: false
             property real dragBeat: 0
             x: beat * ruler.pxPerBeat
+            y: ruler.markerY
             height: ruler.markerHeight
             width: Math.max(18, label.implicitWidth + 14)
             visible: x + width >= ruler.viewStart - 50 && x <= ruler.viewStart + ruler.viewWidth + 50
@@ -172,8 +179,8 @@ Item {
             readonly property int beatTicks: beatPx >= 8 ? modelData.num : 0
             readonly property int divisions: beatPx >= 60 ? 4 : beatPx >= 30 ? 2 : 1
             x: modelData.beat * ruler.pxPerBeat
-            y: ruler.cycleY + ruler.stripHeight
-            height: ruler.height - ruler.cycleY - ruler.stripHeight
+            y: ruler.scaleY
+            height: ruler.scaleHeight
             Rectangle { anchors.bottom: parent.bottom; width: 1; height: 10; color: Theme.lineStrong }
             DText {
                 visible: (barItem.modelData.bar - 1) % ruler.labelEvery === 0
@@ -490,9 +497,9 @@ Item {
 
     // Bar numbers: move the playhead.
     MouseArea {
-        y: ruler.cycleY + ruler.stripHeight
+        y: ruler.scaleY
         width: parent.width
-        height: ruler.height - ruler.cycleY - ruler.stripHeight
+        height: ruler.scaleHeight
         cursorShape: Qt.PointingHandCursor
         onPressed: m => ruler.app.seekBeats(ruler.app.snapBeats(ruler.beatAt(m.x)))
         onPositionChanged: m => { if (pressed) ruler.app.seekBeats(ruler.app.snapBeats(ruler.beatAt(m.x))) }

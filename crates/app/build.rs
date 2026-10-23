@@ -23,7 +23,13 @@ fn main() {
     println!("cargo::rerun-if-changed=qml");
 
     // Theme and Icons are singletons: `Theme.accent`, `Icons.play`.
-    let singletons = ["qml/Theme.qml", "qml/Icons.qml", "qml/Auto.qml", "qml/TimeMap.qml", "qml/Learn.qml"];
+    let singletons = [
+        "qml/Theme.qml",
+        "qml/Icons.qml",
+        "qml/Auto.qml",
+        "qml/TimeMap.qml",
+        "qml/Learn.qml",
+    ];
     let qml: Vec<QmlFile> = files
         .iter()
         .map(|f| QmlFile::from(f.as_str()).singleton(singletons.contains(&f.as_str())))
@@ -40,6 +46,7 @@ fn main() {
 
     CxxQtBuilder::new_qml_module(QmlModule::new("Isai").qml_files(qml))
         .qt_module("Quick")
+        .qt_module("Multimedia")
         .qrc_resources(assets)
         .files(["src/controller.rs", "src/waveform.rs"])
         .build();

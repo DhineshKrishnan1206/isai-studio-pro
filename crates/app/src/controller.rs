@@ -90,6 +90,7 @@ pub mod qobject {
         #[qproperty(QString, history_json)]
         /// Markers: [{ id, beat, name }], sorted by beat.
         #[qproperty(QString, markers_json)]
+        #[qproperty(QString, videos_json)]
         /// The tempo and time-signature map: {"tempos": [[beat, bpm]…], "sigs": [[beat, bar, num, den]…]}.
         #[qproperty(QString, tempo_json)]
         /// Installed plugins: [{ index, name, vendor, format, instrument, category }].
@@ -148,6 +149,8 @@ pub mod qobject {
         #[qproperty(QString, bar_text)]
         #[qproperty(f64, length_beats)]
         #[qproperty(bool, metronome)]
+        #[qproperty(bool, punch)]
+        #[qproperty(bool, os_reduce_motion)]
         #[qproperty(bool, count_in)]
         #[qproperty(bool, counting_in)]
         #[qproperty(bool, cycle)]
@@ -213,6 +216,43 @@ pub mod qobject {
         /// Imports an audio file onto a new track at the playhead.
         #[qinvokable]
         fn import_url(self: Pin<&mut Self>, url: &QUrl);
+        /// Imports a Standard MIDI File as a region on the selected instrument track.
+        #[qinvokable]
+        fn import_midi(self: Pin<&mut Self>, url: &QUrl);
+        #[qinvokable]
+        fn import_video(self: Pin<&mut Self>, url: &QUrl, seconds: f64, track: i32);
+        /// Adds an empty video track to the track list.
+        #[qinvokable]
+        fn add_video_track(self: Pin<&mut Self>);
+        #[qinvokable]
+        fn remove_video(self: Pin<&mut Self>, video: i32);
+        /// Moves a video clip on the video track to `beats`.
+        #[qinvokable]
+        fn move_video(self: Pin<&mut Self>, video: i32, beats: f64);
+        /// Earlier saved versions of the open project, as JSON.
+        #[qinvokable]
+        fn backups_json(self: Pin<&mut Self>) -> QString;
+        /// Replaces the open project with an earlier saved version (undoable).
+        #[qinvokable]
+        fn restore_backup(self: Pin<&mut Self>, path: &QString);
+        /// The other project files in the open project's folder, as JSON.
+        #[qinvokable]
+        fn alternatives_json(self: Pin<&mut Self>) -> QString;
+        /// Saves the open project as an alternative in the same folder.
+        #[qinvokable]
+        fn save_alternative(self: Pin<&mut Self>, url: &QUrl);
+        /// Opens another version of the project from its folder.
+        #[qinvokable]
+        fn open_alternative(self: Pin<&mut Self>, path: &QString);
+        /// Turns punch recording (record only inside the cycle region) on or off.
+        #[qinvokable]
+        fn toggle_punch(self: Pin<&mut Self>);
+        /// Re-reads the system's reduce-motion setting.
+        #[qinvokable]
+        fn refresh_os_motion(self: Pin<&mut Self>);
+        /// Writes a MIDI region's notes to a Standard MIDI File.
+        #[qinvokable]
+        fn export_midi(self: Pin<&mut Self>, url: &QUrl, region: i32);
         #[qinvokable]
         fn add_track(self: Pin<&mut Self>);
         #[qinvokable]
@@ -280,22 +320,52 @@ pub mod qobject {
         fn add_midi_region(self: Pin<&mut Self>, track: i32, start: f64, length: f64) -> i32;
         /// Notes, by region id and index; `start` is in beats from the region's start.
         #[qinvokable]
-        fn add_note(self: Pin<&mut Self>, region: i32, start: f64, length: f64, key: i32, velocity: i32) -> i32;
+        fn add_note(
+            self: Pin<&mut Self>,
+            region: i32,
+            start: f64,
+            length: f64,
+            key: i32,
+            velocity: i32,
+        ) -> i32;
         #[qinvokable]
-        fn update_note(self: Pin<&mut Self>, region: i32, index: i32, start: f64, length: f64, key: i32, velocity: i32) -> i32;
+        fn update_note(
+            self: Pin<&mut Self>,
+            region: i32,
+            index: i32,
+            start: f64,
+            length: f64,
+            key: i32,
+            velocity: i32,
+        ) -> i32;
         #[qinvokable]
         fn remove_note(self: Pin<&mut Self>, region: i32, index: i32);
         /// Moves/transposes/resizes several notes together (one undo step).
         /// `indices` is comma-separated; returns their new indices the same way.
         #[qinvokable]
-        fn transform_notes(self: Pin<&mut Self>, region: i32, indices: &QString, d_start: f64, d_key: i32, d_length: f64) -> QString;
+        fn transform_notes(
+            self: Pin<&mut Self>,
+            region: i32,
+            indices: &QString,
+            d_start: f64,
+            d_key: i32,
+            d_length: f64,
+        ) -> QString;
         #[qinvokable]
         fn remove_notes(self: Pin<&mut Self>, region: i32, indices: &QString);
         /// Moves notes toward a grid (in beats). `indices` is a comma-separated
         /// list, or "" for every note; `strength` is 0..1.
         /// `swing` 0..0.5 delays every second grid step (1/3 is a triplet feel).
         #[qinvokable]
-        fn quantize_notes(self: Pin<&mut Self>, region: i32, indices: &QString, grid: f64, strength: f64, ends: bool, swing: f64);
+        fn quantize_notes(
+            self: Pin<&mut Self>,
+            region: i32,
+            indices: &QString,
+            grid: f64,
+            strength: f64,
+            ends: bool,
+            swing: f64,
+        );
         /// Adds notes ([[start, length, key, velocity]…] JSON, starts in beats
         /// from the region's start) as one edit; returns their indices, comma-separated.
         #[qinvokable]
@@ -303,10 +373,22 @@ pub mod qobject {
         /// Strums the chords among `indices` (every note when ""): `spread` beats
         /// between neighbouring notes, upwards or `down`. Returns the new indices.
         #[qinvokable]
-        fn strum_notes(self: Pin<&mut Self>, region: i32, indices: &QString, spread: f64, down: bool) -> QString;
+        fn strum_notes(
+            self: Pin<&mut Self>,
+            region: i32,
+            indices: &QString,
+            spread: f64,
+            down: bool,
+        ) -> QString;
         /// Turns chords into arpeggios of `step` beats ("up", "down", "updown").
         #[qinvokable]
-        fn arpeggiate_notes(self: Pin<&mut Self>, region: i32, indices: &QString, step: f64, pattern: &QString) -> QString;
+        fn arpeggiate_notes(
+            self: Pin<&mut Self>,
+            region: i32,
+            indices: &QString,
+            step: f64,
+            pattern: &QString,
+        ) -> QString;
         /// Adds a marker at `beats` (snapped); returns its id.
         #[qinvokable]
         fn add_marker(self: Pin<&mut Self>, beats: f64) -> i32;
@@ -358,15 +440,32 @@ pub mod qobject {
         #[qinvokable]
         fn tuner_reading(self: Pin<&mut Self>, a4: f64) -> QString;
         #[qinvokable]
-        fn set_instrument_param(self: Pin<&mut Self>, track: i32, key: &QString, value: f64, commit: bool);
+        fn set_instrument_param(
+            self: Pin<&mut Self>,
+            track: i32,
+            key: &QString,
+            value: f64,
+            commit: bool,
+        );
         /// Sets several instrument parameters ({ key: value } JSON) as one undo step.
         #[qinvokable]
-        fn set_instrument_params(self: Pin<&mut Self>, track: i32, values: &QString, label: &QString);
+        fn set_instrument_params(
+            self: Pin<&mut Self>,
+            track: i32,
+            values: &QString,
+            label: &QString,
+        );
         /// Plays a note on the selected instrument track (computer keyboard, piano roll).
         #[qinvokable]
         fn note_on(self: Pin<&mut Self>, key: i32, velocity: i32);
         #[qinvokable]
         fn note_off(self: Pin<&mut Self>, key: i32);
+        #[qinvokable]
+        fn set_plugin_keyboard(self: Pin<&mut Self>, enabled: bool, octave: i32);
+        #[qinvokable]
+        fn plugin_keyboard_octave(self: &AppController) -> i32;
+        #[qinvokable]
+        fn release_plugin_keys(self: Pin<&mut Self>);
         /// The sustain pedal on the selected instrument track (down or up).
         #[qinvokable]
         fn sustain(self: Pin<&mut Self>, down: bool);
@@ -418,9 +517,22 @@ pub mod qobject {
         fn set_automation_view(self: Pin<&mut Self>, track: i32, target: &QString);
         /// Adds a point to a lane; returns its index, or -1.
         #[qinvokable]
-        fn add_auto_point(self: Pin<&mut Self>, track: i32, target: &QString, beat: f64, value: f64) -> i32;
+        fn add_auto_point(
+            self: Pin<&mut Self>,
+            track: i32,
+            target: &QString,
+            beat: f64,
+            value: f64,
+        ) -> i32;
         #[qinvokable]
-        fn move_auto_point(self: Pin<&mut Self>, track: i32, target: &QString, index: i32, beat: f64, value: f64);
+        fn move_auto_point(
+            self: Pin<&mut Self>,
+            track: i32,
+            target: &QString,
+            index: i32,
+            beat: f64,
+            value: f64,
+        );
         #[qinvokable]
         fn remove_auto_point(self: Pin<&mut Self>, track: i32, target: &QString, index: i32);
         #[qinvokable]
@@ -456,7 +568,14 @@ pub mod qobject {
         fn toggle_region_selection(self: Pin<&mut Self>, id: i32);
         /// Marquee: selects regions over beats `from..to` on track rows `top..=bottom`.
         #[qinvokable]
-        fn select_regions_in(self: Pin<&mut Self>, from: f64, to: f64, top: i32, bottom: i32, add: bool);
+        fn select_regions_in(
+            self: Pin<&mut Self>,
+            from: f64,
+            to: f64,
+            top: i32,
+            bottom: i32,
+            add: bool,
+        );
         #[qinvokable]
         fn select_all_regions(self: Pin<&mut Self>);
         #[qinvokable]
@@ -479,7 +598,13 @@ pub mod qobject {
         fn split_at_playhead(self: Pin<&mut Self>);
         /// Fade lengths in beats; `commit` false while dragging.
         #[qinvokable]
-        fn set_region_fades(self: Pin<&mut Self>, id: i32, fade_in: f64, fade_out: f64, commit: bool);
+        fn set_region_fades(
+            self: Pin<&mut Self>,
+            id: i32,
+            fade_in: f64,
+            fade_out: f64,
+            commit: bool,
+        );
         #[qinvokable]
         fn move_track(self: Pin<&mut Self>, id: i32, index: i32);
         #[qinvokable]
@@ -517,7 +642,14 @@ pub mod qobject {
         fn refresh_inputs(self: Pin<&mut Self>);
         /// Exports the mix (to the file `url`) or stems (into the folder `url`).
         #[qinvokable]
-        fn export_audio(self: Pin<&mut Self>, url: &QUrl, stems: bool, cycle_only: bool, format: &QString, normalize: bool);
+        fn export_audio(
+            self: Pin<&mut Self>,
+            url: &QUrl,
+            stems: bool,
+            cycle_only: bool,
+            format: &QString,
+            normalize: bool,
+        );
         #[qinvokable]
         fn cancel_export(self: Pin<&mut Self>);
         /// Renders a track to audio in the background and plays that instead,
@@ -550,7 +682,14 @@ pub mod qobject {
         fn snap_beats(self: &Self, beats: f64) -> f64;
 
         #[qinvokable]
-        fn new_project(self: Pin<&mut Self>, name: &QString, tempo: f64, num: i32, den: i32, key: &QString);
+        fn new_project(
+            self: Pin<&mut Self>,
+            name: &QString,
+            tempo: f64,
+            num: i32,
+            den: i32,
+            key: &QString,
+        );
         #[qinvokable]
         fn close_project(self: Pin<&mut Self>);
         #[qinvokable]
@@ -580,7 +719,12 @@ pub mod qobject {
         fn poll_plugins(self: Pin<&mut Self>);
         /// Adds installed plugin `index` to a chain and opens it; returns the insert id.
         #[qinvokable]
-        fn add_plugin_effect(self: Pin<&mut Self>, chain_type: &QString, chain_id: i32, index: i32) -> i32;
+        fn add_plugin_effect(
+            self: Pin<&mut Self>,
+            chain_type: &QString,
+            chain_id: i32,
+            index: i32,
+        ) -> i32;
         /// Adds a track playing installed plugin `index` and opens it; returns the track id.
         #[qinvokable]
         fn add_plugin_track(self: Pin<&mut Self>, index: i32) -> i32;
@@ -760,6 +904,7 @@ pub struct AppControllerRust {
     redo_label: QString,
     history_json: QString,
     markers_json: QString,
+    videos_json: QString,
     tempo_json: QString,
     plugins_json: QString,
     plugin_scanning: bool,
@@ -802,6 +947,8 @@ pub struct AppControllerRust {
     bar_text: QString,
     length_beats: f64,
     metronome: bool,
+    punch: bool,
+    os_reduce_motion: bool,
     count_in: bool,
     counting_in: bool,
     cycle: bool,
@@ -864,19 +1011,25 @@ impl qobject::AppController {
     // ---------------------------------------------------------------- startup
 
     pub fn start(mut self: Pin<&mut Self>, software_rendering: bool) {
+        self.as_mut()
+            .set_os_reduce_motion(crate::motion::os_reduces_motion());
         self.as_mut().set_volume(1.0);
         self.as_mut().set_freezing_track(-1);
         self.as_mut().set_stem_region(-1);
         self.as_mut().set_stem_progress(-1.0);
         let env = |key| std::env::var(key).unwrap_or_default();
-        self.as_mut().set_dev_screenshot(qs(&env("ISAI_SCREENSHOT")));
+        self.as_mut()
+            .set_dev_screenshot(qs(&env("ISAI_SCREENSHOT")));
         self.as_mut().set_dev_scene(qs(&env("ISAI_SCENE")));
-        self.as_mut().set_effect_kinds_json(qs(&crate::session::effect_kinds_json()));
-        self.as_mut().set_instrument_kinds_json(qs(&crate::session::instrument_kinds_json()));
+        self.as_mut()
+            .set_effect_kinds_json(qs(&crate::session::effect_kinds_json()));
+        self.as_mut()
+            .set_instrument_kinds_json(qs(&crate::session::instrument_kinds_json()));
         // The installed plugins: from the last scan, or scanned now in the background.
         self.as_mut().st().plugins.start();
         self.as_mut().publish_plugins();
         self.as_mut().refresh_midi();
+        crate::computer_keys::install(self.as_mut().st().live_slot.clone());
         let mut hardware = Hardware::detect();
         if software_rendering {
             hardware.gpu = Some("software renderer".into());
@@ -886,7 +1039,8 @@ impl qobject::AppController {
         self.as_mut().set_ram_gb(f64::from(hardware.ram_gb));
         self.as_mut().st().hardware = hardware;
         if let Some(path) = isai_settings::path() {
-            self.as_mut().set_settings_path(qs(&path.display().to_string()));
+            self.as_mut()
+                .set_settings_path(qs(&path.display().to_string()));
         }
         self.as_mut().refresh_devices();
 
@@ -905,10 +1059,14 @@ impl qobject::AppController {
                 // `isai song.wav` starts a project with that file; `isai song.isai` opens it.
                 if let Some(arg) = std::env::args_os().nth(1) {
                     let path = PathBuf::from(arg);
-                    if path.extension().is_some_and(|e| e == isai_project::EXTENSION) {
+                    if path
+                        .extension()
+                        .is_some_and(|e| e == isai_project::EXTENSION)
+                    {
                         self.as_mut().open_path(&path);
                     } else {
-                        self.as_mut().new_project(&qs("Untitled"), 120.0, 4, 4, &qs("C major"));
+                        self.as_mut()
+                            .new_project(&qs("Untitled"), 120.0, 4, 4, &qs("C major"));
                         self.as_mut().import_path(path);
                     }
                 }
@@ -921,7 +1079,8 @@ impl qobject::AppController {
     }
 
     fn begin_setup(mut self: Pin<&mut Self>, notice: Option<String>) {
-        self.as_mut().set_setup_notice(qs(notice.as_deref().unwrap_or("")));
+        self.as_mut()
+            .set_setup_notice(qs(notice.as_deref().unwrap_or("")));
         self.as_mut().set_needs_setup(true);
         self.as_mut().set_checking(true);
         self.as_mut().publish_settings();
@@ -979,7 +1138,8 @@ impl qobject::AppController {
                 s.visual.animations = Animations::from_key(&value).unwrap_or(s.visual.animations);
             }
             "waveformDetail" => {
-                s.visual.waveform_detail = Detail::from_key(&value).unwrap_or(s.visual.waveform_detail);
+                s.visual.waveform_detail =
+                    Detail::from_key(&value).unwrap_or(s.visual.waveform_detail);
             }
             "deviceId" => s.audio.device_id = (!value.is_empty()).then_some(value),
             "inputDevice" => s.recording.input_device = (!value.is_empty()).then_some(value),
@@ -1048,7 +1208,8 @@ impl qobject::AppController {
     fn publish_settings(mut self: Pin<&mut Self>) {
         let s = self.as_mut().st().settings.clone();
         self.as_mut().set_click_volume(s.metronome.volume as i32);
-        self.as_mut().set_count_in_bars(s.metronome.count_in_bars as i32);
+        self.as_mut()
+            .set_count_in_bars(s.metronome.count_in_bars as i32);
         self.as_mut().set_profile(qs(s.profile.key()));
         self.as_mut().set_view(qs(s.view.key()));
         self.as_mut().set_theme(qs(s.theme.key()));
@@ -1058,23 +1219,31 @@ impl qobject::AppController {
         self.as_mut().set_animations(qs(s.visual.animations.key()));
         self.as_mut().set_ui_fps(s.visual.ui_fps as i32);
         self.as_mut().set_meter_hz(s.visual.meter_hz as i32);
-        self.as_mut().set_waveform_detail(qs(s.visual.waveform_detail.key()));
+        self.as_mut()
+            .set_waveform_detail(qs(s.visual.waveform_detail.key()));
         self.as_mut().set_effects(s.visual.effects);
         self.as_mut().set_eco(s.audio.eco);
         self.as_mut().set_buffer_size(s.audio.buffer_size as i32);
-        self.as_mut().set_device_id(qs(s.audio.device_id.as_deref().unwrap_or("")));
-        self.as_mut().set_suggest_lighter(s.helpers.suggest_lighter_profile);
-        self.as_mut().set_input_device_id(qs(s.recording.input_device.as_deref().unwrap_or("")));
+        self.as_mut()
+            .set_device_id(qs(s.audio.device_id.as_deref().unwrap_or("")));
+        self.as_mut()
+            .set_suggest_lighter(s.helpers.suggest_lighter_profile);
+        self.as_mut()
+            .set_input_device_id(qs(s.recording.input_device.as_deref().unwrap_or("")));
         self.as_mut().set_input_stereo(s.recording.stereo);
-        self.as_mut().set_input_channel(i32::from(s.recording.channel));
-        self.as_mut().set_latency_offset_ms(s.recording.latency_offset_ms);
+        self.as_mut()
+            .set_input_channel(i32::from(s.recording.channel));
+        self.as_mut()
+            .set_latency_offset_ms(s.recording.latency_offset_ms);
     }
 
     pub fn refresh_devices(mut self: Pin<&mut Self>) {
         self.as_mut().refresh_inputs();
         let devices = isai_engine::list_output_devices();
-        self.as_mut().set_device_names(qlist(devices.iter().map(|d| d.name.clone())));
-        self.as_mut().set_device_ids(qlist(devices.into_iter().map(|d| d.id)));
+        self.as_mut()
+            .set_device_names(qlist(devices.iter().map(|d| d.name.clone())));
+        self.as_mut()
+            .set_device_ids(qlist(devices.into_iter().map(|d| d.id)));
     }
 
     // ------------------------------------------------------------------ audio
@@ -1109,7 +1278,8 @@ impl qobject::AppController {
         if let Some(info) = info {
             self.as_mut().set_device_name(qs(&info.device_name));
             self.as_mut().set_sample_rate(info.sample_rate as i32);
-            self.as_mut().set_actual_buffer(info.buffer_size.map_or(0, |n| n as i32));
+            self.as_mut()
+                .set_actual_buffer(info.buffer_size.map_or(0, |n| n as i32));
         }
     }
 
@@ -1120,7 +1290,9 @@ impl qobject::AppController {
         let st = self.as_mut().st();
         st.overruns_seen = 0;
         st.crackles = 0;
-        let Some(engine) = &mut st.audio.engine else { return };
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
         engine.set_volume(volume);
         // Audio is decoded at the device's rate; a new rate means decoding again.
         let rate = engine.info().sample_rate;
@@ -1141,7 +1313,10 @@ impl qobject::AppController {
     }
 
     pub fn switch_to_lightweight(mut self: Pin<&mut Self>) {
-        self.as_mut().st().settings.apply_profile(Profile::Lightweight);
+        self.as_mut()
+            .st()
+            .settings
+            .apply_profile(Profile::Lightweight);
         self.as_mut().set_crackling(false);
         self.settings_changed();
     }
@@ -1168,7 +1343,9 @@ impl qobject::AppController {
 
     fn poll_bench(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
-        let Some(voices) = st.bench.as_ref().and_then(|rx| rx.try_recv().ok()) else { return };
+        let Some(voices) = st.bench.as_ref().and_then(|rx| rx.try_recv().ok()) else {
+            return;
+        };
         st.bench = None;
         st.hardware.voices = voices;
         // Only a recommendation: the user picks the profile themselves.
@@ -1187,7 +1364,9 @@ impl qobject::AppController {
         let now = Instant::now();
         self.as_mut().route_live();
         let st = self.as_mut().st();
-        let Some(engine) = &mut st.audio.engine else { return };
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
         engine.collect_garbage();
 
         let playing = engine.is_playing();
@@ -1198,14 +1377,19 @@ impl qobject::AppController {
             .meter_at
             .is_none_or(|t| now.duration_since(t).as_secs_f64() >= 1.0 / f64::from(meter_hz));
         let levels = if due {
-            let elapsed = st.meter_at.map_or(1.0, |t| now.duration_since(t).as_secs_f32());
+            let elapsed = st
+                .meter_at
+                .map_or(1.0, |t| now.duration_since(t).as_secs_f32());
             let (l, r) = engine.take_peaks();
             // Fall back smoothly instead of dropping straight to zero.
             let decay = (-elapsed / 0.25).exp();
             st.meter = (l.max(st.meter.0 * decay), r.max(st.meter.1 * decay));
             st.meter_at = Some(now);
             // Tracks, then buses.
-            let tracks = st.session.as_ref().map_or(0, |s| s.project.tracks.len() + s.project.buses.len());
+            let tracks = st
+                .session
+                .as_ref()
+                .map_or(0, |s| s.project.tracks.len() + s.project.buses.len());
             engine.take_track_peaks(tracks, &mut st.track_peaks);
             st.track_meter.resize(tracks, (0.0, 0.0));
             for (m, p) in st.track_meter.iter_mut().zip(&st.track_peaks) {
@@ -1228,7 +1412,14 @@ impl qobject::AppController {
         let here = st.session.as_ref().map(|_| {
             let secs = position as f64 / rate;
             let beats = st.tempo_map.secs_to_beats(secs);
-            (secs, beats, st.tempo_map.bar_beat(beats).to_string(), st.tempo_map.has_changes().then(|| st.tempo_map.meter_at(beats)))
+            (
+                secs,
+                beats,
+                st.tempo_map.bar_beat(beats).to_string(),
+                st.tempo_map
+                    .has_changes()
+                    .then(|| st.tempo_map.meter_at(beats)),
+            )
         });
 
         self.as_mut().set_playing(playing);

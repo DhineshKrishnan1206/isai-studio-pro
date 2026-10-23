@@ -36,7 +36,14 @@ pub trait ExternalPlugin: Send + Sync {
     /// Runs one block (at most `BLOCK` frames): `l` and `r` hold the input and
     /// receive the output. With `wait` false (the audio thread), returns false
     /// without touching the audio if the plugin is busy elsewhere.
-    fn process(&self, l: &mut [f32], r: &mut [f32], events: &[NoteEvent], transport: &Transport, wait: bool) -> bool;
+    fn process(
+        &self,
+        l: &mut [f32],
+        r: &mut [f32],
+        events: &[NoteEvent],
+        transport: &Transport,
+        wait: bool,
+    ) -> bool;
 
     /// Stops every sounding note (the transport stopped or jumped).
     fn all_notes_off(&self) {}
@@ -114,7 +121,11 @@ impl PluginInstrument {
 
     fn push(&mut self, offset: usize, key: u8, velocity: u8) {
         if self.events.len() < MAX_EVENTS {
-            self.events.push(NoteEvent { offset: offset as u32, key: key.min(127), velocity });
+            self.events.push(NoteEvent {
+                offset: offset as u32,
+                key: key.min(127),
+                velocity,
+            });
         }
         if velocity > 0 {
             self.struck |= 1 << key.min(127);
@@ -200,7 +211,10 @@ impl PluginInstrument {
     }
 
     pub fn keys(&mut self) -> (u128, u128) {
-        let held = self.held.iter().fold(self.live_held, |m, (k, _)| m | (1 << k));
+        let held = self
+            .held
+            .iter()
+            .fold(self.live_held, |m, (k, _)| m | (1 << k));
         (held, std::mem::take(&mut self.struck))
     }
 
@@ -230,7 +244,14 @@ mod tests {
     }
 
     impl ExternalPlugin for Probe {
-        fn process(&self, l: &mut [f32], r: &mut [f32], events: &[NoteEvent], _: &Transport, _: bool) -> bool {
+        fn process(
+            &self,
+            l: &mut [f32],
+            r: &mut [f32],
+            events: &[NoteEvent],
+            _: &Transport,
+            _: bool,
+        ) -> bool {
             self.events.lock().unwrap().extend_from_slice(events);
             l.fill(0.5);
             r.fill(0.25);
@@ -238,13 +259,30 @@ mod tests {
         }
     }
 
-    const T: Transport = Transport { bpm: 120.0, playing: true, sample_rate: 48_000.0 };
+    const T: Transport = Transport {
+        bpm: 120.0,
+        playing: true,
+        sample_rate: 48_000.0,
+    };
 
     #[test]
     fn notes_become_timed_events_and_end_when_playback_jumps() {
         let probe = Arc::new(Probe::default());
         let mut inst = PluginInstrument::new(Some(PluginRef(probe.clone())), false);
-        let notes = [PlayNote { start: 10, end: 20, key: 60, velocity: 100 }, PlayNote { start: 15, end: 100, key: 64, velocity: 90 }];
+        let notes = [
+            PlayNote {
+                start: 10,
+                end: 20,
+                key: 60,
+                velocity: 100,
+            },
+            PlayNote {
+                start: 15,
+                end: 100,
+                key: 64,
+                velocity: 90,
+            },
+        ];
         let (mut l, mut r) = (vec![0.0; 32], vec![0.0; 32]);
         let positions: Vec<u64> = (0..32).collect();
         inst.render(&notes, &positions, &[], &T, &mut l, &mut r);
@@ -252,9 +290,21 @@ mod tests {
         assert_eq!(
             ev,
             vec![
-                NoteEvent { offset: 10, key: 60, velocity: 100 },
-                NoteEvent { offset: 15, key: 64, velocity: 90 },
-                NoteEvent { offset: 20, key: 60, velocity: 0 },
+                NoteEvent {
+                    offset: 10,
+                    key: 60,
+                    velocity: 100
+                },
+                NoteEvent {
+                    offset: 15,
+                    key: 64,
+                    velocity: 90
+                },
+                NoteEvent {
+                    offset: 20,
+                    key: 60,
+                    velocity: 0
+                },
             ]
         );
         assert_eq!((l[0], r[0]), (0.5, 0.25), "the plugin's sound is added");
@@ -262,12 +312,30 @@ mod tests {
         probe.events.lock().unwrap().clear();
         let back: Vec<u64> = (0..4).collect();
         inst.render(&notes, &back, &[], &T, &mut l[..4], &mut r[..4]);
-        assert_eq!(probe.events.lock().unwrap()[0], NoteEvent { offset: 0, key: 64, velocity: 0 });
+        assert_eq!(
+            probe.events.lock().unwrap()[0],
+            NoteEvent {
+                offset: 0,
+                key: 64,
+                velocity: 0
+            }
+        );
         // Live notes arrive at the block start.
         probe.events.lock().unwrap().clear();
-        let live = [LiveNote { on: true, key: 72, velocity: 80 }];
+        let live = [LiveNote {
+            on: true,
+            key: 72,
+            velocity: 80,
+        }];
         inst.render(&notes, &[SILENT; 4], &live, &T, &mut l[..4], &mut r[..4]);
-        assert_eq!(probe.events.lock().unwrap()[0], NoteEvent { offset: 0, key: 72, velocity: 80 });
+        assert_eq!(
+            probe.events.lock().unwrap()[0],
+            NoteEvent {
+                offset: 0,
+                key: 72,
+                velocity: 80
+            }
+        );
         assert_eq!(inst.keys().0, 1 << 72);
     }
 }

@@ -1,26 +1,28 @@
 mod audio;
 mod browser_ops;
+mod computer_keys;
 mod controller;
 mod export_ops;
 mod format;
 mod mastering;
 mod midi_input;
+mod motion;
 mod plugin_ops;
 mod pool;
 mod project_ops;
 mod record_ops;
 mod recorder;
-mod selection_ops;
 mod sampler_ops;
+mod selection_ops;
 mod session;
+mod shared;
 mod slicer;
-mod stems_ops;
 mod spectrum;
+mod stems_ops;
 mod tap;
 mod tuner;
-mod shared;
-mod waveform;
 mod user_presets;
+mod waveform;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QString, QUrl};
 
@@ -39,9 +41,14 @@ fn main() {
         }
         return;
     }
+    // Video plays through Qt's FFmpeg backend on every platform, so the same
+    // files open everywhere (the OS decoders only cover some containers).
+    // SAFETY: nothing else is running yet, so no other thread reads the environment.
+    unsafe { std::env::set_var("QT_MEDIA_BACKEND", "ffmpeg") };
     let mut app = QGuiApplication::new();
     if let Some(mut app) = app.as_mut() {
-        app.as_mut().set_application_name(&QString::from("Isai Studio Pro"));
+        app.as_mut()
+            .set_application_name(&QString::from("Isai Studio Pro"));
         // Where QML's own little preferences (e.g. the tuner's pitch) are kept.
         app.as_mut().set_organization_name(&QString::from("Isai"));
     }

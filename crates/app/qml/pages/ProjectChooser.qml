@@ -3,9 +3,10 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import Isai
 
-// The start screen: a painting (tools/paint_art.py) with the choices over its
-// darker left side: new song from a template, open, recent songs, recovery.
-// Its colours are fixed (forest and cream), like a poster, in every theme.
+// The start screen. Each starting point has its own 16-step beat: the stage
+// plays the chosen one at that song's tempo, and each card shows its pattern.
+// The page reveals in steps, with the ArtCraft-style square buttons over a
+// faint dot grid. Colours are fixed (the site's dark), in every theme.
 Rectangle {
     id: chooser
     property var app
@@ -17,377 +18,536 @@ Rectangle {
     signal openRecentRequested(string path)
     signal recoverRequested()
 
-    readonly property color cream: "#F6ECD6"
-    readonly property color forest: "#04241A"
-    color: forest
+    // The site's dark palette. Qt reads 8-digit hex as AARRGGBB, so the
+    // translucent tones are written as explicit alpha colours.
+    readonly property color paper: "#121316"
+    readonly property color card: "#0B0B0C"
+    readonly property color raised: "#1C1D21"
+    readonly property color ink: "#F2F1EE"
+    readonly property color invertBg: "#FFFFFF"
+    readonly property color invertFg: "#0B0B0C"
+    readonly property color mute: Qt.rgba(0.949, 0.945, 0.933, 0.6)
+    readonly property color faint: Qt.rgba(0.949, 0.945, 0.933, 0.38)
+    readonly property color line: Qt.rgba(0.949, 0.945, 0.933, 0.15)
+    readonly property color lineStrong: Qt.rgba(0.949, 0.945, 0.933, 0.4)
 
-    // Starting points. Each just sets sensible defaults; you can change anything.
+    FontLoader { id: fArchivo; source: "qrc:/qt/qml/Isai/assets/fonts/Archivo.ttf" }
+    FontLoader { id: fMono; source: "qrc:/qt/qml/Isai/assets/fonts/GeistMono.ttf" }
+    readonly property string sans: fArchivo.name !== "" ? fArchivo.name : Theme.font
+    readonly property string mono: fMono.name !== "" ? fMono.name : Theme.mono
+
+    // Starting points. Each sets the tempo, time and key, and its own beat:
+    // four lanes (kick, snare, hats, bass) of 16 steps, x = a hit.
     readonly property var templates: [
-        { key: "empty",  title: "Empty",         dot: "#7DB862", tempo: 120, num: 4, den: 4, songKey: "C major", metronome: false },
-        { key: "beat",   title: "Beat",          dot: "#CD6138", tempo: 90,  num: 4, den: 4, songKey: "A minor", metronome: true },
-        { key: "song",   title: "Song",          dot: "#F5DC53", tempo: 110, num: 4, den: 4, songKey: "G major", metronome: true },
-        { key: "waltz",  title: "Ballad · 6/8",  dot: "#F4B271", tempo: 72,  num: 6, den: 8, songKey: "D major", metronome: true },
-        { key: "voice",  title: "Voice & podcast", dot: "#56A096", tempo: 120, num: 4, den: 4, songKey: "C major", metronome: false }
+        { key: "empty", title: "Empty", dot: "#2FD39C", tempo: 120, num: 4, den: 4, songKey: "C major", metronome: false,
+          lanes: ["x...x...x...x...", "................", "................", "................"] },
+        { key: "beat", title: "Beat", dot: "#F27141", tempo: 90, num: 4, den: 4, songKey: "A minor", metronome: true,
+          lanes: ["x...x...x...x...", "....x.......x...", "x.x.x.x.x.x.x.x.", "..x...x...x...x."] },
+        { key: "song", title: "Song", dot: "#F5C543", tempo: 110, num: 4, den: 4, songKey: "G major", metronome: true,
+          lanes: ["x.....x..x.....x.", "....x.......x...", "x.x.x.x.x.x.x.x.", "x...x...x.x.x..."] },
+        { key: "waltz", title: "Ballad · 6/8", dot: "#8B5CF6", tempo: 72, num: 6, den: 8, songKey: "D major", metronome: true,
+          lanes: ["x.....x.....x...", "...x.....x......", "x.x.x.x.x.x.x.x.", "x.....x.....x..."] },
+        { key: "voice", title: "Voice & podcast", dot: "#EC5D92", tempo: 120, num: 4, den: 4, songKey: "C major", metronome: false,
+          lanes: ["x...x...x...x...", "................", "..x...x...x..x..", "................"] }
     ]
     property string selected: "empty"
     property var current: templates.find(t => t.key === selected)
 
-    property real tempo: 120
-    property int num: 4
-    property int den: 4
-    property string songKey: "C major"
-
-    function pick(t) {
-        selected = t.key
-        tempo = t.tempo; num = t.num; den = t.den; songKey = t.songKey
-    }
-
     function create() {
-        app.newProject(nameField.text, tempo, num, den, songKey)
-        if (current.metronome) app.toggleMetronome()
-        if (current.key === "song") app.toggleCountIn()
+        const t = current
+        app.newProject(nameField.text, t.tempo, t.num, t.den, t.songKey)
+        if (t.metronome) app.toggleMetronome()
+        if (t.key === "song") app.toggleCountIn()
         nameField.text = ""
         created()
     }
 
-    readonly property var art: ["meadow-field.jpg", "meadow-lake.jpg", "meadow-dusk.jpg"]
-    // A different painting and line each time the app opens.
-    readonly property int artIndex: Math.floor(Math.random() * art.length)
-    readonly property var lines: [
-        "start with\none note.\nthen another.",
-        "every song\nstarts\nsomewhere.",
-        "hum it first.\nthe rest\nfollows.",
-        "the quiet\nbetween notes\nis music too.",
-        "play it\nonce more,\nslower."
-    ]
-    readonly property string line: lines[Math.floor(Math.random() * lines.length)]
-    readonly property string greeting: {
-        const h = new Date().getHours()
-        return h < 5 ? "still up?" : h < 12 ? "good morning." : h < 17 ? "good afternoon." : "good evening."
+    color: paper
+
+    // The playhead: 16 sixteenth-note steps per bar, at the chosen tempo.
+    property real step: 0
+    NumberAnimation on step {
+        from: 0; to: 16
+        duration: Math.round(240000 / chooser.current.tempo)
+        loops: Animation.Infinite
+        running: chooser.splashDone && Theme.motionMs > 0
+    }
+    readonly property int activeCol: Math.floor(step) % 16
+
+    // The splash shows while the app gets ready; then the page reveals in steps.
+    property bool splashDone: false
+    property int stage: 0
+    Timer { running: true; interval: 900; onTriggered: chooser.splashDone = true }
+    Timer {
+        running: chooser.splashDone && chooser.stage < 6
+        interval: 120
+        repeat: true
+        onTriggered: chooser.stage++
     }
 
-    Image {
+    // A faint dot grid along the edges, fading out toward the middle. Drawn once per size.
+    Canvas {
+        id: dots
         anchors.fill: parent
-        source: Theme.artDir + chooser.art[chooser.artIndex]
-        sourceSize: Qt.size(1600, 1000)
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        opacity: status === Image.Ready ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.slow } }
-    }
-    // Deep forest on the left, where the text sits; the painting shows on the right.
-    Rectangle {
-        anchors.fill: parent
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.0; color: Qt.rgba(0.0, 0.13, 0.08, 0.95) }
-            GradientStop { position: 0.40; color: Qt.rgba(0.0, 0.13, 0.08, 0.84) }
-            GradientStop { position: 0.66; color: Qt.rgba(0.0, 0.13, 0.08, 0.0) }
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            ctx.fillStyle = "rgba(242, 241, 238, 0.14)"
+            for (let x = 20; x < width; x += 28) {
+                for (let y = 20; y < height; y += 28) {
+                    if (Math.min(x, width - x, y, height - y) < 110) {
+                        ctx.beginPath()
+                        ctx.arc(x, y, 1.2, 0, Math.PI * 2)
+                        ctx.fill()
+                    }
+                }
+            }
         }
     }
-    WindowDragArea { anchors.left: parent.left; anchors.right: parent.right; height: 56 }
-    // Return starts a new song from the chosen template (also from the name field).
-    Shortcut { sequences: ["Return", "Enter"]; enabled: chooser.visible; onActivated: chooser.create() }
 
-    // The line, poster style, on the painting.
-    Text {
-        visible: chooser.width > 980
-        anchors.right: parent.right
-        anchors.rightMargin: Math.round(parent.width * 0.1)
-        anchors.verticalCenter: parent.verticalCenter
-        text: chooser.line
-        horizontalAlignment: Text.AlignRight
-        font.family: Theme.serif
-        font.pixelSize: 22
-        lineHeight: 1.1
-        color: chooser.cream
-        style: Text.Raised
-        styleColor: Qt.rgba(0, 0.16, 0.1, 0.35)
+    Rectangle {
+        id: splash
+        anchors.fill: parent
+        color: chooser.paper
+        visible: opacity > 0
+        opacity: chooser.splashDone ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: Theme.slow } }
+        Column {
+            anchors.centerIn: parent
+            spacing: 18
+            Logo { anchors.horizontalCenter: parent.horizontalCenter; variant: "mark"; size: 44; ink: "light" }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "ISAI STUDIO PRO"
+                font.family: chooser.mono
+                font.pixelSize: 11
+                font.letterSpacing: 1.6
+                color: chooser.mute
+            }
+            Spinner { anchors.horizontalCenter: parent.horizontalCenter; color: chooser.mute }
+        }
     }
 
-    Flickable {
-        id: scroller
-        anchors.fill: parent
-        anchors.topMargin: 56
-        anchors.bottomMargin: 44
-        contentHeight: column.implicitHeight + 24
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
+    WindowDragArea { anchors.left: parent.left; anchors.right: parent.right; height: 46 }
+    // Return creates the song (also from the name field).
+    Shortcut { sequences: ["Return", "Enter"]; enabled: chooser.visible && chooser.splashDone; onActivated: chooser.create() }
 
+    // A block that rises and fades in once its stage has come.
+    component Revealed: Item {
+        id: rv
+        property int at: 0
+        readonly property bool on: chooser.stage > at
+        opacity: on ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 900; easing.type: Easing.OutCubic } }
+        transform: Translate {
+            y: rv.on ? 0 : 28
+            Behavior on y { NumberAnimation { duration: 900; easing.type: Easing.OutCubic } }
+        }
+    }
+
+    // The site's button: square, mono, bold, uppercase. Filled ones dim on hover;
+    // outlined ones invert.
+    component SiteButton: AbstractButton {
+        id: sb
+        property bool primary: false
+        implicitHeight: 48
+        implicitWidth: buttonText.implicitWidth + 48
+        hoverEnabled: true
+        focusPolicy: Qt.StrongFocus
+        opacity: sb.primary && sb.hovered ? 0.8 : 1
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        background: Rectangle {
+            color: sb.primary || sb.hovered ? chooser.invertBg : "transparent"
+            border.width: sb.primary ? 0 : 1
+            border.color: sb.hovered && !sb.primary ? "transparent" : chooser.lineStrong
+            FocusRing { visible: sb.visualFocus }
+            Behavior on color { ColorAnimation { duration: 120 } }
+        }
+        contentItem: Text {
+            id: buttonText
+            text: sb.text
+            font.family: chooser.mono
+            font.pixelSize: 11
+            font.weight: Font.Bold
+            font.capitalization: Font.AllUppercase
+            font.letterSpacing: 1.3
+            color: sb.primary || sb.hovered ? chooser.invertFg : chooser.ink
+            Behavior on color { ColorAnimation { duration: 120 } }
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+    }
+
+    // A small uppercase label above a block.
+    component Kicker: Text {
+        font.family: chooser.mono
+        font.pixelSize: 11
+        font.capitalization: Font.AllUppercase
+        font.letterSpacing: 1.6
+        color: chooser.mute
+    }
+
+    // A pattern in miniature: four lanes of 16 steps.
+    component PatternGrid: Item {
+        id: pg
+        property var lanes: []
+        property color tint: chooser.ink
+        property real cell: 5
+        property real gap: 2
+        implicitWidth: 16 * (cell + gap)
+        implicitHeight: 4 * (cell + gap)
+        Repeater {
+            model: 64
+            delegate: Rectangle {
+                required property int index
+                readonly property int col: index % 16
+                readonly property int row: Math.floor(index / 16)
+                readonly property bool hit: pg.lanes.length > row && pg.lanes[row].charAt(col) === "x"
+                x: col * (pg.cell + pg.gap)
+                y: row * (pg.cell + pg.gap)
+                width: pg.cell
+                height: pg.cell
+                color: hit ? pg.tint : chooser.line
+            }
+        }
+    }
+
+    // A starting point: its name, tempo, and its own beat in miniature.
+    component TemplateCard: AbstractButton {
+        id: tc
+        property var modelData
+        readonly property bool chosen: chooser.selected === modelData.key
+        hoverEnabled: true
+        focusPolicy: Qt.StrongFocus
+        implicitHeight: 124
+        onClicked: chooser.selected = modelData.key
+        onDoubleClicked: { chooser.selected = modelData.key; chooser.create() }
+        background: Rectangle {
+            color: tc.chosen ? chooser.raised : chooser.card
+            border.width: tc.chosen ? 2 : 1
+            border.color: tc.chosen ? chooser.ink : tc.hovered ? chooser.mute : chooser.line
+            FocusRing { visible: tc.visualFocus }
+            Behavior on border.color { ColorAnimation { duration: 120 } }
+        }
+        contentItem: ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 12
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Rectangle { Layout.preferredWidth: 7; Layout.preferredHeight: 7; color: tc.modelData.dot }
+                Text {
+                    Layout.fillWidth: true
+                    text: tc.modelData.title
+                    font.family: chooser.sans
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    color: chooser.ink
+                    elide: Text.ElideRight
+                }
+            }
+            PatternGrid {
+                lanes: tc.modelData.lanes
+                tint: tc.modelData.dot
+            }
+            Text {
+                text: tc.modelData.tempo + " BPM"
+                font.family: chooser.mono
+                font.pixelSize: 11
+                color: chooser.mute
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- the page
+    GridLayout {
+        id: page
+        width: Math.min(1120, chooser.width - 56)
+        x: (chooser.width - width) / 2
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: -20
+        visible: chooser.splashDone
+        columns: chooser.width > 960 ? 2 : 1
+        columnSpacing: 48
+        rowSpacing: 36
+
+        // ------------------------------------------------ left: the words and the name
         ColumnLayout {
-            id: column
-            x: Math.max(32, Math.min(80, chooser.width * 0.055))
-            width: Math.min(580, chooser.width * 0.52)
+            Layout.fillWidth: true
+            Layout.preferredWidth: 1
+            Layout.alignment: Qt.AlignTop
             spacing: 0
 
-            RowLayout {
-                spacing: 12
-                Logo { variant: "mark"; size: 42; ink: "light" }
-                Text {
-                    text: "studio pro"
-                    font.family: Theme.font
-                    font.pixelSize: 14
-                    font.letterSpacing: 2
-                    color: chooser.cream
-                    opacity: 0.7
-                    Layout.alignment: Qt.AlignBottom
-                    Layout.bottomMargin: 4
-                }
-            }
-
-            Text {
-                Layout.topMargin: 34
-                text: chooser.greeting + "\nwhat are we making?"
-                font.family: Theme.serif
-                font.pixelSize: 38
-                lineHeight: 1.08
-                color: chooser.cream
-            }
-            Text {
-                Layout.topMargin: 10
-                text: "Pick up where you left off, or start something new."
-                font.family: Theme.font
-                font.pixelSize: 15
-                color: chooser.cream
-                opacity: 0.72
-            }
-
-            Banner {
+            Revealed {
+                at: 0
                 Layout.fillWidth: true
-                Layout.topMargin: 20
-                visible: chooser.app.recoveryName !== ""
-                tone: "info"
-                glyph: Icons.lifebuoy
-                text: "“" + chooser.app.recoveryName + "” wasn't saved when Isai last closed (autosaved "
-                      + chooser.app.recoveryAge + ")."
-                DButton { variant: "primary"; text: "Recover"; onClicked: chooser.recoverRequested() }
-                DButton { variant: "ghost"; text: "Discard"; onClicked: chooser.app.discardAutosave() }
-            }
-
-            RowLayout {
-                Layout.topMargin: 26
-                spacing: 12
-                ArtButton {
-                    primary: true
-                    glyph: Icons.plus
-                    text: "New song"
-                    hint: "↵"
-                    onClicked: chooser.create()
-                }
-                ArtButton {
-                    glyph: Icons.folderOpen
-                    text: "Open…"
-                    hint: Qt.platform.os === "osx" ? "⌘O" : "Ctrl+O"
-                    onClicked: chooser.openRequested()
-                }
-                ArtButton {
-                    visible: chooser.cancellable
-                    text: "Back to song"
-                    onClicked: chooser.cancelled()
-                }
-            }
-
-            // ---- New song settings
-            Text {
-                Layout.topMargin: 34
-                text: "START FROM"
-                font.family: Theme.font
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.8
-                color: chooser.cream
-                opacity: 0.55
-            }
-            Flow {
-                Layout.fillWidth: true
-                Layout.topMargin: 12
-                spacing: 8
-                Repeater {
-                    model: chooser.templates
-                    delegate: AbstractButton {
-                        id: chip
-                        required property var modelData
-                        readonly property bool chosen: chooser.selected === modelData.key
-                        implicitHeight: 34
-                        implicitWidth: chipRow.implicitWidth + 28
-                        hoverEnabled: true
-                        focusPolicy: Qt.StrongFocus
-                        onClicked: chooser.pick(modelData)
-                        onDoubleClicked: { chooser.pick(modelData); chooser.create() }
-                        background: Rectangle {
-                            radius: 17
-                            color: chip.chosen ? Qt.rgba(0.96, 0.93, 0.84, 0.16) : chip.hovered ? Qt.rgba(0.96, 0.93, 0.84, 0.08) : "transparent"
-                            border.width: 1
-                            border.color: chip.chosen ? chooser.cream : Qt.rgba(0.96, 0.93, 0.84, 0.25)
-                            FocusRing { visible: chip.visualFocus }
-                        }
-                        contentItem: Item {
-                            Row {
-                                id: chipRow
-                                anchors.centerIn: parent
-                                spacing: 8
-                                Rectangle { width: 9; height: 9; radius: 4.5; color: chip.modelData.dot; anchors.verticalCenter: parent.verticalCenter }
-                                Text {
-                                    text: chip.modelData.title
-                                    font.family: Theme.font
-                                    font.pixelSize: 13
-                                    color: chooser.cream
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
-                            }
-                        }
+                implicitHeight: intro.implicitHeight
+                ColumnLayout {
+                    id: intro
+                    width: parent.width
+                    spacing: 0
+                    Kicker { text: "ISAI · STUDIO PRO" }
+                    Text {
+                        Layout.topMargin: 12
+                        text: "New song"
+                        font.family: chooser.sans
+                        font.pixelSize: 52
+                        font.weight: Font.Bold
+                        color: chooser.ink
+                    }
+                    Text {
+                        Layout.topMargin: 8
+                        text: "Pick a starting beat, name it, and start playing."
+                        font.family: chooser.sans
+                        font.pixelSize: 15
+                        color: chooser.mute
                     }
                 }
             }
 
-            // Name, tempo, signature, key
-            Rectangle {
+            // Work from the last run that wasn't saved.
+            Revealed {
+                at: 1
                 Layout.fillWidth: true
-                Layout.topMargin: 14
-                implicitHeight: details.implicitHeight + 28
-                radius: 14
-                color: Qt.rgba(0.0, 0.1, 0.06, 0.55)
-                border.color: Qt.rgba(0.96, 0.93, 0.84, 0.14)
-                GridLayout {
-                    id: details
-                    anchors.fill: parent
-                    anchors.margins: 14
-                    columns: 2
-                    columnSpacing: 14
-                    rowSpacing: 10
+                Layout.topMargin: 26
+                visible: chooser.app.recoveryName !== ""
+                implicitHeight: recoverBox.implicitHeight
+                Rectangle {
+                    id: recoverBox
+                    width: parent.width
+                    implicitHeight: recoverRow.implicitHeight + 28
+                    color: chooser.card
+                    border.color: chooser.lineStrong
+                    RowLayout {
+                        id: recoverRow
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        spacing: 12
+                        Text {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            text: "“" + chooser.app.recoveryName + "” wasn't saved last time (autosaved " + chooser.app.recoveryAge + ")."
+                            font.family: chooser.sans
+                            font.pixelSize: 14
+                            color: chooser.ink
+                        }
+                        SiteButton { primary: true; text: "Recover"; onClicked: chooser.recoverRequested() }
+                        SiteButton { text: "Discard"; onClicked: chooser.app.discardAutosave() }
+                    }
+                }
+            }
 
-                    Text { text: "Name"; font.family: Theme.font; font.pixelSize: 12; color: chooser.cream; opacity: 0.65 }
+            Revealed {
+                at: 2
+                Layout.fillWidth: true
+                Layout.topMargin: 36
+                implicitHeight: nameBlock.implicitHeight
+                ColumnLayout {
+                    id: nameBlock
+                    width: parent.width
+                    spacing: 10
+                    Kicker { text: "Name" }
                     TextField {
                         id: nameField
                         Layout.fillWidth: true
-                        implicitHeight: 32
-                        placeholderText: "Untitled"
-                        font.family: Theme.font
-                        font.pixelSize: Theme.textMd
-                        color: chooser.cream
-                        placeholderTextColor: Qt.rgba(0.96, 0.93, 0.84, 0.4)
-                        selectionColor: "#2FA38A"
-                        leftPadding: 10
+                        implicitHeight: 52
+                        placeholderText: chooser.current.title + " song"
+                        font.family: chooser.sans
+                        font.pixelSize: 17
+                        color: chooser.ink
+                        placeholderTextColor: chooser.faint
+                        selectionColor: chooser.invertBg
+                        selectedTextColor: chooser.invertFg
+                        leftPadding: 18
                         background: Rectangle {
-                            radius: 8
-                            color: Qt.rgba(0, 0, 0, 0.25)
-                            border.color: nameField.activeFocus ? chooser.cream : Qt.rgba(0.96, 0.93, 0.84, 0.18)
-                        }
-                    }
-
-                    Text { text: "Tempo"; font.family: Theme.font; font.pixelSize: 12; color: chooser.cream; opacity: 0.65 }
-                    RowLayout {
-                        spacing: 10
-                        DSlider {
-                            Layout.fillWidth: true
-                            from: 40; to: 220; stepSize: 1
-                            value: chooser.tempo
-                            onMoved: chooser.tempo = Math.round(value)
-                        }
-                        Text {
-                            Layout.preferredWidth: 64
-                            horizontalAlignment: Text.AlignRight
-                            text: chooser.tempo.toFixed(0) + " BPM"
-                            font.family: Theme.mono
-                            font.pixelSize: 12
-                            color: chooser.cream
-                        }
-                    }
-
-                    Text { text: "Time"; font.family: Theme.font; font.pixelSize: 12; color: chooser.cream; opacity: 0.65 }
-                    Segmented {
-                        minItemWidth: 44
-                        options: ["2/4", "3/4", "4/4", "6/8", "12/8"].map(s => ({ value: s, label: s }))
-                        value: chooser.num + "/" + chooser.den
-                        onActivated: v => { const p = v.split("/"); chooser.num = parseInt(p[0]); chooser.den = parseInt(p[1]) }
-                    }
-
-                    Text { text: "Key"; font.family: Theme.font; font.pixelSize: 12; color: chooser.cream; opacity: 0.65 }
-                    RowLayout {
-                        spacing: 8
-                        Dropdown {
-                            implicitWidth: 96
-                            model: ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
-                            currentIndex: Math.max(0, model.indexOf(chooser.songKey.split(" ")[0]))
-                            onActivated: chooser.songKey = model[currentIndex] + " " + chooser.songKey.split(" ")[1]
-                        }
-                        Segmented {
-                            minItemWidth: 60
-                            options: [{ value: "major", label: "Major" }, { value: "minor", label: "Minor" }]
-                            value: chooser.songKey.split(" ")[1]
-                            onActivated: v => chooser.songKey = chooser.songKey.split(" ")[0] + " " + v
+                            color: chooser.card
+                            border.color: nameField.activeFocus ? chooser.ink : chooser.lineStrong
+                            Behavior on border.color { ColorAnimation { duration: 120 } }
                         }
                     }
                 }
             }
 
-            // ---- Recent songs
-            Text {
-                visible: chooser.app.recentPaths.length > 0
-                Layout.topMargin: 30
-                text: "RECENT"
-                font.family: Theme.font
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.8
-                color: chooser.cream
-                opacity: 0.55
+            Revealed {
+                at: 4
+                Layout.fillWidth: true
+                Layout.topMargin: 26
+                implicitHeight: buttonRow.implicitHeight
+                RowLayout {
+                    id: buttonRow
+                    width: parent.width
+                    spacing: 12
+                    SiteButton { primary: true; text: "Create song"; onClicked: chooser.create() }
+                    SiteButton { text: "Open…"; onClicked: chooser.openRequested() }
+                    SiteButton { visible: chooser.cancellable; text: "Back"; onClicked: chooser.cancelled() }
+                    Item { Layout.fillWidth: true }
+                }
             }
-            Repeater {
-                model: Math.min(6, chooser.app.recentPaths.length)
-                delegate: AbstractButton {
-                    id: recentRow
-                    required property int index
-                    readonly property string path: chooser.app.recentPaths[index]
-                    Layout.fillWidth: true
-                    Layout.topMargin: index === 0 ? 10 : 2
-                    implicitHeight: 56
-                    hoverEnabled: true
-                    onClicked: chooser.openRecentRequested(path)
-                    background: Rectangle {
-                        radius: 12
-                        color: recentRow.hovered ? Qt.rgba(0.96, 0.93, 0.84, 0.09) : "transparent"
-                    }
-                    contentItem: RowLayout {
-                        spacing: 14
-                        // A small piece of a painting, so each song has its own little cover.
-                        Rectangle {
-                            Layout.leftMargin: 8
-                            Layout.preferredWidth: 52
-                            Layout.preferredHeight: 38
-                            radius: 7
-                            clip: true
-                            color: chooser.forest
-                            border.color: Qt.rgba(0.96, 0.93, 0.84, 0.22)
-                            Image {
-                                anchors.fill: parent
-                                anchors.margins: 1
-                                source: Theme.artDir + chooser.art[recentRow.index % chooser.art.length]
-                                sourceSize: Qt.size(160, 100)
-                                fillMode: Image.PreserveAspectCrop
-                                horizontalAlignment: [Image.AlignLeft, Image.AlignHCenter, Image.AlignRight][recentRow.index % 3]
-                                asynchronous: true
+
+            Revealed {
+                at: 5
+                Layout.fillWidth: true
+                Layout.topMargin: 36
+                visible: chooser.app.recentPaths.length > 0
+                implicitHeight: recentBlock.implicitHeight
+                ColumnLayout {
+                    id: recentBlock
+                    width: parent.width
+                    spacing: 0
+                    Kicker { Layout.bottomMargin: 10; text: "Recent" }
+                    Repeater {
+                        model: Math.min(3, chooser.app.recentPaths.length)
+                        delegate: AbstractButton {
+                            id: recentRow
+                            required property int index
+                            readonly property string path: chooser.app.recentPaths[index]
+                            Layout.fillWidth: true
+                            implicitHeight: 44
+                            hoverEnabled: true
+                            focusPolicy: Qt.StrongFocus
+                            onClicked: chooser.openRecentRequested(path)
+                            background: Rectangle {
+                                color: recentRow.hovered ? chooser.invertBg : "transparent"
+                                border.width: recentRow.hovered ? 0 : 1
+                                border.color: chooser.line
+                                FocusRing { visible: recentRow.visualFocus }
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                            }
+                            contentItem: Text {
+                                leftPadding: 16
+                                verticalAlignment: Text.AlignVCenter
+                                text: chooser.app.recentNames[recentRow.index]
+                                font.family: chooser.sans
+                                font.pixelSize: 15
+                                font.weight: Font.DemiBold
+                                color: recentRow.hovered ? chooser.invertFg : chooser.ink
+                                elide: Text.ElideRight
+                                Behavior on color { ColorAnimation { duration: 120 } }
                             }
                         }
-                        ColumnLayout {
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------ right: the stage, playing the chosen beat
+        Revealed {
+            at: 1
+            Layout.fillWidth: true
+            Layout.preferredWidth: 1
+            Layout.alignment: Qt.AlignTop
+            implicitHeight: stageBox.implicitHeight
+            Rectangle {
+                id: stageBox
+                width: parent.width
+                implicitHeight: stageCol.implicitHeight + 40
+                color: chooser.card
+                border.color: chooser.lineStrong
+
+                ColumnLayout {
+                    id: stageCol
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 16
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text {
+                            text: "NOW PLAYING · " + chooser.current.title.toUpperCase()
+                            font.family: chooser.mono
+                            font.pixelSize: 11
+                            font.letterSpacing: 1.4
+                            color: chooser.mute
+                        }
+                        Item { Layout.fillWidth: true }
+                        Text {
+                            text: chooser.current.num + "/" + chooser.current.den + " · " + chooser.current.songKey.toUpperCase()
+                            font.family: chooser.mono
+                            font.pixelSize: 11
+                            color: chooser.mute
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        Text {
+                            text: chooser.current.tempo
+                            font.family: chooser.sans
+                            font.pixelSize: 64
+                            font.weight: Font.Bold
+                            color: chooser.ink
+                        }
+                        Text {
+                            Layout.alignment: Qt.AlignBottom
+                            Layout.bottomMargin: 14
+                            text: "BPM"
+                            font.family: chooser.mono
+                            font.pixelSize: 12
+                            font.letterSpacing: 1.4
+                            color: chooser.mute
+                        }
+                    }
+
+                    // The grid: the playhead sweeps across at the chosen tempo.
+                    Item {
+                        id: stageGrid
+                        Layout.fillWidth: true
+                        implicitHeight: 4 * 44
+                        readonly property real cellW: width / 16
+                        Repeater {
+                            model: 64
+                            delegate: Rectangle {
+                                required property int index
+                                readonly property int col: index % 16
+                                readonly property int row: Math.floor(index / 16)
+                                readonly property bool hit: chooser.current.lanes[row].charAt(col) === "x"
+                                readonly property bool hot: hit && col === chooser.activeCol
+                                x: col * stageGrid.cellW + 3
+                                y: row * 44 + 4
+                                width: stageGrid.cellW - 6
+                                height: 36
+                                radius: 3
+                                color: hot ? chooser.ink : hit ? chooser.current.dot : chooser.line
+                                opacity: hit ? 1 : 0.7
+                                Behavior on color { ColorAnimation { duration: 80 } }
+                            }
+                        }
+                        Rectangle {
+                            x: chooser.step * stageGrid.cellW
+                            y: -6
+                            width: 2
+                            height: stageGrid.height + 12
+                            color: chooser.ink
+                            opacity: 0.85
+                        }
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------ the starting points, across the bottom
+        Revealed {
+            at: 3
+            Layout.fillWidth: true
+            Layout.columnSpan: chooser.width > 960 ? 2 : 1
+            implicitHeight: pickBlock.implicitHeight
+            ColumnLayout {
+                id: pickBlock
+                width: parent.width
+                spacing: 12
+                Kicker { text: "Start from" }
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    Repeater {
+                        model: chooser.templates
+                        delegate: TemplateCard {
+                            modelData: chooser.templates[index]
                             Layout.fillWidth: true
-                            spacing: 1
-                            Text {
-                                text: chooser.app.recentNames[recentRow.index]
-                                font.family: Theme.font
-                                font.pixelSize: 14
-                                font.weight: Font.DemiBold
-                                color: chooser.cream
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: recentRow.path
-                                font.family: Theme.font
-                                font.pixelSize: 12
-                                color: chooser.cream
-                                opacity: 0.5
-                                elide: Text.ElideMiddle
-                            }
                         }
                     }
                 }
@@ -395,28 +555,25 @@ Rectangle {
         }
     }
 
+    // The footer: what the app is, and the chosen starting point's settings.
     Text {
         anchors.left: parent.left
-        anchors.leftMargin: column.x
+        anchors.leftMargin: 24
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 18
         text: "offline · no account · free forever"
-        font.family: Theme.font
-        font.pixelSize: 12
-        font.letterSpacing: 1
-        color: chooser.cream
-        opacity: 0.55
+        font.family: chooser.mono
+        font.pixelSize: 11
+        color: chooser.mute
     }
     Text {
         anchors.right: parent.right
         anchors.rightMargin: 24
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 18
-        text: "audio at " + (chooser.app.sampleRate / 1000).toFixed(1) + " kHz"
-        font.family: Theme.font
-        font.pixelSize: 12
-        font.letterSpacing: 1
-        color: chooser.cream
-        opacity: 0.7
+        text: chooser.current.tempo + " BPM · " + chooser.current.num + "/" + chooser.current.den + " · " + chooser.current.songKey.toUpperCase()
+        font.family: chooser.mono
+        font.pixelSize: 11
+        color: chooser.mute
     }
 }

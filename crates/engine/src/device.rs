@@ -27,7 +27,11 @@ pub fn list_output_devices() -> Vec<OutputDevice> {
                 .map(|d| d.name().to_owned())
                 .unwrap_or_else(|_| id.clone());
             let is_default = default_id.as_deref() == Some(id.as_str());
-            Some(OutputDevice { id, name, is_default })
+            Some(OutputDevice {
+                id,
+                name,
+                is_default,
+            })
         })
         .collect()
 }

@@ -14,6 +14,8 @@ mod au;
 mod base64;
 mod clap;
 #[cfg(target_os = "macos")]
+mod key_guard;
+#[cfg(target_os = "macos")]
 mod macwin;
 mod vst3;
 
@@ -21,12 +23,16 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-pub use base64::{decode as decode_state, encode as encode_state};
 #[cfg(target_os = "macos")]
 pub use au::AuPlugin;
+pub use base64::{decode as decode_state, encode as encode_state};
+#[cfg(target_os = "macos")]
+pub fn set_plugin_key_handler(handler: impl Fn(u16, bool) + Send + Sync + 'static) {
+    key_guard::set_handler(handler);
+}
 pub use clap::ClapPlugin;
-pub use vst3::Vst3Plugin;
 use isai_engine::plugin::PluginRef;
+pub use vst3::Vst3Plugin;
 
 /// A plugin format.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -91,7 +97,12 @@ pub fn scan() -> Vec<PluginInfo> {
     found.extend(clap::scan());
     #[cfg(target_os = "macos")]
     found.extend(au::scan());
-    found.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()).then(a.vendor.cmp(&b.vendor)));
+    found.sort_by(|a, b| {
+        a.name
+            .to_lowercase()
+            .cmp(&b.name.to_lowercase())
+            .then(a.vendor.cmp(&b.vendor))
+    });
     found.dedup_by(|a, b| a.path == b.path && a.uid == b.uid);
     found
 }
@@ -161,8 +172,12 @@ impl LoadedPlugin {
 /// Loads a plugin, ready to process at `sample_rate`.
 pub fn load(info: &PluginInfo, sample_rate: f64) -> Result<LoadedPlugin, String> {
     match info.format {
-        Format::Vst3 => Vst3Plugin::load(&info.path, &info.uid, sample_rate).map(LoadedPlugin::Vst3),
-        Format::Clap => ClapPlugin::load(&info.path, &info.uid, sample_rate).map(LoadedPlugin::Clap),
+        Format::Vst3 => {
+            Vst3Plugin::load(&info.path, &info.uid, sample_rate).map(LoadedPlugin::Vst3)
+        }
+        Format::Clap => {
+            ClapPlugin::load(&info.path, &info.uid, sample_rate).map(LoadedPlugin::Clap)
+        }
         #[cfg(target_os = "macos")]
         Format::Au => AuPlugin::load(&info.uid, sample_rate).map(LoadedPlugin::Au),
         #[cfg(not(target_os = "macos"))]

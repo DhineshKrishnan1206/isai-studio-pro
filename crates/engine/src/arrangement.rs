@@ -31,7 +31,13 @@ pub struct Arrangement {
 
 impl Default for Arrangement {
     fn default() -> Self {
-        Self { tracks: Vec::new(), buses: Vec::new(), master: Vec::new(), bpm: 120.0, tempo_changes: Vec::new() }
+        Self {
+            tracks: Vec::new(),
+            buses: Vec::new(),
+            master: Vec::new(),
+            bpm: 120.0,
+            tempo_changes: Vec::new(),
+        }
     }
 }
 
@@ -107,7 +113,9 @@ impl PlayLane {
         }
         let (p0, v0) = self.points[i - 1];
         match self.points.get(i) {
-            Some(&(p1, v1)) if p1 > p0 => Some(v0 + (v1 - v0) * ((pos - p0) as f32 / (p1 - p0) as f32)),
+            Some(&(p1, v1)) if p1 > p0 => {
+                Some(v0 + (v1 - v0) * ((pos - p0) as f32 / (p1 - p0) as f32))
+            }
             _ => Some(v0),
         }
     }
@@ -115,7 +123,11 @@ impl PlayLane {
 
 /// Decibels to a linear gain; silent at -60 dB and below.
 pub fn db_gain(db: f32) -> f32 {
-    if db <= -60.0 { 0.0 } else { 10f32.powf(db.min(6.0) / 20.0) }
+    if db <= -60.0 {
+        0.0
+    } else {
+        10f32.powf(db.min(6.0) / 20.0)
+    }
 }
 
 /// Fader times a constant-power pan law, scaled so centre is unity.
@@ -174,7 +186,9 @@ impl PlayTrack {
 
     /// Fader and pan gains at timeline position `pos`, following automation.
     pub fn gains_at(&self, pos: Option<u64>) -> (f32, f32) {
-        let Some(pos) = pos.filter(|_| !self.automation.is_empty()) else { return self.target_gains() };
+        let Some(pos) = pos.filter(|_| !self.automation.is_empty()) else {
+            return self.target_gains();
+        };
         let (mut gain, mut pan) = (self.gain, self.pan);
         for lane in &self.automation {
             match lane.target {
@@ -188,8 +202,13 @@ impl PlayTrack {
 
     /// The send level to bus `bus` at `pos`, following automation.
     pub fn send_at(&self, bus: usize, level: f32, pos: Option<u64>) -> f32 {
-        pos.and_then(|pos| self.automation.iter().find(|l| l.target == AutoTarget::Send(bus))?.value_at(pos))
-            .map_or(level, db_gain)
+        pos.and_then(|pos| {
+            self.automation
+                .iter()
+                .find(|l| l.target == AutoTarget::Send(bus))?
+                .value_at(pos)
+        })
+        .map_or(level, db_gain)
     }
 }
 
@@ -221,7 +240,17 @@ mod tests {
 
     #[test]
     fn centre_pan_is_unity_and_hard_pan_is_one_side() {
-        let mut t = PlayTrack { gain: 1.0, pan: 0.0, audible: true, sends: vec![], inserts: vec![], automation: vec![], instrument: None, notes: vec![], regions: vec![] };
+        let mut t = PlayTrack {
+            gain: 1.0,
+            pan: 0.0,
+            audible: true,
+            sends: vec![],
+            inserts: vec![],
+            automation: vec![],
+            instrument: None,
+            notes: vec![],
+            regions: vec![],
+        };
         let (l, r) = t.target_gains();
         assert!((l - 1.0).abs() < 1e-6 && (r - 1.0).abs() < 1e-6);
         t.pan = -1.0;
@@ -239,7 +268,16 @@ mod tests {
             left: (0..10).map(|i| i as f32).collect(),
             right: vec![0.0; 10],
         });
-        let r = PlayRegion { audio, start: 100, offset: 3, len: 4, fade_in: 0, fade_out: 0, gain: 1.0, reverse: false };
+        let r = PlayRegion {
+            audio,
+            start: 100,
+            offset: 3,
+            len: 4,
+            fade_in: 0,
+            fade_out: 0,
+            gain: 1.0,
+            reverse: false,
+        };
         assert_eq!(r.sample_at(99), None);
         assert_eq!(r.sample_at(100), Some((3.0, 0.0)));
         assert_eq!(r.sample_at(103), Some((6.0, 0.0)));
@@ -254,15 +292,38 @@ mod tests {
             left: (0..10).map(|i| i as f32).collect(),
             right: vec![0.0; 10],
         });
-        let r = PlayRegion { audio, start: 0, offset: 3, len: 4, fade_in: 0, fade_out: 0, gain: 0.5, reverse: true };
+        let r = PlayRegion {
+            audio,
+            start: 0,
+            offset: 3,
+            len: 4,
+            fade_in: 0,
+            fade_out: 0,
+            gain: 0.5,
+            reverse: true,
+        };
         let played: Vec<f32> = (0..4).map(|p| r.sample_at(p).unwrap().0).collect();
         assert_eq!(played, vec![3.0, 2.5, 2.0, 1.5]);
     }
 
     #[test]
     fn fades_rise_and_fall() {
-        let audio = Arc::new(Clip { name: String::new(), sample_rate: 10, left: vec![1.0; 100], right: vec![1.0; 100] });
-        let r = PlayRegion { audio, start: 0, offset: 0, len: 100, fade_in: 10, fade_out: 10, gain: 1.0, reverse: false };
+        let audio = Arc::new(Clip {
+            name: String::new(),
+            sample_rate: 10,
+            left: vec![1.0; 100],
+            right: vec![1.0; 100],
+        });
+        let r = PlayRegion {
+            audio,
+            start: 0,
+            offset: 0,
+            len: 100,
+            fade_in: 10,
+            fade_out: 10,
+            gain: 1.0,
+            reverse: false,
+        };
         assert_eq!(r.sample_at(0).unwrap().0, 0.0);
         assert!((r.sample_at(5).unwrap().0 - std::f32::consts::FRAC_1_SQRT_2).abs() < 1e-5);
         assert_eq!(r.sample_at(50).unwrap().0, 1.0);
@@ -271,17 +332,44 @@ mod tests {
 
     #[test]
     fn automation_draws_straight_lines_between_points() {
-        let lane = PlayLane { target: AutoTarget::Volume, points: vec![(100, -12.0), (200, 0.0)] };
+        let lane = PlayLane {
+            target: AutoTarget::Volume,
+            points: vec![(100, -12.0), (200, 0.0)],
+        };
         assert_eq!(lane.value_at(0), Some(-12.0), "before the first point");
         assert_eq!(lane.value_at(150), Some(-6.0));
         assert_eq!(lane.value_at(500), Some(0.0), "after the last point");
-        assert_eq!(PlayLane { target: AutoTarget::Pan, points: vec![] }.value_at(5), None);
+        assert_eq!(
+            PlayLane {
+                target: AutoTarget::Pan,
+                points: vec![]
+            }
+            .value_at(5),
+            None
+        );
 
-        let mut t = PlayTrack { gain: 1.0, pan: 0.0, audible: true, sends: vec![], inserts: vec![], automation: vec![lane], instrument: None, notes: vec![], regions: vec![] };
+        let mut t = PlayTrack {
+            gain: 1.0,
+            pan: 0.0,
+            audible: true,
+            sends: vec![],
+            inserts: vec![],
+            automation: vec![lane],
+            instrument: None,
+            notes: vec![],
+            regions: vec![],
+        };
         let (l, _) = t.gains_at(Some(0));
         assert!((l - db_gain(-12.0)).abs() < 1e-5);
-        assert_eq!(t.gains_at(None), t.target_gains(), "stopped: the fader's own value");
-        t.automation.push(PlayLane { target: AutoTarget::Send(0), points: vec![(0, -6.0)] });
+        assert_eq!(
+            t.gains_at(None),
+            t.target_gains(),
+            "stopped: the fader's own value"
+        );
+        t.automation.push(PlayLane {
+            target: AutoTarget::Send(0),
+            points: vec![(0, -6.0)],
+        });
         assert!((t.send_at(0, 1.0, Some(10)) - db_gain(-6.0)).abs() < 1e-5);
         assert_eq!(t.send_at(1, 0.7, Some(10)), 0.7);
     }

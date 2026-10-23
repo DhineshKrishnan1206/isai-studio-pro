@@ -114,11 +114,22 @@ impl Default for Sampler {
 
 impl Sampler {
     pub fn new() -> Self {
-        Self { voices: [Voice::OFF; VOICES], expected: SILENT, cursor: 0, clock: 0, struck: 0, velocities: [0; 128] }
+        Self {
+            voices: [Voice::OFF; VOICES],
+            expected: SILENT,
+            cursor: 0,
+            clock: 0,
+            struck: 0,
+            velocities: [0; 128],
+        }
     }
 
     pub fn keys(&mut self) -> (u128, u128) {
-        let held = self.voices.iter().filter(|v| v.held()).fold(0u128, |m, v| m | 1 << (v.key & 127));
+        let held = self
+            .voices
+            .iter()
+            .filter(|v| v.held())
+            .fold(0u128, |m, v| m | 1 << (v.key & 127));
         (held, std::mem::take(&mut self.struck))
     }
 
@@ -136,7 +147,16 @@ impl Sampler {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn note_on(&mut self, p: &[f32; MAX_INST_PARAMS], clip: &Clip, slices: &[u64], key: u8, velocity: u8, end: u64, live: bool) {
+    fn note_on(
+        &mut self,
+        p: &[f32; MAX_INST_PARAMS],
+        clip: &Clip,
+        slices: &[u64],
+        key: u8,
+        velocity: u8,
+        end: u64,
+        live: bool,
+    ) {
         use param::*;
         let len = clip.frames() as f64;
         if len < 2.0 {
@@ -147,7 +167,13 @@ impl Sampler {
         let reverse = p[REVERSE] >= 0.5;
         let (from, to, step, looping, one_shot) = if p[MODE] >= 0.5 {
             // Slices: a key per slice, at the sample's own pitch.
-            let Some(i) = key.checked_sub(FIRST_SLICE_KEY).map(usize::from).filter(|&i| i < slices.len()) else { return };
+            let Some(i) = key
+                .checked_sub(FIRST_SLICE_KEY)
+                .map(usize::from)
+                .filter(|&i| i < slices.len())
+            else {
+                return;
+            };
             let from = slices[i] as f64;
             let to = slices.get(i + 1).map_or(len, |&s| s as f64).min(len);
             (from, to, 2f64.powf(tune), None, true)
@@ -155,7 +181,8 @@ impl Sampler {
             let from = (f64::from(p[START]) / 100.0 * len).clamp(0.0, len - 1.0);
             let to = (f64::from(p[END]) / 100.0 * len).clamp(from + 1.0, len);
             let semis = f64::from(key) - f64::from(p[ROOT].round());
-            let looping = (p[LOOP] >= 0.5).then(|| (f64::from(p[LOOP_START]) / 100.0 * len).clamp(from, to - 1.0));
+            let looping = (p[LOOP] >= 0.5)
+                .then(|| (f64::from(p[LOOP_START]) / 100.0 * len).clamp(from, to - 1.0));
             (from, to, 2f64.powf(semis / 12.0 + tune), looping, false)
         };
         if to - from < 2.0 {
@@ -173,7 +200,11 @@ impl Sampler {
             .unwrap_or_else(|| (0..VOICES).min_by_key(|&i| self.voices[i].age).unwrap_or(0));
         // Retriggering a slice cuts the one already playing it.
         if one_shot {
-            for v in self.voices.iter_mut().filter(|v| v.one_shot && v.key == key) {
+            for v in self
+                .voices
+                .iter_mut()
+                .filter(|v| v.one_shot && v.key == key)
+            {
                 v.stage = Stage::Release;
                 v.one_shot = false;
             }
@@ -231,7 +262,9 @@ impl Sampler {
         let decay = (-6.9 * step_ms(p[DECAY])).exp();
         let sustain = (p[SUSTAIN] / 100.0).clamp(0.0, 1.0);
         let release = (-6.9 * step_ms(p[RELEASE])).exp();
-        let lp = 1.0 - (-std::f32::consts::TAU * p[CUTOFF].clamp(40.0, 20_000.0).min(rate * 0.45) / rate).exp();
+        let lp = 1.0
+            - (-std::f32::consts::TAU * p[CUTOFF].clamp(40.0, 20_000.0).min(rate * 0.45) / rate)
+                .exp();
         let filtered = p[CUTOFF] < 19_000.0;
         let volume = 10f32.powf(p[VOLUME] / 20.0) * 0.6;
         let (left, right) = (&clip.left, &clip.right);
@@ -250,7 +283,11 @@ impl Sampler {
                     }
                     self.cursor += 1;
                 }
-                for v in self.voices.iter_mut().filter(|v| !v.live && v.held() && v.end <= pos) {
+                for v in self
+                    .voices
+                    .iter_mut()
+                    .filter(|v| !v.live && v.held() && v.end <= pos)
+                {
                     v.release();
                 }
                 self.expected = pos + 1;
@@ -268,7 +305,11 @@ impl Sampler {
                         v.level += attack;
                         if v.level >= 1.0 {
                             v.level = 1.0;
-                            v.stage = if v.one_shot { Stage::Sustain } else { Stage::Decay };
+                            v.stage = if v.one_shot {
+                                Stage::Sustain
+                            } else {
+                                Stage::Decay
+                            };
                         }
                     }
                     Stage::Decay => {
@@ -299,7 +340,11 @@ impl Sampler {
                 let mut sr = right[i] + (right[i + 1] - right[i]) * frac;
                 v.pos += v.step;
                 // Past the end: loop back while held, or stop.
-                let (past_end, left_over) = if v.step > 0.0 { (v.pos >= v.to, v.to - v.pos) } else { (v.pos < v.from, v.pos - v.from) };
+                let (past_end, left_over) = if v.step > 0.0 {
+                    (v.pos >= v.to, v.to - v.pos)
+                } else {
+                    (v.pos < v.from, v.pos - v.from)
+                };
                 if past_end {
                     match v.looping.filter(|_| v.held()) {
                         Some(back) if v.step > 0.0 => v.pos = back + (v.pos - v.to),
@@ -337,8 +382,15 @@ mod tests {
 
     /// One second of a 100 Hz sine at 48 kHz.
     fn clip() -> Clip {
-        let wave: Vec<f32> = (0..48_000).map(|i| (i as f32 * 100.0 / 48_000.0 * std::f32::consts::TAU).sin() * 0.5).collect();
-        Clip { name: String::new(), sample_rate: 48_000, left: wave.clone(), right: wave }
+        let wave: Vec<f32> = (0..48_000)
+            .map(|i| (i as f32 * 100.0 / 48_000.0 * std::f32::consts::TAU).sin() * 0.5)
+            .collect();
+        Clip {
+            name: String::new(),
+            sample_rate: 48_000,
+            left: wave.clone(),
+            right: wave,
+        }
     }
 
     fn crossings(s: &[f32]) -> usize {
@@ -350,8 +402,23 @@ mod tests {
         let c = clip();
         let positions: Vec<u64> = (0..frames as u64).collect();
         let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
-        let notes = [PlayNote { start: 0, end: frames as u64 / 2, key, velocity: 127 }];
-        s.render(p, Some(&c), slices, &notes, &positions, &[], 48_000.0, &mut l, &mut r);
+        let notes = [PlayNote {
+            start: 0,
+            end: frames as u64 / 2,
+            key,
+            velocity: 127,
+        }];
+        s.render(
+            p,
+            Some(&c),
+            slices,
+            &notes,
+            &positions,
+            &[],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         l
     }
 
@@ -360,8 +427,14 @@ mod tests {
         let p = InstrumentKind::Sampler.defaults();
         let at_root = crossings(&play(&p, &[], 60, 19_200)[..9600]);
         let octave_up = crossings(&play(&p, &[], 72, 19_200)[..9600]);
-        assert!((at_root as i32 - 20).abs() <= 1, "100 Hz for 0.2 s: {at_root}");
-        assert!((octave_up as i32 - 40).abs() <= 1, "an octave up: {octave_up}");
+        assert!(
+            (at_root as i32 - 20).abs() <= 1,
+            "100 Hz for 0.2 s: {at_root}"
+        );
+        assert!(
+            (octave_up as i32 - 40).abs() <= 1,
+            "an octave up: {octave_up}"
+        );
     }
 
     #[test]
@@ -374,7 +447,12 @@ mod tests {
         let loud = |a: usize, b: usize| out[a..b].iter().fold(0.0f32, |m, s| m.max(s.abs()));
         assert!(loud(1000, 11_000) > 0.1, "plays");
         assert!(loud(12_100, 48_000) < 1e-6, "stops at the slice's end");
-        assert!(play(&p, &slices, FIRST_SLICE_KEY + 9, 4800).iter().all(|s| *s == 0.0), "no slice there");
+        assert!(
+            play(&p, &slices, FIRST_SLICE_KEY + 9, 4800)
+                .iter()
+                .all(|s| *s == 0.0),
+            "no slice there"
+        );
     }
 
     #[test]
@@ -383,19 +461,40 @@ mod tests {
         p[param::LOOP] = 1.0;
         p[param::END] = 10.0; // the first tenth of a second, looped
         let out = play(&p, &[], 60, 96_000);
-        assert!(out[40_000..46_000].iter().any(|s| s.abs() > 0.1), "still sounding long after the end, while held");
+        assert!(
+            out[40_000..46_000].iter().any(|s| s.abs() > 0.1),
+            "still sounding long after the end, while held"
+        );
         p[param::LOOP] = 0.0;
         p[param::REVERSE] = 1.0;
         let back = play(&p, &[], 60, 9600);
-        assert!(back[100] < 0.0 && back[1].abs() < 0.05, "starts from the end, faded in");
+        assert!(
+            back[100] < 0.0 && back[1].abs() < 0.05,
+            "starts from the end, faded in"
+        );
     }
 
     #[test]
     fn nothing_loaded_is_silent() {
         let mut s = Sampler::new();
         let (mut l, mut r) = (vec![0.0; 100], vec![0.0; 100]);
-        let notes = [PlayNote { start: 0, end: 50, key: 60, velocity: 100 }];
-        s.render(&InstrumentKind::Sampler.defaults(), None, &[], &notes, &(0..100).collect::<Vec<_>>(), &[], 48_000.0, &mut l, &mut r);
+        let notes = [PlayNote {
+            start: 0,
+            end: 50,
+            key: 60,
+            velocity: 100,
+        }];
+        s.render(
+            &InstrumentKind::Sampler.defaults(),
+            None,
+            &[],
+            &notes,
+            &(0..100).collect::<Vec<_>>(),
+            &[],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         assert!(l.iter().all(|s| *s == 0.0));
     }
 }

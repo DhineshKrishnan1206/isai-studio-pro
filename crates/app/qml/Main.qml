@@ -24,6 +24,8 @@ ApplicationWindow {
     property bool quitting: false
 
     // Ask to save unsaved work before the window closes.
+    // The system's motion setting may have changed while the app was in the background.
+    onActiveChanged: if (active) app.refreshOsMotion()
     onClosing: close => {
         if (!quitting && app.projectOpen && app.dirty) {
             close.accepted = false
@@ -32,6 +34,16 @@ ApplicationWindow {
     }
 
     AppController { id: app }
+
+    // Holds the keyboard whenever nothing else does, and accepts every key. A key
+    // that nobody takes would otherwise reach macOS, which answers it with its
+    // error beep.
+    Item {
+        anchors.fill: parent
+        focus: true
+        Keys.onPressed: e => { e.accepted = true }
+        Keys.onReleased: e => { e.accepted = true }
+    }
 
     // The menu bar (macOS top bar, or the strip under the title bar elsewhere).
     menuBar: AppMenuBar { studio: studio }
@@ -44,7 +56,8 @@ ApplicationWindow {
     }
     Binding {
         target: Theme; property: "motionMs"
-        value: app.animations === "full" ? 200 : app.animations === "reduced" ? 90 : 0
+        // The system's "reduce motion" turns full animations into the reduced ones.
+        value: app.animations === "off" ? 0 : app.animations === "full" && !app.osReduceMotion ? 200 : 90
     }
     Binding { target: Theme; property: "effects"; value: app.effects }
     Binding { target: Theme; property: "style"; value: app.uiStyle || "studio" }

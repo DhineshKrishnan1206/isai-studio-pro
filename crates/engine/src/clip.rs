@@ -60,7 +60,12 @@ impl Clip {
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
-        Ok(Self { name, sample_rate: target_rate, left, right })
+        Ok(Self {
+            name,
+            sample_rate: target_rate,
+            left,
+            right,
+        })
     }
 }
 
@@ -74,7 +79,12 @@ fn decode(path: &Path) -> anyhow::Result<(Vec<f32>, usize, u32)> {
     }
 
     let mut format = symphonia::default::get_probe()
-        .probe(&hint, source, FormatOptions::default(), MetadataOptions::default())
+        .probe(
+            &hint,
+            source,
+            FormatOptions::default(),
+            MetadataOptions::default(),
+        )
         .context("unsupported or damaged audio file")?;
     let track = format
         .default_track(TrackType::Audio)
@@ -98,7 +108,11 @@ fn decode(path: &Path) -> anyhow::Result<(Vec<f32>, usize, u32)> {
             Ok(None) => break,
             // Some valid files (e.g. from some FLAC encoders) report the end of
             // the stream this way; once audio has been decoded, it just means "done".
-            Err(DecodeError::IoError(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof && !samples.is_empty() => break,
+            Err(DecodeError::IoError(e))
+                if e.kind() == std::io::ErrorKind::UnexpectedEof && !samples.is_empty() =>
+            {
+                break;
+            }
             Err(err) => return Err(err.into()),
         };
         if packet.track_id != track_id {
@@ -162,7 +176,10 @@ impl Peaks {
                 })
             })
             .collect();
-        Self { frames_per_peak: Self::FRAMES_PER_PEAK, values }
+        Self {
+            frames_per_peak: Self::FRAMES_PER_PEAK,
+            values,
+        }
     }
 }
 
@@ -178,7 +195,10 @@ mod tests {
             .collect();
         let (out, out_frames) = resample(&input, 2, frames, 44_100, 48_000).unwrap();
         assert_eq!(out.len(), out_frames * 2);
-        assert!((out_frames as i64 - 48_000).abs() <= 1, "got {out_frames} frames");
+        assert!(
+            (out_frames as i64 - 48_000).abs() <= 1,
+            "got {out_frames} frames"
+        );
     }
 
     #[test]

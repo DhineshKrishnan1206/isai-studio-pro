@@ -38,7 +38,10 @@ impl Recorder {
             let result = write(&mut queue, &path, sample_rate, &flag).map(|frames| (path, frames));
             (queue, result)
         });
-        Self { stop, handle: Some(handle) }
+        Self {
+            stop,
+            handle: Some(handle),
+        }
     }
 
     /// Asks the writer to finish once the queue is empty.
@@ -57,7 +60,12 @@ impl Recorder {
     }
 }
 
-fn write(queue: &mut rtrb::Consumer<f32>, path: &Path, sample_rate: u32, stop: &AtomicBool) -> anyhow::Result<u64> {
+fn write(
+    queue: &mut rtrb::Consumer<f32>,
+    path: &Path,
+    sample_rate: u32,
+    stop: &AtomicBool,
+) -> anyhow::Result<u64> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }

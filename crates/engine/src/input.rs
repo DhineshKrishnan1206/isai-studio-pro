@@ -21,15 +21,31 @@ pub struct InputDevice {
 
 pub fn list_input_devices() -> Vec<InputDevice> {
     let host = cpal::default_host();
-    let default_id = host.default_input_device().and_then(|d| d.id().ok()).map(|id| id.to_string());
-    let Ok(devices) = host.input_devices() else { return Vec::new() };
+    let default_id = host
+        .default_input_device()
+        .and_then(|d| d.id().ok())
+        .map(|id| id.to_string());
+    let Ok(devices) = host.input_devices() else {
+        return Vec::new();
+    };
     devices
         .filter_map(|device| {
             let id = device.id().ok()?.to_string();
-            let name = device.description().map(|d| d.name().to_owned()).unwrap_or_else(|_| id.clone());
-            let channels = device.default_input_config().map(|c| c.channels()).unwrap_or(1);
+            let name = device
+                .description()
+                .map(|d| d.name().to_owned())
+                .unwrap_or_else(|_| id.clone());
+            let channels = device
+                .default_input_config()
+                .map(|c| c.channels())
+                .unwrap_or(1);
             let is_default = default_id.as_deref() == Some(id.as_str());
-            Some(InputDevice { id, name, channels, is_default })
+            Some(InputDevice {
+                id,
+                name,
+                channels,
+                is_default,
+            })
         })
         .collect()
 }
@@ -59,12 +75,19 @@ pub fn start_input(
     out_rate: u32,
 ) -> anyhow::Result<(Input, rtrb::Consumer<f32>)> {
     let host = cpal::default_host();
-    let saved = device_id.and_then(|id| id.parse().ok()).and_then(|id| host.device_by_id(&id));
+    let saved = device_id
+        .and_then(|id| id.parse().ok())
+        .and_then(|id| host.device_by_id(&id));
     let device = saved
         .or_else(|| host.default_input_device())
         .ok_or_else(|| anyhow!("no microphone or audio input found"))?;
-    let device_name = device.description().map(|d| d.name().to_owned()).unwrap_or_else(|_| "Input".into());
-    let supported = device.default_input_config().context("the input didn't report a usable format")?;
+    let device_name = device
+        .description()
+        .map(|d| d.name().to_owned())
+        .unwrap_or_else(|_| "Input".into());
+    let supported = device
+        .default_input_config()
+        .context("the input didn't report a usable format")?;
     let config = supported.config();
     // One second of queued stereo audio.
     let (tx, rx) = rtrb::RingBuffer::new(out_rate as usize * 2);
@@ -78,10 +101,22 @@ pub fn start_input(
         other => Err(anyhow!("unsupported input sample format {other}")),
     }?;
     stream.play().context("couldn't start the input")?;
-    Ok((Input { _stream: stream, device_name, sample_rate: config.sample_rate, channels: config.channels }, rx))
+    Ok((
+        Input {
+            _stream: stream,
+            device_name,
+            sample_rate: config.sample_rate,
+            channels: config.channels,
+        },
+        rx,
+    ))
 }
 
-fn build<T: SizedSample + 'static>(device: &Device, config: &StreamConfig, mut state: Capture) -> anyhow::Result<cpal::Stream>
+fn build<T: SizedSample + 'static>(
+    device: &Device,
+    config: &StreamConfig,
+    mut state: Capture,
+) -> anyhow::Result<cpal::Stream>
 where
     f32: FromSample<T>,
 {
@@ -90,7 +125,11 @@ where
         *config,
         move |data: &[T], _| {
             for frame in data.chunks_exact(channels) {
-                let get = |i: u16| frame.get(usize::from(i)).map_or(0.0, |s| <f32 as FromSample<T>>::from_sample_(*s));
+                let get = |i: u16| {
+                    frame
+                        .get(usize::from(i))
+                        .map_or(0.0, |s| <f32 as FromSample<T>>::from_sample_(*s))
+                };
                 let (l, r) = match state.select {
                     InputChannels::Mono(c) => {
                         let s = get(c);
@@ -121,14 +160,28 @@ struct Capture {
 }
 
 impl Capture {
-    fn new(select: InputChannels, channels: u16, in_rate: u32, out_rate: u32, tx: rtrb::Producer<f32>) -> Self {
+    fn new(
+        select: InputChannels,
+        channels: u16,
+        in_rate: u32,
+        out_rate: u32,
+        tx: rtrb::Producer<f32>,
+    ) -> Self {
         // A stereo pair needs two channels; fall back to mono on a mono input.
         let select = match select {
-            InputChannels::Stereo(c) if c + 1 >= channels => InputChannels::Mono(c.min(channels.saturating_sub(1))),
+            InputChannels::Stereo(c) if c + 1 >= channels => {
+                InputChannels::Mono(c.min(channels.saturating_sub(1)))
+            }
             InputChannels::Mono(c) if c >= channels => InputChannels::Mono(0),
             s => s,
         };
-        Self { select, step: f64::from(in_rate) / f64::from(out_rate), frac: 0.0, prev: (0.0, 0.0), tx }
+        Self {
+            select,
+            step: f64::from(in_rate) / f64::from(out_rate),
+            frac: 0.0,
+            prev: (0.0, 0.0),
+            tx,
+        }
     }
 
     #[inline]
@@ -140,7 +193,10 @@ impl Capture {
         // Emit every output sample that falls between the previous input sample and this one.
         while self.frac < 1.0 {
             let t = self.frac as f32;
-            let out = (self.prev.0 + (l - self.prev.0) * t, self.prev.1 + (r - self.prev.1) * t);
+            let out = (
+                self.prev.0 + (l - self.prev.0) * t,
+                self.prev.1 + (r - self.prev.1) * t,
+            );
             self.emit(out.0, out.1);
             self.frac += self.step;
         }
@@ -163,7 +219,10 @@ mod tests {
 
     fn capture(in_rate: u32, out_rate: u32) -> (Capture, rtrb::Consumer<f32>) {
         let (tx, rx) = rtrb::RingBuffer::new(10_000);
-        (Capture::new(InputChannels::Mono(0), 1, in_rate, out_rate, tx), rx)
+        (
+            Capture::new(InputChannels::Mono(0), 1, in_rate, out_rate, tx),
+            rx,
+        )
     }
 
     #[test]

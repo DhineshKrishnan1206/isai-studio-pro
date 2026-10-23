@@ -105,12 +105,20 @@ impl Shape {
         let step = |ms: f32| 1.0 / (ms.max(0.5) * 0.001 * rate);
         // Exponential decay/release reaching ~0.1% in the set time.
         let coef = |ms: f32| (-6.9 * step(ms)).exp();
-        Shape { attack: step(attack_ms), decay: coef(decay_ms), sustain: sustain.clamp(0.0, 1.0), release: coef(release_ms) }
+        Shape {
+            attack: step(attack_ms),
+            decay: coef(decay_ms),
+            sustain: sustain.clamp(0.0, 1.0),
+            release: coef(release_ms),
+        }
     }
 }
 
 impl Env {
-    const OFF: Env = Env { stage: Stage::Off, level: 0.0 };
+    const OFF: Env = Env {
+        stage: Stage::Off,
+        level: 0.0,
+    };
 
     fn trigger(&mut self) {
         self.stage = Stage::Attack;
@@ -300,7 +308,11 @@ impl Synth {
     }
 
     pub fn keys(&mut self) -> (u128, u128) {
-        let held = self.voices.iter().filter(|v| v.held()).fold(0u128, |m, v| m | 1 << (v.key & 127));
+        let held = self
+            .voices
+            .iter()
+            .filter(|v| v.held())
+            .fold(0u128, |m, v| m | 1 << (v.key & 127));
         (held, std::mem::take(&mut self.struck))
     }
 
@@ -369,10 +381,24 @@ impl Synth {
             .or_else(|| {
                 (0..VOICES)
                     .filter(|&i| self.voices[i].amp.stage == Stage::Release)
-                    .min_by(|&a, &b| self.voices[a].amp.level.total_cmp(&self.voices[b].amp.level))
+                    .min_by(|&a, &b| {
+                        self.voices[a]
+                            .amp
+                            .level
+                            .total_cmp(&self.voices[b].amp.level)
+                    })
             })
             .unwrap_or_else(|| (0..VOICES).min_by_key(|&i| self.voices[i].age).unwrap_or(0));
-        let mut v = Voice { key, velocity: vel, end, live, age: self.clock, freq: start, target: freq, ..Voice::OFF };
+        let mut v = Voice {
+            key,
+            velocity: vel,
+            end,
+            live,
+            age: self.clock,
+            freq: start,
+            target: freq,
+            ..Voice::OFF
+        };
         // Spread out the starting phases so unison copies don't start in step.
         for (u, (a, b)) in v.phase_a.iter_mut().zip(v.phase_b.iter_mut()).enumerate() {
             *a = (u as f32 * 0.618_034 + self.clock as f32 * 0.1) % 1.0;
@@ -453,7 +479,9 @@ impl Synth {
                     }
                 }
             } else if n.on && n.velocity > 0 {
-                if self.stack_len < self.stack.len() && !self.stack[..self.stack_len].contains(&n.key) {
+                if self.stack_len < self.stack.len()
+                    && !self.stack[..self.stack_len].contains(&n.key)
+                {
                     self.stack[self.stack_len] = n.key;
                     self.stack_len += 1;
                 }
@@ -483,7 +511,11 @@ impl Synth {
         let mut detunes = [1.0f32; MAX_UNISON];
         let mut pans = [(1.0f32, 1.0f32); MAX_UNISON];
         for u in 0..unison {
-            let x = if unison == 1 { 0.0 } else { u as f32 / (unison - 1) as f32 * 2.0 - 1.0 };
+            let x = if unison == 1 {
+                0.0
+            } else {
+                u as f32 / (unison - 1) as f32 * 2.0 - 1.0
+            };
             detunes[u] = 2f32.powf(x * uni_cents / 1200.0);
             let angle = (x * spread + 1.0) * FRAC_PI_4;
             pans[u] = (angle.cos() * 2f32.sqrt(), angle.sin() * 2f32.sqrt());
@@ -500,11 +532,25 @@ impl Synth {
         let drive_gain = 1.0 + 9.0 * drive;
         let drive_norm = 1.0 / drive_gain.sqrt();
         let amp_shape = Shape::new(p[ATTACK], p[DECAY], p[SUSTAIN] / 100.0, p[RELEASE], rate);
-        let filter_shape = Shape::new(p[F_ATTACK], p[F_DECAY], p[F_SUSTAIN] / 100.0, p[F_RELEASE], rate);
-        let glide = if p[GLIDE] > 0.5 { (-1.0 / (p[GLIDE] * 0.001 * rate)).exp() } else { 0.0 };
+        let filter_shape = Shape::new(
+            p[F_ATTACK],
+            p[F_DECAY],
+            p[F_SUSTAIN] / 100.0,
+            p[F_RELEASE],
+            rate,
+        );
+        let glide = if p[GLIDE] > 0.5 {
+            (-1.0 / (p[GLIDE] * 0.001 * rate)).exp()
+        } else {
+            0.0
+        };
         let lfo_step = p[LFO_RATE].max(0.01) / rate;
         let lfo_shape = p[LFO_SHAPE].round() as u32;
-        let lfo_fade = if p[LFO_DELAY] > 0.5 { 1.0 / (p[LFO_DELAY] * 0.001 * rate) } else { 0.0 };
+        let lfo_fade = if p[LFO_DELAY] > 0.5 {
+            1.0 / (p[LFO_DELAY] * 0.001 * rate)
+        } else {
+            0.0
+        };
         let lfo_depth = (p[LFO_DEPTH] / 100.0).clamp(0.0, 1.0);
         let lfo_target = p[LFO_TARGET].round() as u32;
         let sens = (p[VELOCITY] / 100.0).clamp(0.0, 1.0);
@@ -552,7 +598,11 @@ impl Synth {
                 4 => self.lfo_hold,
                 _ => (t * TAU).sin(),
             };
-            let fade = if lfo_fade > 0.0 { (self.lfo_age as f32 * lfo_fade).min(1.0) } else { 1.0 };
+            let fade = if lfo_fade > 0.0 {
+                (self.lfo_age as f32 * lfo_fade).min(1.0)
+            } else {
+                1.0
+            };
             self.lfo_age = self.lfo_age.saturating_add(1);
             let lfo = shape * lfo_depth * fade;
             self.lfo_phase += lfo_step;
@@ -560,10 +610,26 @@ impl Synth {
                 self.lfo_phase -= 1.0;
                 self.lfo_hold = self.noise();
             }
-            let pitch_mod = if lfo_target == 0 { 2f32.powf(lfo / 12.0) } else { 1.0 };
-            let filter_mod = if lfo_target == 1 { 2f32.powf(lfo * 3.0) } else { 1.0 };
-            let amp_mod = if lfo_target == 2 { 1.0 - 0.5 * (lfo + lfo_depth * fade) } else { 1.0 };
-            let (pan_l, pan_r) = if lfo_target == 3 { (1.0 - lfo.max(0.0), 1.0 + lfo.min(0.0)) } else { (1.0, 1.0) };
+            let pitch_mod = if lfo_target == 0 {
+                2f32.powf(lfo / 12.0)
+            } else {
+                1.0
+            };
+            let filter_mod = if lfo_target == 1 {
+                2f32.powf(lfo * 3.0)
+            } else {
+                1.0
+            };
+            let amp_mod = if lfo_target == 2 {
+                1.0 - 0.5 * (lfo + lfo_depth * fade)
+            } else {
+                1.0
+            };
+            let (pan_l, pan_r) = if lfo_target == 3 {
+                (1.0 - lfo.max(0.0), 1.0 + lfo.min(0.0))
+            } else {
+                (1.0, 1.0)
+            };
 
             let (mut out_l, mut out_r) = (0.0, 0.0);
             for vi in 0..VOICES {
@@ -579,7 +645,11 @@ impl Synth {
                 }
                 let fenv = v.filter.next(&filter_shape);
                 // Glide toward the target pitch.
-                v.freq = if glide > 0.0 { v.target + (v.freq - v.target) * glide } else { v.target };
+                v.freq = if glide > 0.0 {
+                    v.target + (v.freq - v.target) * glide
+                } else {
+                    v.target
+                };
                 let f = v.freq * pitch_mod;
 
                 // Oscillators (unison copies), sub and noise.
@@ -588,7 +658,8 @@ impl Synth {
                     let fu = f * detunes[u];
                     let dta = (fu * ratio_a / rate).min(0.49);
                     let dtb = (fu * ratio_b / rate).min(0.49);
-                    let s = osc(wave_a, v.phase_a[u], dta, width, n) * gain_a + osc(wave_b, v.phase_b[u], dtb, width, n) * gain_b;
+                    let s = osc(wave_a, v.phase_a[u], dta, width, n) * gain_a
+                        + osc(wave_b, v.phase_b[u], dtb, width, n) * gain_b;
                     v.phase_a[u] = (v.phase_a[u] + dta) % 1.0;
                     v.phase_b[u] = (v.phase_b[u] + dtb) % 1.0;
                     sl += s * pans[u].0;
@@ -616,7 +687,8 @@ impl Synth {
                 if v.tick == 0 {
                     let track = (f / 261.6).powf(keytrack);
                     let env = env_octaves * fenv * (0.6 + 0.4 * v.velocity);
-                    let fc = (cutoff * track * 2f32.powf(env) * filter_mod).clamp(20.0, rate * 0.45);
+                    let fc =
+                        (cutoff * track * 2f32.powf(env) * filter_mod).clamp(20.0, rate * 0.45);
                     let g = (PI * fc / rate).tan();
                     v.k = 1.0 / q;
                     v.a1 = 1.0 / (1.0 + g * (g + v.k));
@@ -664,7 +736,14 @@ mod tests {
         InstrumentKind::Synth.defaults()
     }
 
-    fn run(synth: &mut Synth, p: &[f32; MAX_INST_PARAMS], notes: &[PlayNote], from: u64, frames: usize, live: &[LiveNote]) -> (Vec<f32>, Vec<f32>) {
+    fn run(
+        synth: &mut Synth,
+        p: &[f32; MAX_INST_PARAMS],
+        notes: &[PlayNote],
+        from: u64,
+        frames: usize,
+        live: &[LiveNote],
+    ) -> (Vec<f32>, Vec<f32>) {
         let positions: Vec<u64> = (from..from + frames as u64).collect();
         let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
         synth.render(p, notes, &positions, live, 48_000.0, &mut l, &mut r);
@@ -676,13 +755,23 @@ mod tests {
     }
 
     fn sounding(synth: &Synth) -> Vec<u8> {
-        synth.voices.iter().filter(|v| v.held()).map(|v| v.key).collect()
+        synth
+            .voices
+            .iter()
+            .filter(|v| v.held())
+            .map(|v| v.key)
+            .collect()
     }
 
     #[test]
     fn plays_a_note_from_its_start_to_its_end() {
         let mut synth = Synth::new();
-        let notes = [PlayNote { start: 4800, end: 24_000, key: 60, velocity: 100 }];
+        let notes = [PlayNote {
+            start: 4800,
+            end: 24_000,
+            key: 60,
+            velocity: 100,
+        }];
         let (out, _) = run(&mut synth, &defaults(), &notes, 0, 48_000, &[]);
         assert_eq!(loudness(&out[..4800]), 0.0, "silent before the note");
         assert!(loudness(&out[6000..20_000]) > 0.01, "sounds during it");
@@ -694,8 +783,24 @@ mod tests {
     fn a_seek_releases_sequenced_notes_but_not_live_ones() {
         let mut synth = Synth::new();
         let p = defaults();
-        let notes = [PlayNote { start: 0, end: 1_000_000, key: 60, velocity: 100 }];
-        run(&mut synth, &p, &notes, 0, 4800, &[LiveNote { on: true, key: 72, velocity: 90 }]);
+        let notes = [PlayNote {
+            start: 0,
+            end: 1_000_000,
+            key: 60,
+            velocity: 100,
+        }];
+        run(
+            &mut synth,
+            &p,
+            &notes,
+            0,
+            4800,
+            &[LiveNote {
+                on: true,
+                key: 72,
+                velocity: 90,
+            }],
+        );
         assert_eq!(sounding(&synth).len(), 2);
         run(&mut synth, &p, &notes, 500_000, 48_000, &[]);
         assert_eq!(sounding(&synth), vec![72]);
@@ -706,7 +811,19 @@ mod tests {
         let mut synth = Synth::new();
         let positions = vec![SILENT; 9600];
         let (mut l, mut r) = (vec![0.0; 9600], vec![0.0; 9600]);
-        synth.render(&defaults(), &[], &positions, &[LiveNote { on: true, key: 64, velocity: 100 }], 48_000.0, &mut l, &mut r);
+        synth.render(
+            &defaults(),
+            &[],
+            &positions,
+            &[LiveNote {
+                on: true,
+                key: 64,
+                velocity: 100,
+            }],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         assert!(loudness(&l[2000..]) > 0.01);
     }
 
@@ -730,10 +847,29 @@ mod tests {
                     p[param::DRIVE] = 60.0;
                     p[param::RESONANCE] = 90.0;
                     let mut synth = Synth::new();
-                    let notes = [PlayNote { start: 0, end: 12_000, key: 48, velocity: 120 }, PlayNote { start: 0, end: 12_000, key: 84, velocity: 120 }];
+                    let notes = [
+                        PlayNote {
+                            start: 0,
+                            end: 12_000,
+                            key: 48,
+                            velocity: 120,
+                        },
+                        PlayNote {
+                            start: 0,
+                            end: 12_000,
+                            key: 84,
+                            velocity: 120,
+                        },
+                    ];
                     let (l, r) = run(&mut synth, &p, &notes, 0, 24_000, &[]);
-                    assert!(l.iter().chain(&r).all(|s| s.is_finite() && s.abs() < 4.0), "wave {wave} filter {filter} lfo {target}");
-                    assert!(loudness(&l[1000..10_000]) > 1e-3, "wave {wave} filter {filter} lfo {target} is silent");
+                    assert!(
+                        l.iter().chain(&r).all(|s| s.is_finite() && s.abs() < 4.0),
+                        "wave {wave} filter {filter} lfo {target}"
+                    );
+                    assert!(
+                        loudness(&l[1000..10_000]) > 1e-3,
+                        "wave {wave} filter {filter} lfo {target} is silent"
+                    );
                 }
             }
         }
@@ -753,13 +889,34 @@ mod tests {
             p[param::ENV_AMOUNT] = 0.0;
             p[param::OCT_A] = oct;
             let mut synth = Synth::new();
-            let (l, _) = run(&mut synth, &p, &[PlayNote { start: 0, end: 48_000, key: 57, velocity: 100 }], 0, 48_000, &[]);
+            let (l, _) = run(
+                &mut synth,
+                &p,
+                &[PlayNote {
+                    start: 0,
+                    end: 48_000,
+                    key: 57,
+                    velocity: 100,
+                }],
+                0,
+                48_000,
+                &[],
+            );
             crossings(&l[4800..43_200])
         };
         let (down, mid, up) = (tone(1.0), tone(2.0), tone(3.0));
-        assert!((mid as f32 / 0.8 - 220.0).abs() < 4.0, "A3 is 220 Hz: {mid}");
-        assert!((down as f32 * 2.0 - mid as f32).abs() < 4.0, "an octave down: {down}");
-        assert!((up as f32 - mid as f32 * 2.0).abs() < 6.0, "an octave up: {up}");
+        assert!(
+            (mid as f32 / 0.8 - 220.0).abs() < 4.0,
+            "A3 is 220 Hz: {mid}"
+        );
+        assert!(
+            (down as f32 * 2.0 - mid as f32).abs() < 4.0,
+            "an octave down: {down}"
+        );
+        assert!(
+            (up as f32 - mid as f32 * 2.0).abs() < 6.0,
+            "an octave up: {up}"
+        );
     }
 
     #[test]
@@ -772,7 +929,19 @@ mod tests {
         p[param::LFO_DELAY] = 1000.0;
         p[param::SUSTAIN] = 100.0;
         let mut synth = Synth::new();
-        let (l, _) = run(&mut synth, &p, &[PlayNote { start: 0, end: 96_000, key: 60, velocity: 100 }], 0, 96_000, &[]);
+        let (l, _) = run(
+            &mut synth,
+            &p,
+            &[PlayNote {
+                start: 0,
+                end: 96_000,
+                key: 60,
+                velocity: 100,
+            }],
+            0,
+            96_000,
+            &[],
+        );
         // Loudness of each 1/16 s window; the spread between loud and quiet grows.
         let wobble = |a: usize, b: usize| {
             let w: Vec<f32> = l[a..b].chunks(3000).map(loudness).collect();
@@ -792,7 +961,19 @@ mod tests {
         p[param::UNISON] = 6.0; // seven voices
         p[param::SPREAD] = 100.0;
         let mut synth = Synth::new();
-        let (l, r) = run(&mut synth, &p, &[PlayNote { start: 0, end: 48_000, key: 60, velocity: 100 }], 0, 24_000, &[]);
+        let (l, r) = run(
+            &mut synth,
+            &p,
+            &[PlayNote {
+                start: 0,
+                end: 48_000,
+                key: 60,
+                velocity: 100,
+            }],
+            0,
+            24_000,
+            &[],
+        );
         let diff: f32 = l.iter().zip(&r).map(|(a, b)| (a - b).abs()).sum();
         assert!(diff > 1.0, "left and right differ");
     }
@@ -803,15 +984,43 @@ mod tests {
         p[param::MONO] = 2.0;
         p[param::GLIDE] = 100.0;
         let mut synth = Synth::new();
-        let live = |on, key| LiveNote { on, key, velocity: 100 };
+        let live = |on, key| LiveNote {
+            on,
+            key,
+            velocity: 100,
+        };
         let positions = vec![SILENT; 480];
         let (mut l, mut r) = (vec![0.0; 480], vec![0.0; 480]);
-        synth.render(&p, &[], &positions, &[live(true, 48)], 48_000.0, &mut l, &mut r);
-        synth.render(&p, &[], &positions, &[live(true, 60)], 48_000.0, &mut l, &mut r);
+        synth.render(
+            &p,
+            &[],
+            &positions,
+            &[live(true, 48)],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
+        synth.render(
+            &p,
+            &[],
+            &positions,
+            &[live(true, 60)],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         assert_eq!(sounding(&synth), vec![60], "one voice");
         let f = synth.voices[0].freq;
         assert!(f > 130.0 && f < 261.0, "gliding up: {f}");
-        synth.render(&p, &[], &positions, &[live(false, 60)], 48_000.0, &mut l, &mut r);
+        synth.render(
+            &p,
+            &[],
+            &positions,
+            &[live(false, 60)],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         assert_eq!(sounding(&synth), vec![48], "back to the key still held");
     }
 
@@ -821,11 +1030,50 @@ mod tests {
         let p = defaults();
         let positions = vec![SILENT; 480];
         let (mut l, mut r) = (vec![0.0; 480], vec![0.0; 480]);
-        let pedal = |on| LiveNote { on, key: SUSTAIN_PEDAL, velocity: 0 };
-        synth.render(&p, &[], &positions, &[pedal(true), LiveNote { on: true, key: 60, velocity: 100 }], 48_000.0, &mut l, &mut r);
-        synth.render(&p, &[], &positions, &[LiveNote { on: false, key: 60, velocity: 0 }], 48_000.0, &mut l, &mut r);
+        let pedal = |on| LiveNote {
+            on,
+            key: SUSTAIN_PEDAL,
+            velocity: 0,
+        };
+        synth.render(
+            &p,
+            &[],
+            &positions,
+            &[
+                pedal(true),
+                LiveNote {
+                    on: true,
+                    key: 60,
+                    velocity: 100,
+                },
+            ],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
+        synth.render(
+            &p,
+            &[],
+            &positions,
+            &[LiveNote {
+                on: false,
+                key: 60,
+                velocity: 0,
+            }],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         assert_eq!(sounding(&synth), vec![60], "held by the pedal");
-        synth.render(&p, &[], &positions, &[pedal(false)], 48_000.0, &mut l, &mut r);
+        synth.render(
+            &p,
+            &[],
+            &positions,
+            &[pedal(false)],
+            48_000.0,
+            &mut l,
+            &mut r,
+        );
         assert!(sounding(&synth).is_empty(), "let go with the pedal");
     }
 }

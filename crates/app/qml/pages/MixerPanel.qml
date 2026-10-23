@@ -60,7 +60,8 @@ Item {
     x: margin
     width: parent.width - margin * 2
     height: Math.max(240, Math.min(parent.height * 0.7, dockHeight))
-    y: parent.height - height - margin
+    y: shown ? parent.height - height - margin : parent.height
+    Behavior on y { NumberAnimation { duration: Theme.slow; easing.type: Easing.OutCubic } }
 
     visible: opacity > 0
     opacity: shown ? 1 : 0

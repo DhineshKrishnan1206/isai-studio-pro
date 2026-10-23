@@ -134,9 +134,7 @@ nav .menu .menu-links a:hover { background: var(--raised); }
 .arr-lane .name { padding: 0 16px; font: 500 13px var(--sans); color: var(--ink2); display: flex; align-items: center; gap: 10px; }
 .arr-lane .name i { width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
 .arr-lane .track { position: relative; height: 100%; }
-.clip { position: absolute; top: 7px; bottom: 7px; border-radius: 4px; background: color-mix(in srgb, var(--c) 28%, var(--card)); border: 1px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: inset 0 3px 0 var(--c); cursor: pointer; padding: 0; transition: background .25s ease, opacity .25s ease, filter .25s ease; }
-.clip:hover { background: color-mix(in srgb, var(--c) 42%, var(--card)); }
-.clip[aria-pressed="true"] { opacity: 0.35; filter: grayscale(0.8); box-shadow: none; }
+.clip { position: absolute; top: 7px; bottom: 7px; border-radius: 4px; background: color-mix(in srgb, var(--c) 28%, var(--card)); border: 1px solid color-mix(in srgb, var(--c) 70%, transparent); box-shadow: inset 0 3px 0 var(--c); }
 .clip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .arr { --lane: 150px; }
 .arr-play { pointer-events: none; position: absolute; top: 0; bottom: 0; left: var(--lane); width: 1px; background: var(--ink); animation: sweep-arr 9s linear infinite; box-shadow: 0 0 10px rgba(255,255,255,0.45); }
@@ -182,7 +180,8 @@ nav .menu .menu-links a:hover { background: var(--raised); }
 .try .kit { position: relative; margin: 0 0 40px; }
 .try .kit svg { width: 100%; height: auto; display: block; overflow: visible; }
 .kit .part { fill: color-mix(in srgb, var(--cream) 8%, transparent); stroke: color-mix(in srgb, var(--cream) 55%, transparent); stroke-width: 1.5; cursor: pointer; transform-box: fill-box; transform-origin: center; transition: fill .2s ease; }
-.kit .part:hover, .kit .part:focus-visible { fill: color-mix(in srgb, var(--gold) 30%, transparent); outline: none; }
+.kit .part:hover { fill: color-mix(in srgb, var(--gold) 30%, transparent); }
+.kit .part:focus-visible { fill: color-mix(in srgb, var(--gold) 30%, transparent); stroke: var(--ink); stroke-width: 3; outline: none; }
 .kit .part.hit { animation: hit .22s var(--ease); fill: color-mix(in srgb, var(--gold) 55%, transparent); }
 @keyframes hit { 0% { transform: scale(0.95); } 45% { transform: scale(1.04); } 100% { transform: scale(1); } }
 .kit .shell { fill: none; stroke: color-mix(in srgb, var(--cream) 28%, transparent); stroke-width: 1.5; pointer-events: none; }
@@ -348,9 +347,8 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
 
 <div class="strip">
   <div class="wrap">
-    <span class="new">NEW</span>
-    <span>Isai 0.0.1 is out, with a new look in the Meadow palette.</span>
-    <a href="#get">Build it from source</a>
+    <span>Development builds for Windows, macOS and Linux are available.</span>
+    <a href="https://github.com/DhineshKrishnan1206/isai-studio-pro/actions/workflows/package.yml" target="_blank" rel="noopener">Try a build on GitHub Actions</a>
   </div>
 </div>
 
@@ -368,7 +366,7 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
     </div>
     <div class="right">
       <a class="pill" href="https://github.com/DhineshKrishnan1206/isai-studio-pro"><i class="ph ph-github-logo"></i> GitHub</a>
-      <a class="pill dark" href="#get">Get Isai</a>
+      <a class="pill dark" href="https://github.com/DhineshKrishnan1206/isai-studio-pro/actions/workflows/package.yml" target="_blank" rel="noopener">Try a build</a>
     </div>
     <details class="menu">
       <summary>Menu</summary>
@@ -401,15 +399,15 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
     <h1>every song starts <em>somewhere.</em></h1>
     <p class="lede">A free music studio for any computer. Record, write, mix and master on macOS, Windows and Linux, offline and yours.</p>
     <div class="ctas">
-      <a class="btn primary" href="#get">Get Isai free</a>
+      <a class="btn primary" href="https://github.com/DhineshKrishnan1206/isai-studio-pro/actions/workflows/package.yml" target="_blank" rel="noopener">Try a development build</a>
       <a class="btn ghost" href="#first">Start your first song</a>
     </div>
     <div class="arr" aria-hidden="true">
       <div class="arr-head"><span>ARRANGEMENT · 64 BARS</span><span>120 BPM · 4/4 · C MAJOR</span></div>
-      <div class="arr-lane" style="--c:var(--gold)"><div class="name"><i></i>drums</div><div class="track"><button type="button" class="clip" style="left:0;width:22%" aria-pressed="false" aria-label="Mute this clip"></button><button type="button" class="clip" style="left:24%;width:30%" aria-pressed="false" aria-label="Mute this clip"></button><button type="button" class="clip" style="left:58%;width:40%" aria-pressed="false" aria-label="Mute this clip"></button></div></div>
-      <div class="arr-lane" style="--c:var(--teal)"><div class="name"><i></i>bass</div><div class="track"><button type="button" class="clip" style="left:4%;width:44%" aria-pressed="false" aria-label="Mute this clip"></button><button type="button" class="clip" style="left:52%;width:46%" aria-pressed="false" aria-label="Mute this clip"></button></div></div>
-      <div class="arr-lane" style="--c:var(--pink)"><div class="name"><i></i>keys</div><div class="track"><button type="button" class="clip" style="left:16%;width:26%" aria-pressed="false" aria-label="Mute this clip"></button><button type="button" class="clip" style="left:46%;width:24%" aria-pressed="false" aria-label="Mute this clip"></button><button type="button" class="clip" style="left:74%;width:24%" aria-pressed="false" aria-label="Mute this clip"></button></div></div>
-      <div class="arr-lane" style="--c:var(--blue)"><div class="name"><i></i>vocal</div><div class="track"><button type="button" class="clip" style="left:30%;width:38%" aria-pressed="false" aria-label="Mute this clip"></button></div></div>
+      <div class="arr-lane" style="--c:var(--gold)"><div class="name"><i></i>drums</div><div class="track"><span class="clip" style="left:0;width:22%"></span><span class="clip" style="left:24%;width:30%"></span><span class="clip" style="left:58%;width:40%"></span></div></div>
+      <div class="arr-lane" style="--c:var(--teal)"><div class="name"><i></i>bass</div><div class="track"><span class="clip" style="left:4%;width:44%"></span><span class="clip" style="left:52%;width:46%"></span></div></div>
+      <div class="arr-lane" style="--c:var(--pink)"><div class="name"><i></i>keys</div><div class="track"><span class="clip" style="left:16%;width:26%"></span><span class="clip" style="left:46%;width:24%"></span><span class="clip" style="left:74%;width:24%"></span></div></div>
+      <div class="arr-lane" style="--c:var(--blue)"><div class="name"><i></i>vocal</div><div class="track"><span class="clip" style="left:30%;width:38%"></span></div></div>
       <div class="arr-play"></div>
     </div>
   </div>
@@ -420,20 +418,20 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
     <div class="region-head"><span class="kicker">Drum machine</span><span class="n">01 / 06</span></div>
     <h2>make a <em>beat,</em> right here.</h2>
     <p class="lede" style="margin-top:20px">Tap the squares, then press play. A small taste of the drum machine in Isai, running in your browser. Nothing to install.</p>
-    <figure class="kit" style="margin-top:56px" aria-label="Drum kit. Click a part to hear it.">
-      <svg viewBox="0 0 520 220" aria-hidden="true">
+    <figure class="kit" style="margin-top:56px">
+      <svg viewBox="0 0 520 220" role="group" aria-label="Playable drum kit">
         <line class="stand" x1="62" y1="44" x2="62" y2="196"/>
-        <ellipse class="part" data-part="hat" cx="62" cy="56" rx="50" ry="9" tabindex="0"/>
-        <ellipse class="part" data-part="tom" cx="190" cy="102" rx="54" ry="16" tabindex="0"/>
+        <ellipse class="part" data-part="hat" cx="62" cy="56" rx="50" ry="9" tabindex="0" role="button" aria-label="Play hi-hat sound" aria-keyshortcuts="Enter Space"/>
+        <ellipse class="part" data-part="tom" cx="190" cy="102" rx="54" ry="16" tabindex="0" role="button" aria-label="Play tom sound" aria-keyshortcuts="Enter Space"/>
         <ellipse class="shell" cx="190" cy="102" rx="54" ry="16"/>
-        <ellipse class="part" data-part="snare" cx="150" cy="172" rx="58" ry="16" tabindex="0"/>
+        <ellipse class="part" data-part="snare" cx="150" cy="172" rx="58" ry="16" tabindex="0" role="button" aria-label="Play snare sound" aria-keyshortcuts="Enter Space"/>
         <path class="shell" d="M92 172 V188 A58 16 0 0 0 208 188 V172"/>
-        <circle class="part" data-part="kick" cx="356" cy="132" r="64" tabindex="0"/>
+        <circle class="part" data-part="kick" cx="356" cy="132" r="64" tabindex="0" role="button" aria-label="Play kick drum sound" aria-keyshortcuts="Enter Space"/>
         <circle class="shell" cx="356" cy="132" r="48"/>
         <line class="stick l" id="stick-l" x1="240" y1="60" x2="162" y2="158"/>
         <line class="stick r" id="stick-r" x1="280" y1="60" x2="182" y2="152"/>
       </svg>
-      <figcaption>Click any part to hear it. It plays with the beat too.</figcaption>
+      <figcaption>Click or focus a drum and press Enter or Space to hear it. The kick, snare and hi-hat play with the beat too.</figcaption>
     </figure>
     <div class="seq" id="sequencer" aria-label="Drum pattern: tap a square to add or remove a sound"></div>
     <noscript><p class="try-note">The drum machine needs JavaScript. The rest of this page works without it.</p></noscript>
@@ -442,7 +440,7 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
       <label>Tempo <input id="tempo" type="range" min="80" max="160" value="110" aria-label="Tempo"> <output id="bpm" for="tempo">110</output>&nbsp;bpm</label>
     </div>
     <p class="try-note" id="try-note" hidden>Your browser cannot play sound here. The grid still works, and Isai plays it in full.</p>
-    <p class="try-next">Like it? <a href="#get">Get Isai free</a> for the rest of the studio: a playlist, a piano roll, a synth and a mixer.</p>
+    <p class="try-next">Like it? <a href="https://github.com/DhineshKrishnan1206/isai-studio-pro/actions/workflows/package.yml" target="_blank" rel="noopener">Try Isai</a> for the rest of the studio: a playlist, a piano roll, a synth and a mixer.</p>
   </div>
 </section>
 
@@ -450,10 +448,10 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
   <div class="wrap">
     <div class="region-head"><span class="kicker">Start here</span><span class="n">02 / 06</span></div>
     <h2>your first song, <em>in five steps.</em></h2>
-    <p class="lede" style="margin-top:20px">The same guide that opens in the app. Each step lights up when you do it.</p>
+    <p class="lede" style="margin-top:20px">A quick path through the basics. Scroll to follow each step.</p>
     <ol class="rail" id="rail">
       <li><b>Add a track</b><span>Tracks are the lines of sound in your song. Click Add drum track to make one.</span></li>
-      <li><b>Press play</b><span>Play starts the song from the beginning, so you can hear your track.</span></li>
+      <li><b>Press play</b><span>Press Play to hear your song.</span></li>
       <li><b>Change the tempo</b><span>Tempo is how fast the song goes. Click the number and type a new one.</span></li>
       <li><b>Open the mixer</b><span>The mixer has one fader per track. Faders set how loud each track is.</span></li>
       <li><b>Add an effect</b><span>Pick a track in the mixer and add an Equalizer. Click the i button to learn what it does.</span></li>
@@ -470,12 +468,12 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
       <article class="clip-card" style="--t:var(--blue);--d:0ms">
         <div class="bar"><span>PLAYLIST</span><span>F5</span></div>
         <figure class="clip-shot"><img src="img/c-arrange.jpg" alt="Regions with crossfades on the playlist" loading="lazy"></figure>
-        <div class="body"><h3>Arrange a song</h3><ul><li>Move, trim, split, fade and loop regions</li><li>Loops follow your tempo, pitch stays put</li><li>Audio and MIDI, as many tracks as you need</li></ul><div class="foot"><span>Open the playlist</span><kbd>F5</kbd></div></div>
+        <div class="body"><h3>Arrange a song</h3><ul><li>Move, trim, split, fade and loop regions</li><li>Tempo-following audio stretches without changing pitch</li><li>Audio and MIDI tracks</li></ul><div class="foot"><span>Hide the editor drawers</span><kbd>F5</kbd></div></div>
       </article>
       <article class="clip-card" style="--t:var(--pink);--d:120ms">
-        <div class="bar"><span>PIANO ROLL</span><span>F7</span></div>
+        <div class="bar"><span>PIANO ROLL</span><span>F7 / P</span></div>
         <figure class="clip-shot"><img src="img/c-compose.jpg" alt="Notes in the piano roll" loading="lazy"></figure>
-        <div class="body"><h3>Write melodies</h3><ul><li>Chords in your key, in one click</li><li>Strum, arpeggiate and quantize with swing</li><li>Play with computer keys or a MIDI keyboard</li></ul><div class="foot"><span>Open the piano roll</span><kbd>F7</kbd></div></div>
+        <div class="body"><h3>Write melodies</h3><ul><li>Chords in your key, in one click</li><li>Strum, arpeggiate and quantize with swing</li><li>Play with computer keys or a MIDI keyboard</li></ul><div class="foot"><span>Open the piano roll</span><kbd>F7 / P</kbd></div></div>
       </article>
       <article class="clip-card" style="--t:var(--orange);--d:240ms">
         <div class="bar"><span>SYNTH</span><span>NEW TRACK</span></div>
@@ -488,14 +486,14 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
         <div class="body"><h3>Program beats</h3><ul><li>808, Club, Acoustic, Lo-fi and Trap kits</li><li>Click or paint steps, accents and swing</li><li>Slice any loop into pads with the sampler</li></ul><div class="foot"><span>Add a Drum machine</span><kbd>New track</kbd></div></div>
       </article>
       <article class="clip-card" style="--t:var(--teal);--d:120ms">
-        <div class="bar"><span>MIXER</span><span>F9</span></div>
+        <div class="bar"><span>MIXER</span><span>F9 / X</span></div>
         <figure class="clip-shot"><img src="img/c-bands.jpg" alt="The mixer's EQ band controls" loading="lazy"></figure>
-        <div class="body"><h3>Mix it</h3><ul><li>An inspector and a mixer with buses and sends</li><li>13 effects, from EQ to Pitch Correct</li><li>Automate any knob over time</li></ul><div class="foot"><span>Open the mixer</span><kbd>F9</kbd></div></div>
+        <div class="body"><h3>Mix it</h3><ul><li>An inspector and a mixer with buses and sends</li><li>13 effects, from EQ to Pitch Correct</li><li>Automate volume, pan, sends and supported effect controls</li></ul><div class="foot"><span>Open the mixer</span><kbd>F9 / X</kbd></div></div>
       </article>
       <article class="clip-card" style="--t:var(--violet);--d:240ms">
-        <div class="bar"><span>MASTER</span><span>⌘E</span></div>
+        <div class="bar"><span>MASTER</span><span>⌘E / Ctrl+E</span></div>
         <figure class="clip-shot"><img src="img/c-eq.jpg" alt="The EQ curve over a live analyzer of the mix" loading="lazy"></figure>
-        <div class="body"><h3>Finish and share</h3><ul><li>Mastering assistant: streaming, loud or gentle loudness targets</li><li>Export the song, a section or stems</li><li>WAV and FLAC, at full quality</li></ul><div class="foot"><span>Export</span><kbd>⌘E</kbd></div></div>
+        <div class="body"><h3>Finish and share</h3><ul><li>Mastering assistant: streaming, loud or gentle loudness targets</li><li>Export the song, a section or stems</li><li>WAV and FLAC, at full quality</li></ul><div class="foot"><span>Export</span><kbd>⌘E / Ctrl+E</kbd></div></div>
       </article>
     </div>
   </div>
@@ -526,13 +524,13 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
       <div>
         <p>Isai is not a trial, a subscription or a cut-down "lite" edition.</p>
         <p>It brings together the tools that usually cost hundreds: a playlist, a piano roll, instruments, a mixer, effects and mastering, in one free app that you own.</p>
-        <p>It is built to run on the computer you already have. A dual-core laptop with 4 GB of RAM is the target, and every heavy feature can be turned down.</p>
+        <p>It is built for the computer you already have. A dual-core laptop with 4 GB of RAM is the target; Eco mode, track freeze and lighter visual settings help it scale to smaller systems.</p>
         <p>Start with a template and press play, then go as deep as you like. <em>Isai</em> (இசை) means <em>music</em> in Tamil.</p>
         <div class="links"><a href="#tools">See every tool</a><a href="#get">Build it yourself</a></div>
         <div class="sig">— isai studio</div>
       </div>
       <div class="stamps">
-        <div class="stamp"><div class="ic" style="background:var(--gold)"><i class="ph ph-heart"></i></div><b>Free</b><small>forever, GPL-3.0</small></div>
+        <div class="stamp"><div class="ic" style="background:var(--gold)"><i class="ph ph-heart"></i></div><b>Free</b><small>forever, GPL-3.0-or-later</small></div>
         <div class="stamp"><div class="ic" style="background:var(--orange)"><i class="ph ph-wifi-slash"></i></div><b>Offline</b><small>no account, no login</small></div>
         <div class="stamp"><div class="ic" style="background:var(--teal)"><i class="ph ph-cpu"></i></div><b>Low-spec</b><small>2 cores, 4 GB RAM</small></div>
         <div class="stamp"><div class="ic" style="background:var(--violet)"><i class="ph ph-code"></i></div><b>Open</b><small>read and change the code</small></div>
@@ -551,7 +549,7 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
       <div class="plugin" style="--c:var(--teal)"><i class="ph-thin ph-folder-open"></i><h3>Browser</h3><p>Preview in time, drag onto tracks</p></div>
       <div class="plugin" style="--c:var(--gold)"><i class="ph-thin ph-magic-wand"></i><h3>Mastering assistant</h3><p>EQ, compressor and limiter in one step</p></div>
       <div class="plugin" style="--c:var(--blue)"><i class="ph-thin ph-snowflake"></i><h3>Freeze</h3><p>Render heavy tracks to audio</p></div>
-      <div class="plugin" style="--c:var(--orange)"><i class="ph-thin ph-magnifying-glass"></i><h3>Command palette</h3><p>⌘K: "128 bpm", "bar 17", "A minor"</p></div>
+      <div class="plugin" style="--c:var(--orange)"><i class="ph-thin ph-magnifying-glass"></i><h3>Command palette</h3><p>⌘K / Ctrl+K: "128 bpm", "bar 17", "A minor"</p></div>
       <div class="plugin" style="--c:var(--violet)"><i class="ph-thin ph-microphone-stage"></i><h3>Pitch Correct</h3><p>From gentle touch-up to hard snap</p></div>
       <div class="plugin" style="--c:var(--teal)"><i class="ph-thin ph-floppy-disk"></i><h3>Autosave</h3><p>Crash recovery, self-contained projects</p></div>
     </div>
@@ -561,8 +559,8 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
 <section class="region" id="palette" style="--t:var(--gold)">
   <div class="wrap">
     <div class="region-head"><span class="kicker">Palette</span><span class="n">06 / 06</span></div>
-    <h2>the colours <em>of isai.</em></h2>
-    <p class="lede" style="margin-top:18px">Every track, region and button in the app takes its colour from this palette.</p>
+    <h2>the colours <em>of this page.</em></h2>
+    <p class="lede" style="margin-top:18px">A Vivid-inspired palette for the showcase.</p>
     <div class="swatches">
       <div class="sw" style="background:#000;border:1px solid var(--line-strong);color:var(--ink)"><b>Night</b><span>#000000</span></div>
       <div class="sw" style="background:var(--violet);color:#fff"><b>Violet</b><span>#8B5CF6</span></div>
@@ -588,8 +586,8 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
     <div class="keys">
       <div class="key">Play / stop <kbd>Space</kbd></div>
       <div class="key">Record <kbd>R</kbd></div>
-      <div class="key">Command palette <kbd>⌘K</kbd></div>
-      <div class="key">Cycle the selection <kbd>⌘U</kbd></div>
+      <div class="key">Command palette <kbd>⌘K / Ctrl+K</kbd></div>
+      <div class="key">Cycle the selection <kbd>⌘U / Ctrl+U</kbd></div>
       <div class="key">Add a marker <kbd>M</kbd></div>
       <div class="key">Inspector <kbd>I</kbd></div>
       <div class="key">Metronome <kbd>K</kbd></div>
@@ -602,9 +600,13 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
 <section class="region" id="get" style="--t:var(--teal);padding-top:90px">
   <div class="wrap get">
     <div>
-      <span class="kicker">Build it from source</span>
-      <h2>get it <em>from source.</em></h2>
-      <p class="lede" style="margin-top:20px">Ready-made downloads come with the first release. Until then, building it takes a few minutes.</p>
+      <span class="kicker">Download or build</span>
+      <h2>try Isai <em>today.</em></h2>
+      <p class="lede" style="margin-top:20px">Development builds for Windows, macOS and Linux are available from GitHub Actions. Choose the latest successful Package run and download its artifact. These are test builds, not stable releases.</p>
+      <p class="try-note">Windows and macOS artifacts bundle Qt. The Linux archive needs a system Qt 6.9+ runtime. macOS builds are ad-hoc signed, not notarized.</p>
+      <p style="margin-top:22px"><a class="btn primary" href="https://github.com/DhineshKrishnan1206/isai-studio-pro/actions/workflows/package.yml" target="_blank" rel="noopener">Browse development builds</a></p>
+      <h3 style="margin-top:36px;font-size:24px">Build from source</h3>
+      <p class="lede" style="margin-top:12px">To compile Isai yourself, install the tools below, then follow the commands.</p>
       <ul>
         <li><i class="ph ph-check-circle"></i><span><a href="https://rustup.rs">Rust</a> 1.88 or newer</span></li>
         <li><i class="ph ph-check-circle"></i><span>Qt 6.9 or newer</span></li>
@@ -630,7 +632,7 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
 <footer>
   <div class="wrap">
     <img src="img/wordmark-light.png" alt="Isai Studio Pro">
-    <span class="meta">GPL-3.0 · Built with Rust and Qt · Art made with tools/paint_art.py · இசை</span>
+    <span class="meta">GPL-3.0-or-later · Built with Rust and Qt · Art made with tools/paint_art.py · இசை</span>
   </div>
 </footer>
 
@@ -689,16 +691,6 @@ footer .meta { font: 400 13px var(--mono); color: var(--mute); }
     const p = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     const max = document.documentElement.scrollHeight - innerHeight;
     window.scrollTo({ top: p * max, behavior: reduce ? 'auto' : 'smooth' });
-  });
-
-
-  // Hero clips: click to mute or unmute, like a clip in the arrangement.
-  document.querySelectorAll('.arr .clip').forEach((clip) => {
-    clip.addEventListener('click', () => {
-      const muted = clip.getAttribute('aria-pressed') !== 'true';
-      clip.setAttribute('aria-pressed', String(muted));
-      clip.setAttribute('aria-label', muted ? 'Unmute this clip' : 'Mute this clip');
-    });
   });
 
   // The region the ruler names is the one at the middle of the screen.

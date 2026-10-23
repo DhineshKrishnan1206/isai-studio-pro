@@ -29,7 +29,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt }}
-          modules: qtshadertools
+          modules: qtsvg qtshadertools qtmultimedia
           cache: true
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -38,3 +38,8 @@ jobs:
           sudo apt-get install -y libasound2-dev pkg-config libgl1-mesa-dev libxkbcommon-dev libxcb1-dev libx11-xcb-dev
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - name: Build the release application
+        run: cargo build --release -p isai
+      - name: Check macOS packaging script syntax
+        if: runner.os == 'macOS'
+        run: bash -n tools/package-macos.sh

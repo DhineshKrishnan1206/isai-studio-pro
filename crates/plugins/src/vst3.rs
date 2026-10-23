@@ -13,7 +13,9 @@ use vst3_host::{Plugin, PluginWindow, Vst3Host};
 use crate::{Format, PluginInfo};
 
 pub(crate) fn scan() -> Vec<PluginInfo> {
-    let Ok(found) = vst3_host::simple::discover_plugins() else { return Vec::new() };
+    let Ok(found) = vst3_host::simple::discover_plugins() else {
+        return Vec::new();
+    };
     found
         .into_iter()
         .map(|p| {
@@ -25,7 +27,9 @@ pub(crate) fn scan() -> Vec<PluginInfo> {
                 uid: p.uid,
                 name: p.name,
                 vendor: p.vendor,
-                instrument: lower.contains("instrument") || lower.contains("synth") || lower.contains("sampler"),
+                instrument: lower.contains("instrument")
+                    || lower.contains("synth")
+                    || lower.contains("sampler"),
                 category,
                 has_gui: p.has_gui,
             }
@@ -60,11 +64,26 @@ impl Vst3Plugin {
             .output_channels(2)
             .build()
             .map_err(|e| e.to_string())?;
-        let mut plugin = if uid.is_empty() { host.load_plugin(path) } else { host.load_plugin_class(path, uid) }.map_err(|e| e.to_string())?;
+        let mut plugin = if uid.is_empty() {
+            host.load_plugin(path)
+        } else {
+            host.load_plugin_class(path, uid)
+        }
+        .map_err(|e| e.to_string())?;
         plugin.start_processing().map_err(|e| e.to_string())?;
-        let buffers = plugin.create_bus_audio_buffers(BLOCK).map_err(|e| e.to_string())?;
-        let core = Core { plugin: Arc::new(Mutex::new(plugin)), buffers: Mutex::new(buffers), bpm: AtomicU64::new(0), playing: AtomicU64::new(2) };
-        Ok(Self { core: Arc::new(core), window: None })
+        let buffers = plugin
+            .create_bus_audio_buffers(BLOCK)
+            .map_err(|e| e.to_string())?;
+        let core = Core {
+            plugin: Arc::new(Mutex::new(plugin)),
+            buffers: Mutex::new(buffers),
+            bpm: AtomicU64::new(0),
+            playing: AtomicU64::new(2),
+        };
+        Ok(Self {
+            core: Arc::new(core),
+            window: None,
+        })
     }
 
     /// The handle the engine processes through.
@@ -78,7 +97,11 @@ impl Vst3Plugin {
     }
 
     pub fn load_state(&self, data: &[u8]) -> Result<(), String> {
-        let mut p = self.core.plugin.lock().map_err(|_| "the plugin is unavailable".to_string())?;
+        let mut p = self
+            .core
+            .plugin
+            .lock()
+            .map_err(|_| "the plugin is unavailable".to_string())?;
         p.load_state(data).map_err(|e| e.to_string())
     }
 
@@ -90,6 +113,8 @@ impl Vst3Plugin {
     pub fn open_window(&mut self) -> Result<(), String> {
         // Already open: reopen it, which brings it in front (the host can't raise it otherwise).
         self.close_window();
+        #[cfg(target_os = "macos")]
+        crate::key_guard::install();
         let mut window = PluginWindow::new(self.core.plugin.clone());
         window.open().map_err(|e| e.to_string())?;
         self.window = Some(window);
@@ -105,7 +130,9 @@ impl Vst3Plugin {
     /// Keeps the window responsive and notices when the user closed it.
     /// Returns whether it's open.
     pub fn service_window(&mut self) -> bool {
-        let Some(w) = &mut self.window else { return false };
+        let Some(w) = &mut self.window else {
+            return false;
+        };
         let _ = w.service_platform_events();
         if w.closed_by_user() || !w.is_open() {
             self.close_window();
@@ -134,13 +161,29 @@ impl Drop for Core {
 }
 
 impl ExternalPlugin for Core {
-    fn process(&self, l: &mut [f32], r: &mut [f32], events: &[NoteEvent], transport: &Transport, wait: bool) -> bool {
+    fn process(
+        &self,
+        l: &mut [f32],
+        r: &mut [f32],
+        events: &[NoteEvent],
+        transport: &Transport,
+        wait: bool,
+    ) -> bool {
         let n = l.len().min(r.len()).min(BLOCK);
-        let mut plugin = match if wait { self.plugin.lock().map_err(|_| ()) } else { self.plugin.try_lock().map_err(|e| matches!(e, TryLockError::WouldBlock)).map_err(|_| ()) } {
+        let mut plugin = match if wait {
+            self.plugin.lock().map_err(|_| ())
+        } else {
+            self.plugin
+                .try_lock()
+                .map_err(|e| matches!(e, TryLockError::WouldBlock))
+                .map_err(|_| ())
+        } {
             Ok(p) => p,
             Err(()) => return false,
         };
-        let Ok(mut buffers) = self.buffers.try_lock() else { return false };
+        let Ok(mut buffers) = self.buffers.try_lock() else {
+            return false;
+        };
 
         // Tempo and play state, only when they change.
         let bpm_bits = transport.bpm.to_bits();
@@ -154,9 +197,17 @@ impl ExternalPlugin for Core {
 
         for e in events {
             let event = if e.velocity > 0 {
-                MidiEvent::NoteOn { channel: MidiChannel::Ch1, note: e.key, velocity: e.velocity }
+                MidiEvent::NoteOn {
+                    channel: MidiChannel::Ch1,
+                    note: e.key,
+                    velocity: e.velocity,
+                }
             } else {
-                MidiEvent::NoteOff { channel: MidiChannel::Ch1, note: e.key, velocity: 0 }
+                MidiEvent::NoteOff {
+                    channel: MidiChannel::Ch1,
+                    note: e.key,
+                    velocity: 0,
+                }
             };
             let _ = plugin.send_midi_event_at(event, e.offset as i32);
         }
@@ -193,7 +244,14 @@ impl ExternalPlugin for Core {
     fn all_notes_off(&self) {
         if let Ok(mut p) = self.plugin.try_lock() {
             for note in 0..128u8 {
-                let _ = p.send_midi_event_at(MidiEvent::NoteOff { channel: MidiChannel::Ch1, note, velocity: 0 }, 0);
+                let _ = p.send_midi_event_at(
+                    MidiEvent::NoteOff {
+                        channel: MidiChannel::Ch1,
+                        note,
+                        velocity: 0,
+                    },
+                    0,
+                );
             }
         }
     }

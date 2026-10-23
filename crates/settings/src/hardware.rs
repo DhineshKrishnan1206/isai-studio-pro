@@ -23,7 +23,9 @@ impl Hardware {
             .first()
             .map(|c| c.brand().trim().to_owned())
             .unwrap_or_default();
-        let cores = sysinfo::System::physical_core_count().unwrap_or(sys.cpus().len()).max(1);
+        let cores = sysinfo::System::physical_core_count()
+            .unwrap_or(sys.cpus().len())
+            .max(1);
         Self {
             cpu_name,
             cores,
@@ -37,9 +39,15 @@ impl Hardware {
     pub fn software_rendering(&self) -> bool {
         self.gpu.as_deref().is_some_and(|g| {
             let g = g.to_ascii_lowercase();
-            ["llvmpipe", "softpipe", "swiftshader", "software", "gdi generic"]
-                .iter()
-                .any(|s| g.contains(s))
+            [
+                "llvmpipe",
+                "softpipe",
+                "swiftshader",
+                "software",
+                "gdi generic",
+            ]
+            .iter()
+            .any(|s| g.contains(s))
         })
     }
 
@@ -63,15 +71,30 @@ mod tests {
     use super::*;
 
     fn hw(cores: usize, ram_gb: f32, voices: u32, gpu: &str) -> Hardware {
-        Hardware { cpu_name: String::new(), cores, ram_gb, gpu: Some(gpu.into()), voices }
+        Hardware {
+            cpu_name: String::new(),
+            cores,
+            ram_gb,
+            gpu: Some(gpu.into()),
+            voices,
+        }
     }
 
     #[test]
     fn recommends_by_capability() {
-        assert_eq!(hw(2, 4.0, 600, "Intel HD 4000").recommend(), Profile::Lightweight);
-        assert_eq!(hw(4, 8.0, 2000, "Intel Iris Xe").recommend(), Profile::Balanced);
+        assert_eq!(
+            hw(2, 4.0, 600, "Intel HD 4000").recommend(),
+            Profile::Lightweight
+        );
+        assert_eq!(
+            hw(4, 8.0, 2000, "Intel Iris Xe").recommend(),
+            Profile::Balanced
+        );
         assert_eq!(hw(8, 16.0, 7000, "Apple M2").recommend(), Profile::Smooth);
         // A fast CPU with software graphics still needs light visuals.
-        assert_eq!(hw(8, 16.0, 7000, "llvmpipe (LLVM 15)").recommend(), Profile::Lightweight);
+        assert_eq!(
+            hw(8, 16.0, 7000, "llvmpipe (LLVM 15)").recommend(),
+            Profile::Lightweight
+        );
     }
 }
