@@ -58,6 +58,8 @@ pub fn release_held() {
 }
 
 impl Keyboard {
+    // Only the macOS plugin key handler calls this (the tests too).
+    #[cfg(any(target_os = "macos", test))]
     fn event(&self, key: u16, down: bool) {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
@@ -139,6 +141,7 @@ impl Keyboard {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn note_offset(key: u16) -> Option<u8> {
     match key {
         0 => Some(0),   // A
