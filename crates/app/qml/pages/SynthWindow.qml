@@ -1267,7 +1267,7 @@ Item {
             color: win.text
             border.color: win.bg
             border.width: 1.5
-            Behavior on width { NumberAnimation { duration: 90 } }
+            Behavior on width { NumberAnimation { duration: Theme.fast } }
         }
         MouseArea {
             id: hArea
@@ -1400,7 +1400,7 @@ Item {
                     width: 3; height: ud.height - 44; radius: 1.5
                     color: win.accent
                     opacity: 1 - Math.abs(uv.t) * 0.5
-                    Behavior on x { NumberAnimation { duration: 120 } }
+                    Behavior on x { NumberAnimation { duration: Theme.fast } }
                 }
                 // Pan: dots spread by spread.
                 Rectangle {
@@ -1408,7 +1408,7 @@ Item {
                     y: ud.height - 24
                     width: 6; height: 6; radius: 3
                     color: win.dim
-                    Behavior on x { NumberAnimation { duration: 120 } }
+                    Behavior on x { NumberAnimation { duration: Theme.fast } }
                 }
             }
         }
@@ -1439,7 +1439,7 @@ Item {
                     GradientStop { position: 1; color: win.rgba(win.keyLit, 1) }
                 }
                 opacity: k.held ? 0.55 + 0.45 * k.vel : 0
-                Behavior on opacity { NumberAnimation { duration: k.held ? 25 : 220; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: k.held ? 25 : Theme.slow; easing.type: Easing.OutCubic } }
             }
         }
         DText {

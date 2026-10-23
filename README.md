@@ -90,6 +90,17 @@ cargo clippy --workspace --all-targets -- -D warnings  # lint (CI runs this)
 cargo run -p isai-engine --release --example bench     # benchmark your CPU
 ```
 
+### Prebuilt builds
+
+The **Package** GitHub Actions workflow creates downloadable artifacts on pushes
+to `main` and when run manually. Windows and macOS artifacts bundle Qt; macOS
+artifacts are for the runner's architecture (shown in the artifact name), are
+ad-hoc signed but not Developer ID signed or notarized, so Gatekeeper may ask
+you to approve the app.
+The Linux x86_64 archive contains the app binary and licence notices but uses
+the system Qt 6.9+ runtime and platform libraries. It is not a self-contained
+Linux bundle.
+
 ### Screenshots without clicking around
 
 The app can open a screen, save it as an image and quit. `ISAI_CONFIG_DIR`

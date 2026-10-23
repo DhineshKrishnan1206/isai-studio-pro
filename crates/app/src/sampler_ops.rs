@@ -15,7 +15,9 @@ impl AppController {
         let Some(path) = url_path(url) else { return };
         let file = path.display().to_string();
         self.as_mut().st().pool.request(&path);
-        self.as_mut().edit("Load Sample", true, |p| p.set_instrument_sample(id(track), Some(&file)));
+        self.as_mut().edit("Load Sample", true, |p| {
+            p.set_instrument_sample(id(track), Some(&file))
+        });
         self.update_busy();
     }
 
@@ -23,9 +25,22 @@ impl AppController {
     fn sample_mono(mut self: Pin<&mut Self>, track: i32) -> Option<(Vec<f32>, u32)> {
         let st = self.as_mut().st();
         let session = st.session.as_ref()?;
-        let file = session.project.track(id(track))?.instrument.as_ref()?.sample.as_ref()?;
+        let file = session
+            .project
+            .track(id(track))?
+            .instrument
+            .as_ref()?
+            .sample
+            .as_ref()?;
         let clip = st.pool.ready(&session.resolve(file))?;
-        Some((clip.left.iter().zip(&clip.right).map(|(l, r)| (l + r) * 0.5).collect(), clip.sample_rate))
+        Some((
+            clip.left
+                .iter()
+                .zip(&clip.right)
+                .map(|(l, r)| (l + r) * 0.5)
+                .collect(),
+            clip.sample_rate,
+        ))
     }
 
     pub fn slice_sample(mut self: Pin<&mut Self>, track: i32, how: &QString, count: i32) {
@@ -34,7 +49,11 @@ impl AppController {
             return;
         };
         let count = count.clamp(1, 64) as usize;
-        let starts = if how.to_string() == "beats" { crate::slicer::onsets(&mono, rate, count) } else { crate::slicer::even(mono.len(), count) };
+        let starts = if how.to_string() == "beats" {
+            crate::slicer::onsets(&mono, rate, count)
+        } else {
+            crate::slicer::even(mono.len(), count)
+        };
         let secs: Vec<f64> = starts.iter().map(|&s| s as f64 / f64::from(rate)).collect();
         self.edit("Slice Sample", true, |p| p.set_slices(id(track), &secs));
     }
@@ -53,7 +72,13 @@ impl AppController {
         let total = mono.len() as f64 / f64::from(rate);
         let mut made = None;
         self.as_mut().edit("Slices to Pattern", true, |p| {
-            let Some(slices) = p.track(id(track)).and_then(|t| t.instrument.as_ref()).map(|i| i.slices.clone()) else { return false };
+            let Some(slices) = p
+                .track(id(track))
+                .and_then(|t| t.instrument.as_ref())
+                .map(|i| i.slices.clone())
+            else {
+                return false;
+            };
             if slices.is_empty() {
                 return false;
             }
@@ -61,7 +86,9 @@ impl AppController {
             let bar = p.bar_beats();
             let length = (meter.secs_to_beats(total) / bar).ceil().max(1.0) * bar;
             let start = (at / bar).floor() * bar;
-            let Some(region) = p.add_midi_region(id(track), start, length) else { return false };
+            let Some(region) = p.add_midi_region(id(track), start, length) else {
+                return false;
+            };
             let notes: Vec<Note> = slices
                 .iter()
                 .enumerate()
@@ -75,7 +102,12 @@ impl AppController {
                     }
                 })
                 .collect();
-            if let Some(r) = p.tracks.iter_mut().flat_map(|t| t.regions.iter_mut()).find(|r| r.id == region) {
+            if let Some(r) = p
+                .tracks
+                .iter_mut()
+                .flat_map(|t| t.regions.iter_mut())
+                .find(|r| r.id == region)
+            {
                 r.start = start;
                 r.name = "Slices".into();
             }

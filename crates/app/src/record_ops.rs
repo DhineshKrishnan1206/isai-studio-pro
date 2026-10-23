@@ -26,7 +26,12 @@ pub struct MidiTake {
 
 impl MidiTake {
     fn new(track: u64) -> Self {
-        Self { track, held: [None; 128], notes: Vec::new(), scratch: Vec::with_capacity(256) }
+        Self {
+            track,
+            held: [None; 128],
+            notes: Vec::new(),
+            scratch: Vec::with_capacity(256),
+        }
     }
 
     fn absorb(&mut self, engine: &mut isai_engine::Engine) {
@@ -66,7 +71,8 @@ fn level(peak: f32) -> f64 {
 impl AppController {
     pub fn refresh_inputs(mut self: Pin<&mut Self>) {
         let devices = isai_engine::list_input_devices();
-        self.as_mut().set_input_device_names(qlist(devices.iter().map(|d| d.name.clone())));
+        self.as_mut()
+            .set_input_device_names(qlist(devices.iter().map(|d| d.name.clone())));
         self.set_input_device_ids(qlist(devices.into_iter().map(|d| d.id)));
     }
 
@@ -74,7 +80,12 @@ impl AppController {
     /// track is armed (instrument tracks record notes, not the input).
     pub(crate) fn sync_input(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
-        let armed = st.session.as_ref().and_then(|s| s.project.armed_track().filter(|t| t.instrument.is_none()).map(|t| t.monitor));
+        let armed = st.session.as_ref().and_then(|s| {
+            s.project
+                .armed_track()
+                .filter(|t| t.instrument.is_none())
+                .map(|t| t.monitor)
+        });
         // The tuner listens too, without monitoring.
         let armed = armed.or(st.tuner.then_some(false));
         match armed {
@@ -108,7 +119,9 @@ impl AppController {
 
     pub fn tuner_reading(mut self: Pin<&mut Self>, a4: f64) -> QString {
         let st = self.as_mut().st();
-        let Some(engine) = &st.audio.engine else { return QString::default() };
+        let Some(engine) = &st.audio.engine else {
+            return QString::default();
+        };
         let rate = engine.info().sample_rate as f32;
         engine.input_scope(&mut st.tuner_samples);
         let samples = &st.tuner_samples;
@@ -116,7 +129,8 @@ impl AppController {
         let level = crate::controller::meter_scale(peak);
         let json = match crate::tuner::detect(samples, rate) {
             Some(r) => {
-                let (name, octave, cents, midi) = crate::tuner::note(r.hz, a4.clamp(400.0, 480.0) as f32);
+                let (name, octave, cents, midi) =
+                    crate::tuner::note(r.hz, a4.clamp(400.0, 480.0) as f32);
                 serde_json::json!({ "level": level, "hz": r.hz, "note": name, "octave": octave, "cents": cents, "midi": midi, "clarity": r.clarity })
             }
             None => serde_json::json!({ "level": level }),
@@ -140,9 +154,19 @@ impl AppController {
     fn open_input(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
         let rec = st.settings.recording.clone();
-        let Some(engine) = &mut st.audio.engine else { return };
-        let select = if rec.stereo { InputChannels::Stereo(rec.channel) } else { InputChannels::Mono(rec.channel) };
-        match isai_engine::start_input(rec.input_device.as_deref(), select, engine.info().sample_rate) {
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
+        let select = if rec.stereo {
+            InputChannels::Stereo(rec.channel)
+        } else {
+            InputChannels::Mono(rec.channel)
+        };
+        match isai_engine::start_input(
+            rec.input_device.as_deref(),
+            select,
+            engine.info().sample_rate,
+        ) {
             Ok((input, queue)) => {
                 engine.set_input(Some(queue));
                 let name = input.device_name.clone();
@@ -162,7 +186,12 @@ impl AppController {
 
     pub fn toggle_arm(mut self: Pin<&mut Self>, track: i32) {
         let id = track.max(0) as u64;
-        let armed = self.as_mut().st().session.as_ref().and_then(|s| s.project.track(id).map(|t| t.armed));
+        let armed = self
+            .as_mut()
+            .st()
+            .session
+            .as_ref()
+            .and_then(|s| s.project.track(id).map(|t| t.armed));
         let Some(armed) = armed else { return };
         if let Some(s) = self.as_mut().st().session.as_mut() {
             // Arming isn't an edit to the song, so it isn't an undo step.
@@ -191,7 +220,10 @@ impl AppController {
             self.stop_recording();
             return;
         }
-        if self.as_mut().st().session.is_none() || self.as_mut().st().recorder.is_some() || self.as_mut().st().midi_take.is_some() {
+        if self.as_mut().st().session.is_none()
+            || self.as_mut().st().recorder.is_some()
+            || self.as_mut().st().midi_take.is_some()
+        {
             return;
         }
         // Record onto the selected instrument track (notes), else the armed
@@ -227,7 +259,11 @@ impl AppController {
         };
         self.as_mut().set_selected_track(target as i32);
         self.as_mut().publish_project();
-        let notes = self.as_mut().st().session.as_ref().is_some_and(|s| s.project.track(target).is_some_and(|t| t.instrument.is_some()));
+        let notes = self.as_mut().st().session.as_ref().is_some_and(|s| {
+            s.project
+                .track(target)
+                .is_some_and(|t| t.instrument.is_some())
+        });
         if notes {
             self.start_midi_take(target);
             return;
@@ -243,8 +279,12 @@ impl AppController {
         let st = self.as_mut().st();
         let count_in = st.session.as_ref().is_some_and(|s| s.project.count_in);
         let bars = st.settings.metronome.count_in_bars;
-        let Some(engine) = &mut st.audio.engine else { return };
-        let Some(queue) = engine.take_record_queue() else { return };
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
+        let Some(queue) = engine.take_record_queue() else {
+            return;
+        };
         let rate = engine.info().sample_rate;
         st.recorder = Some(Recorder::start(queue, &path, rate));
         st.take_track = Some(target);
@@ -264,7 +304,9 @@ impl AppController {
         let st = self.as_mut().st();
         let count_in = st.session.as_ref().is_some_and(|s| s.project.count_in);
         let bars = st.settings.metronome.count_in_bars;
-        let Some(engine) = &mut st.audio.engine else { return };
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
         let mut take = MidiTake::new(track);
         take.absorb(engine); // drop anything left from before
         take.notes.clear();
@@ -283,8 +325,12 @@ impl AppController {
     /// Turns the notes of a finished MIDI take into a region.
     fn finish_midi_take(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
-        let Some(mut take) = st.midi_take.take() else { return };
-        let Some(engine) = &mut st.audio.engine else { return };
+        let Some(mut take) = st.midi_take.take() else {
+            return;
+        };
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
         take.absorb(engine);
         engine.set_capture_notes(false);
         take.release_all(engine.position());
@@ -300,7 +346,12 @@ impl AppController {
             .filter(|n| n.1 > n.0)
             .map(|&(start, end, key, velocity)| {
                 let b = beats(start);
-                isai_project::Note { start: b, length: beats(end) - b, key, velocity }
+                isai_project::Note {
+                    start: b,
+                    length: beats(end) - b,
+                    key,
+                    velocity,
+                }
             })
             .collect();
         if notes.is_empty() {
@@ -324,15 +375,29 @@ impl AppController {
     fn take_path(mut self: Pin<&mut Self>, track: u64) -> PathBuf {
         let st = self.as_mut().st();
         let session = st.session.as_ref().expect("recording needs a project");
-        let name = session.project.track(track).map_or("Audio".into(), |t| t.name.clone());
-        let safe: String = name.chars().map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' }).collect();
+        let name = session
+            .project
+            .track(track)
+            .map_or("Audio".into(), |t| t.name.clone());
+        let safe: String = name
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == ' ' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
         let dir = match &session.paths {
             Some(p) => p.audio_dir(),
             None => isai_settings::path()
                 .and_then(|p| p.parent().map(|d| d.join("recordings")))
                 .unwrap_or_else(std::env::temp_dir),
         };
-        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
         for n in 1.. {
             let candidate = dir.join(format!("{safe} take {n}.wav"));
             if !candidate.exists() {
@@ -368,17 +433,24 @@ impl AppController {
         }
         if let (Some(engine), Some(_)) = (&st.audio.engine, &st.input) {
             let (l, r) = engine.take_input_peaks();
-            st.input_meter = (l.max(st.input_meter.0 * 0.85), r.max(st.input_meter.1 * 0.85));
+            st.input_meter = (
+                l.max(st.input_meter.0 * 0.85),
+                r.max(st.input_meter.1 * 0.85),
+            );
             let (ml, mr) = st.input_meter;
             self.as_mut().set_input_level_l(level(ml));
             self.as_mut().set_input_level_r(level(mr));
         }
 
         let st = self.as_mut().st();
-        let Some((queue, result)) = st.recorder.as_mut().and_then(|r| r.finished()) else { return };
+        let Some((queue, result)) = st.recorder.as_mut().and_then(|r| r.finished()) else {
+            return;
+        };
         st.recorder = None;
         let track = st.take_track.take();
-        let Some(engine) = &mut st.audio.engine else { return };
+        let Some(engine) = &mut st.audio.engine else {
+            return;
+        };
         engine.return_record_queue(queue);
         let rate = engine.info().sample_rate;
         let record_start = engine.record_start();
@@ -395,21 +467,54 @@ impl AppController {
                 let secs = |samples: i64| samples as f64 / f64::from(rate);
                 let length = secs(take.frames as i64);
                 // A take that would start before bar 1 is trimmed instead.
-                let (start_secs, offset_secs) = if first >= 0 { (secs(first), 0.0) } else { (0.0, secs(-first)) };
+                let (start_secs, offset_secs) = if first >= 0 {
+                    (secs(first), 0.0)
+                } else {
+                    (0.0, secs(-first))
+                };
+                // Punch: keep only the part of the take inside the cycle region.
+                let audible = (length - offset_secs).max(0.0);
+                let window = st.session.as_ref().filter(|s| s.project.punch).map(|s| {
+                    let map = s.project.tempo_map();
+                    (
+                        map.beats_to_secs(s.project.cycle_start),
+                        map.beats_to_secs(s.project.cycle_end),
+                    )
+                });
+                let kept = match window {
+                    Some(w) => punch_clip(start_secs, offset_secs, audible, w),
+                    None => Some((start_secs, offset_secs, audible)),
+                };
+                let Some((start_secs, offset_secs, audible)) = kept else {
+                    self.as_mut().show_problem(
+                        "Nothing was recorded inside the punch range (the cycle region)",
+                    );
+                    return;
+                };
                 let file = take.path.display().to_string();
-                let name: String = take.path.file_stem().map_or_else(|| "Take".into(), |n| n.to_string_lossy().into_owned());
+                let name: String = take
+                    .path
+                    .file_stem()
+                    .map_or_else(|| "Take".into(), |n| n.to_string_lossy().into_owned());
                 st.pool.request(&take.path);
                 let mut region_id = 0;
                 if let Some(s) = st.session.as_mut() {
                     let beats = s.project.tempo_map().secs_to_beats(start_secs);
                     s.edit("Record", |p| {
-                        let Some(id) = p.add_region(track, &file, &name, beats, length) else { return false };
+                        let Some(id) = p.add_region(track, &file, &name, beats, length) else {
+                            return false;
+                        };
                         region_id = id;
                         // The region keeps its exact position; snapping would move the take.
-                        if let Some(r) = p.tracks.iter_mut().flat_map(|t| t.regions.iter_mut()).find(|r| r.id == id) {
+                        if let Some(r) = p
+                            .tracks
+                            .iter_mut()
+                            .flat_map(|t| t.regions.iter_mut())
+                            .find(|r| r.id == id)
+                        {
                             r.start = beats;
                             r.offset = offset_secs.min(length);
-                            r.length = (length - offset_secs).max(0.0);
+                            r.length = audible;
                         }
                         true
                     });
@@ -417,13 +522,58 @@ impl AppController {
                 self.as_mut().push_arrangement();
                 self.as_mut().publish_project();
                 self.as_mut().set_selection(vec![region_id]);
-                let dropped = self.as_mut().st().audio.engine.as_ref().map_or(0, |e| e.record_dropped());
+                let dropped = self
+                    .as_mut()
+                    .st()
+                    .audio
+                    .engine
+                    .as_ref()
+                    .map_or(0, |e| e.record_dropped());
                 if dropped > 0 {
-                    self.show_problem("Recorded, but the disk couldn't keep up and some audio was lost");
+                    self.show_problem(
+                        "Recorded, but the disk couldn't keep up and some audio was lost",
+                    );
                 }
             }
             (Err(err), _, _) => self.show_problem(&format!("Couldn't save the recording: {err:#}")),
             _ => self.show_problem("Nothing was recorded"),
         }
+    }
+}
+
+/// Keeps the part of a take that falls inside a punch window. The take is
+/// audible from `start` for `len` seconds, after skipping `offset` seconds of
+/// its file. Returns the kept `(start, offset, len)`, or `None` if nothing is left.
+fn punch_clip(start: f64, offset: f64, len: f64, window: (f64, f64)) -> Option<(f64, f64, f64)> {
+    let from = start.max(window.0);
+    let to = (start + len).min(window.1);
+    (to > from + 1e-9).then_some((from, offset + (from - start), to - from))
+}
+
+#[cfg(test)]
+mod punch_tests {
+    use super::punch_clip;
+
+    #[test]
+    fn a_take_is_cut_to_the_punch_window() {
+        // Audible from 2 s for 6 s; punch 4 s to 6 s keeps 2 s, starting 2 s into the take.
+        assert_eq!(punch_clip(2.0, 0.0, 6.0, (4.0, 6.0)), Some((4.0, 2.0, 2.0)));
+        // The window covers the whole take: nothing is cut.
+        assert_eq!(
+            punch_clip(2.0, 0.5, 3.0, (0.0, 10.0)),
+            Some((2.0, 0.5, 3.0))
+        );
+        // A take that starts before the window keeps its file offset.
+        assert_eq!(punch_clip(0.0, 1.0, 5.0, (2.0, 3.0)), Some((2.0, 3.0, 1.0)));
+    }
+
+    #[test]
+    fn a_take_outside_the_window_keeps_nothing() {
+        assert_eq!(punch_clip(0.0, 0.0, 2.0, (4.0, 6.0)), None);
+        assert_eq!(
+            punch_clip(6.0, 0.0, 2.0, (4.0, 6.0)),
+            None,
+            "touching the window's end isn't inside it"
+        );
     }
 }

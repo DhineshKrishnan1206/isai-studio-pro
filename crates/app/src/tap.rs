@@ -16,7 +16,11 @@ impl TapTempo {
 
     /// Records a tap. Returns a tempo once there are at least two taps.
     pub fn tap(&mut self, now: Instant) -> Option<f64> {
-        if self.taps.last().is_some_and(|&t| now.duration_since(t) > Self::RESET_AFTER) {
+        if self
+            .taps
+            .last()
+            .is_some_and(|&t| now.duration_since(t) > Self::RESET_AFTER)
+        {
             self.taps.clear();
         }
         self.taps.push(now);

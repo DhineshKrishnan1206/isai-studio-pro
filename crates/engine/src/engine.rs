@@ -1,5 +1,5 @@
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering::Relaxed;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context as _, anyhow};
 use cpal::traits::{DeviceTrait as _, HostTrait as _, StreamTrait as _};
@@ -87,7 +87,15 @@ impl Engine {
             }
             None => (Running::build(&device, &stream_config, format)?, None),
         };
-        let Running { stream, commands, garbage, shared, record, live, played } = running;
+        let Running {
+            stream,
+            commands,
+            garbage,
+            shared,
+            record,
+            live,
+            played,
+        } = running;
         stream.play().context("could not start the audio stream")?;
 
         Ok(Self {
@@ -177,12 +185,18 @@ impl Engine {
         out.clear();
         let end = self.shared.input_scope_pos.load(Relaxed);
         let n = end.min(INPUT_SCOPE);
-        out.extend((end - n..end).map(|i| f32::from_bits(self.shared.input_scope[i % INPUT_SCOPE].load(Relaxed))));
+        out.extend(
+            (end - n..end)
+                .map(|i| f32::from_bits(self.shared.input_scope[i % INPUT_SCOPE].load(Relaxed))),
+        );
     }
     /// Input level since the last call, (left, right).
     pub fn take_input_peaks(&self) -> (f32, f32) {
         let take = |p: &std::sync::atomic::AtomicU32| f32::from_bits(p.swap(0, Relaxed));
-        (take(&self.shared.input_peak_l), take(&self.shared.input_peak_r))
+        (
+            take(&self.shared.input_peak_l),
+            take(&self.shared.input_peak_r),
+        )
     }
     pub fn record_dropped(&self) -> u64 {
         self.shared.record_dropped.load(Relaxed)
@@ -198,7 +212,12 @@ impl Engine {
     /// Gives the audio thread the running state for effect `id` (build it
     /// with `Effect::new` here, off the audio thread).
     /// `meters` (optional) receive its live levels for an editor.
-    pub fn add_effect(&mut self, id: u64, effect: Box<crate::effects::Effect>, meters: Option<Arc<crate::effects::Meters>>) {
+    pub fn add_effect(
+        &mut self,
+        id: u64,
+        effect: Box<crate::effects::Effect>,
+        meters: Option<Arc<crate::effects::Meters>>,
+    ) {
         self.collect_garbage();
         self.send(Command::AddEffect(id, effect, meters));
     }
@@ -234,8 +253,10 @@ impl Engine {
     /// Also returns how hard each key was last played (1..=127, 0 = never).
     pub fn take_keys(&self) -> (u128, u128, [u8; 128]) {
         let s = &self.shared;
-        let held = u128::from(s.keys_held[0].load(Relaxed)) | u128::from(s.keys_held[1].load(Relaxed)) << 64;
-        let struck = u128::from(s.keys_struck[0].swap(0, Relaxed)) | u128::from(s.keys_struck[1].swap(0, Relaxed)) << 64;
+        let held = u128::from(s.keys_held[0].load(Relaxed))
+            | u128::from(s.keys_held[1].load(Relaxed)) << 64;
+        let struck = u128::from(s.keys_struck[0].swap(0, Relaxed))
+            | u128::from(s.keys_struck[1].swap(0, Relaxed)) << 64;
         let mut velocities = [0u8; 128];
         for (v, a) in velocities.iter_mut().zip(&s.key_velocities) {
             *v = a.load(Relaxed);
@@ -270,7 +291,15 @@ impl Engine {
     pub fn take_track_peaks(&self, tracks: usize, out: &mut Vec<(f32, f32)>) {
         let take = |p: &std::sync::atomic::AtomicU32| f32::from_bits(p.swap(0, Relaxed));
         out.clear();
-        out.extend(self.shared.track_peaks.as_chunks::<2>().0.iter().take(tracks).map(|[l, r]| (take(l), take(r))));
+        out.extend(
+            self.shared
+                .track_peaks
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .take(tracks)
+                .map(|[l, r]| (take(l), take(r))),
+        );
     }
     /// Share of the real-time budget the audio thread is using, where 1.0 means 100%.
     pub fn load(&self) -> f32 {
@@ -354,6 +383,14 @@ impl Running {
             },
             None,
         )?;
-        Ok(Self { stream, record, commands, garbage, shared, live: live_tx, played })
+        Ok(Self {
+            stream,
+            record,
+            commands,
+            garbage,
+            shared,
+            live: live_tx,
+            played,
+        })
     }
 }

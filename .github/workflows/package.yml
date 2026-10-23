@@ -1,8 +1,9 @@
 name: Package
 
-# Ready-to-run builds, to try Isai without installing Rust or Qt.
+# Build artifacts for trying Isai without installing Rust.
 # Runs on main and on demand (Actions → Package → Run workflow); each run's
-# zip is under its "Artifacts".
+# artifacts are under the workflow run. The Linux archive needs a Qt 6.9+
+# runtime; Windows and macOS artifacts bundle Qt.
 
 on:
   push:
@@ -20,7 +21,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: "6.9.*"
-          modules: qtshadertools
+          modules: qtsvg qtshadertools qtmultimedia
           cache: true
       - run: cargo build --release -p isai
       - name: Bundle Qt and the C++ runtime
@@ -40,3 +41,74 @@ jobs:
         with:
           name: Isai-windows-x64
           path: dist/
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.9.*"
+          modules: qtsvg qtshadertools qtmultimedia
+          cache: true
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config libgl1-mesa-dev libxkbcommon-dev libxcb1-dev libx11-xcb-dev
+      - run: cargo build --release -p isai
+      - name: Package and smoke-test the Linux binary
+        run: |
+          mkdir -p dist/linux/Isai/licenses
+          cp target/release/isai dist/linux/Isai/
+          cp LICENSE THIRD-PARTY-NOTICES.md README.md dist/linux/Isai/
+          cp -R licenses/. dist/linux/Isai/licenses/
+          cp -R crates/app/assets/fonts/licenses dist/linux/Isai/licenses/fonts
+          cat > dist/linux/Isai/README-LINUX.txt <<'EOF'
+          Isai Studio Pro for Linux x86_64
+
+          This archive contains the application binary and licence notices.
+          It requires a system Qt 6.9 or newer runtime, including Qt Quick,
+          Qt Quick Controls, Qt Quick Shapes, Qt Quick Effects, Qt SVG,
+          Qt Shader Tools and Qt Multimedia, plus the platform's audio, graphics and windowing
+          libraries. See README.md for build and Qt installation instructions.
+
+          Run ./isai from a terminal to see startup errors.
+          EOF
+          tar -C dist/linux -czf dist/linux/Isai-linux-x86_64.tar.gz Isai
+          mkdir -p "$RUNNER_TEMP/isai-linux-smoke"
+          tar -xzf dist/linux/Isai-linux-x86_64.tar.gz -C "$RUNNER_TEMP/isai-linux-smoke"
+          QT_QPA_PLATFORM=offscreen \
+          QT_QUICK_BACKEND=software \
+          ISAI_CONFIG_DIR="$RUNNER_TEMP/isai-config" \
+          ISAI_SCENE=studio \
+          ISAI_SCREENSHOT="$RUNNER_TEMP/isai-studio.png" \
+            timeout 90s "$RUNNER_TEMP/isai-linux-smoke/Isai/isai"
+          test -s "$RUNNER_TEMP/isai-studio.png"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Isai-linux-x86_64-qt-runtime-required
+          path: dist/linux/Isai-linux-x86_64.tar.gz
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.9.*"
+          modules: qtsvg qtshadertools qtmultimedia
+          cache: true
+      - name: Build the app bundle and DMG
+        run: |
+          python3 -m pip install --quiet pillow
+          ./tools/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Isai-macos-${{ runner.arch }}-dmg
+          path: dist/macos/

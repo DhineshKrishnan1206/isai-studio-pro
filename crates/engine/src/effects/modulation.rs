@@ -15,7 +15,10 @@ struct Line {
 impl Line {
     fn new(seconds: f32, rate: f32) -> Self {
         let len = (seconds * rate) as usize + 4;
-        Self { buf: [vec![0.0; len], vec![0.0; len]], pos: 0 }
+        Self {
+            buf: [vec![0.0; len], vec![0.0; len]],
+            pos: 0,
+        }
     }
 
     /// The sample `delay` samples ago on channel `ch` (linear interpolation).
@@ -51,7 +54,10 @@ pub struct Chorus {
 
 impl Chorus {
     pub fn new(rate: f32) -> Self {
-        Self { line: Line::new(0.06, rate), phase: 0.0 }
+        Self {
+            line: Line::new(0.06, rate),
+            phase: 0.0,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -65,7 +71,9 @@ impl Chorus {
             // Two taps per side, a quarter-cycle apart; the sides opposite each other.
             let tap = |offset: f32| base + depth * (0.5 + 0.5 * (self.phase + offset).sin());
             let wl = 0.5 * (self.line.read(0, tap(0.0)) + self.line.read(0, tap(FRAC_PI_2)));
-            let wr = 0.5 * (self.line.read(1, tap(PI * width)) + self.line.read(1, tap(PI * width + FRAC_PI_2)));
+            let wr = 0.5
+                * (self.line.read(1, tap(PI * width))
+                    + self.line.read(1, tap(PI * width + FRAC_PI_2)));
             self.line.write(*a, *b);
             *a += (wl - *a) * mix;
             *b += (wr - *b) * mix;
@@ -86,7 +94,10 @@ pub struct Flanger {
 
 impl Flanger {
     pub fn new(rate: f32) -> Self {
-        Self { line: Line::new(0.03, rate), phase: 0.0 }
+        Self {
+            line: Line::new(0.03, rate),
+            phase: 0.0,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -97,7 +108,9 @@ impl Flanger {
         let feedback = (p[3] / 100.0).clamp(-0.95, 0.95);
         let mix = (p[4] / 100.0).clamp(0.0, 1.0);
         for (a, b) in l.iter_mut().zip(r.iter_mut()) {
-            let sweep = |offset: f32| (base * (1.0 - depth * 0.5 * (1.0 + (self.phase + offset).sin()))).max(1.0);
+            let sweep = |offset: f32| {
+                (base * (1.0 - depth * 0.5 * (1.0 + (self.phase + offset).sin()))).max(1.0)
+            };
             let wl = self.line.read(0, sweep(0.0));
             let wr = self.line.read(1, sweep(FRAC_PI_2));
             self.line.write(*a + wl * feedback, *b + wr * feedback);
@@ -132,7 +145,13 @@ pub struct Phaser {
 
 impl Phaser {
     pub fn new() -> Self {
-        Self { state: [[(0.0, 0.0); MAX_STAGES]; 2], phase: 0.0, fb: [0.0; 2], coef: [0.0; 2], tick: 0 }
+        Self {
+            state: [[(0.0, 0.0); MAX_STAGES]; 2],
+            phase: 0.0,
+            fb: [0.0; 2],
+            coef: [0.0; 2],
+            tick: 0,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -146,7 +165,9 @@ impl Phaser {
         for (a, b) in l.iter_mut().zip(r.iter_mut()) {
             if self.tick == 0 {
                 for (ch, c) in self.coef.iter_mut().enumerate() {
-                    let f = (centre * 2f32.powf(depth * (self.phase + ch as f32 * FRAC_PI_2).sin())).clamp(20.0, sr * 0.45);
+                    let f = (centre
+                        * 2f32.powf(depth * (self.phase + ch as f32 * FRAC_PI_2).sin()))
+                    .clamp(20.0, sr * 0.45);
                     let t = (PI * f / sr).tan();
                     *c = (t - 1.0) / (t + 1.0);
                 }

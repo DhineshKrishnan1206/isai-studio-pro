@@ -91,10 +91,14 @@ impl qobject::WaveformView {
     /// Qt passes a valid painter that lives for the duration of this call.
     pub unsafe fn paint(self: Pin<&mut Self>, painter: *mut qobject::QPainter) {
         // SAFETY: see above; the pointer is valid and not aliased during paint.
-        let Some(painter) = (unsafe { painter.as_mut() }) else { return };
+        let Some(painter) = (unsafe { painter.as_mut() }) else {
+            return;
+        };
         // SAFETY: the painter is not moved while pinned.
         let mut painter = unsafe { Pin::new_unchecked(painter) };
-        let Some(wave) = shared::peaks(&self.source().to_string()) else { return };
+        let Some(wave) = shared::peaks(&self.source().to_string()) else {
+            return;
+        };
 
         let size = self.size();
         let (width, height) = (size.width(), size.height());
@@ -102,7 +106,8 @@ impl qobject::WaveformView {
         // The peaks covering this region's slice of the file.
         let per_sec = f64::from(wave.sample_rate) / wave.peaks.frames_per_peak as f64;
         let first = ((*self.offset() * per_sec) as usize).min(all.len());
-        let last = (((*self.offset() + *self.length()) * per_sec).ceil() as usize).clamp(first, all.len());
+        let last =
+            (((*self.offset() + *self.length()) * per_sec).ceil() as usize).clamp(first, all.len());
         let peaks = &all[first..last];
         if width <= 0.0 || peaks.is_empty() {
             return;
@@ -121,7 +126,11 @@ impl qobject::WaveformView {
         let mut x = 0.0;
         while x < width {
             // A reversed region reads its peaks from the far end.
-            let at = if reverse { (width - x - step).max(0.0) } else { x };
+            let at = if reverse {
+                (width - x - step).max(0.0)
+            } else {
+                x
+            };
             let first = ((at * peaks_per_px) as usize).min(peaks.len() - 1);
             let last = (((at + step) * peaks_per_px) as usize).clamp(first + 1, peaks.len());
             let (lo, hi) = peaks[first..last]
@@ -131,7 +140,9 @@ impl qobject::WaveformView {
             let top = mid - f64::from(hi) * half;
             // At least one pixel tall, so silence still shows as a thin line.
             let h = (f64::from(hi - lo) * half).max(1.0);
-            painter.as_mut().fill_rect(&QRectF::new(x, top, bar, h), &color);
+            painter
+                .as_mut()
+                .fill_rect(&QRectF::new(x, top, bar, h), &color);
             x += step;
         }
     }
@@ -139,12 +150,26 @@ impl qobject::WaveformView {
 
 impl cxx_qt::Initialize for qobject::WaveformView {
     fn initialize(mut self: Pin<&mut Self>) {
-        self.as_mut().on_color_changed(|item| item.update()).release();
-        self.as_mut().on_column_width_changed(|item| item.update()).release();
-        self.as_mut().on_source_changed(|item| item.update()).release();
-        self.as_mut().on_offset_changed(|item| item.update()).release();
-        self.as_mut().on_length_changed(|item| item.update()).release();
-        self.as_mut().on_gain_changed(|item| item.update()).release();
-        self.as_mut().on_reverse_changed(|item| item.update()).release();
+        self.as_mut()
+            .on_color_changed(|item| item.update())
+            .release();
+        self.as_mut()
+            .on_column_width_changed(|item| item.update())
+            .release();
+        self.as_mut()
+            .on_source_changed(|item| item.update())
+            .release();
+        self.as_mut()
+            .on_offset_changed(|item| item.update())
+            .release();
+        self.as_mut()
+            .on_length_changed(|item| item.update())
+            .release();
+        self.as_mut()
+            .on_gain_changed(|item| item.update())
+            .release();
+        self.as_mut()
+            .on_reverse_changed(|item| item.update())
+            .release();
     }
 }

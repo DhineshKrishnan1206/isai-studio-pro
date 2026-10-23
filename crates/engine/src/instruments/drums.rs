@@ -71,7 +71,12 @@ struct Svf {
 
 impl Svf {
     fn new(freq: f32, q: f32, rate: f32) -> Self {
-        Self { g: (PI * freq.min(rate * 0.45) / rate).tan(), k: 1.0 / q.max(0.1), ic1: 0.0, ic2: 0.0 }
+        Self {
+            g: (PI * freq.min(rate * 0.45) / rate).tan(),
+            k: 1.0 / q.max(0.1),
+            ic1: 0.0,
+            ic2: 0.0,
+        }
     }
 
     /// (band-pass, high-pass)
@@ -123,8 +128,18 @@ impl Voice {
         gain_r: 0.0,
         phase: [0.0; 6],
         noise: 1,
-        f1: Svf { g: 0.0, k: 1.0, ic1: 0.0, ic2: 0.0 },
-        f2: Svf { g: 0.0, k: 1.0, ic1: 0.0, ic2: 0.0 },
+        f1: Svf {
+            g: 0.0,
+            k: 1.0,
+            ic1: 0.0,
+            ic2: 0.0,
+        },
+        f2: Svf {
+            g: 0.0,
+            k: 1.0,
+            ic1: 0.0,
+            ic2: 0.0,
+        },
         choke: 1.0,
         choking: false,
         held: 0.0,
@@ -193,7 +208,10 @@ impl Voice {
                     KIT_TRAP => (220.0, 0.15, 0.25, 0.7),
                     _ => (185.0, 0.25, 0.3, 0.55),
                 };
-                let body = (self.sine(0, tone * self.tune, rate) + 0.6 * self.sine(1, tone * 1.8 * self.tune, rate)) * 0.6 * env(tone_len);
+                let body = (self.sine(0, tone * self.tune, rate)
+                    + 0.6 * self.sine(1, tone * 1.8 * self.tune, rate))
+                    * 0.6
+                    * env(tone_len);
                 let n = self.noise();
                 let (_, high) = self.f1.run(n);
                 if t > rattle_len.max(tone_len) * d {
@@ -205,8 +223,21 @@ impl Voice {
                 // Three quick slaps, then a short tail of noise.
                 let n = self.noise();
                 let (band, _) = self.f1.run(n);
-                let bursts = [0.0, 0.011, 0.022].iter().map(|&b| if t >= b { (-(t - b) / 0.006).exp() } else { 0.0 }).fold(0.0, f32::max);
-                let tail = if t >= 0.03 { 0.7 * (-6.9 * (t - 0.03) / (0.35 * d)).exp() } else { 0.0 };
+                let bursts = [0.0, 0.011, 0.022]
+                    .iter()
+                    .map(|&b| {
+                        if t >= b {
+                            (-(t - b) / 0.006).exp()
+                        } else {
+                            0.0
+                        }
+                    })
+                    .fold(0.0, f32::max);
+                let tail = if t >= 0.03 {
+                    0.7 * (-6.9 * (t - 0.03) / (0.35 * d)).exp()
+                } else {
+                    0.0
+                };
                 if t > 0.03 + 0.35 * d {
                     return None;
                 }
@@ -216,7 +247,9 @@ impl Voice {
                 if t > 0.06 * d {
                     return None;
                 }
-                (self.sine(0, 1700.0 * self.tune, rate) * 0.6 + self.sine(1, 480.0 * self.tune, rate) * 0.5) * env(0.06)
+                (self.sine(0, 1700.0 * self.tune, rate) * 0.6
+                    + self.sine(1, 480.0 * self.tune, rate) * 0.5)
+                    * env(0.06)
             }
             CLOSED | OPEN | CRASH => {
                 let len = match self.piece {
@@ -240,7 +273,11 @@ impl Voice {
                 high * 1.6 * env(len)
             }
             LOW_TOM | HIGH_TOM => {
-                let (start, end) = if self.piece == LOW_TOM { (110.0, 85.0) } else { (190.0, 150.0) };
+                let (start, end) = if self.piece == LOW_TOM {
+                    (110.0, 85.0)
+                } else {
+                    (190.0, 150.0)
+                };
                 let hz = (end + (start - end) * (-t / 0.05).exp()) * self.tune;
                 let len = if kit == KIT_ACOUSTIC { 0.45 } else { 0.7 };
                 if t > len * d {
@@ -299,7 +336,15 @@ impl Default for Drums {
 
 impl Drums {
     pub fn new() -> Self {
-        Self { voices: [Voice::OFF; VOICES], expected: SILENT, cursor: 0, clock: 1, struck: 0, held: 0, velocities: [0; 128] }
+        Self {
+            voices: [Voice::OFF; VOICES],
+            expected: SILENT,
+            cursor: 0,
+            clock: 1,
+            struck: 0,
+            held: 0,
+            velocities: [0; 128],
+        }
     }
 
     /// Which piece a MIDI key plays.
@@ -308,7 +353,10 @@ impl Drums {
     }
 
     pub fn keys(&mut self) -> (u128, u128) {
-        (std::mem::take(&mut self.held), std::mem::take(&mut self.struck))
+        (
+            std::mem::take(&mut self.held),
+            std::mem::take(&mut self.struck),
+        )
     }
 
     pub fn velocities(&self) -> &[u8; 128] {
@@ -325,7 +373,9 @@ impl Drums {
     }
 
     fn hit(&mut self, p: &[f32; MAX_INST_PARAMS], key: u8, velocity: u8, rate: f32) {
-        let Some(piece) = Self::piece_for(key) else { return };
+        let Some(piece) = Self::piece_for(key) else {
+            return;
+        };
         self.struck |= 1 << key;
         self.held |= 1 << key;
         self.velocities[usize::from(key)] = velocity.clamp(1, 127);
@@ -340,19 +390,39 @@ impl Drums {
             }
         }
         // The same piece again restarts on a fresh voice; the oldest one goes if all are busy.
-        let slot = self.voices.iter().position(|v| !v.active()).unwrap_or_else(|| {
-            (0..VOICES).max_by_key(|&i| self.voices[i].t).unwrap_or(0)
-        });
+        let slot = self
+            .voices
+            .iter()
+            .position(|v| !v.active())
+            .unwrap_or_else(|| (0..VOICES).max_by_key(|&i| self.voices[i].t).unwrap_or(0));
         let kit = (p[param::KIT].round() as usize).min(KITS.len() - 1);
         let tune = 2f32.powf(p[base + param::TUNE].clamp(-12.0, 12.0) / 12.0);
         let vel = (f32::from(velocity.clamp(1, 127)) / 127.0).powf(1.3);
-        self.clock = self.clock.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        self.clock = self
+            .clock
+            .wrapping_mul(1_664_525)
+            .wrapping_add(1_013_904_223);
         let (f1, f2) = match piece {
-            SNARE => (Svf::new(if kit == KIT_CLUB { 2500.0 } else { 1500.0 } * tune, 0.7, rate), Svf::default()),
+            SNARE => (
+                Svf::new(
+                    if kit == KIT_CLUB { 2500.0 } else { 1500.0 } * tune,
+                    0.7,
+                    rate,
+                ),
+                Svf::default(),
+            ),
             CLAP => (Svf::new(1200.0 * tune, 1.2, rate), Svf::default()),
             CLOSED | OPEN | CRASH => (
-                Svf::new(if piece == CRASH { 6000.0 } else { 10_000.0 } * tune, 0.8, rate),
-                Svf::new(if piece == CRASH { 4000.0 } else { 7000.0 } * tune, 0.7, rate),
+                Svf::new(
+                    if piece == CRASH { 6000.0 } else { 10_000.0 } * tune,
+                    0.8,
+                    rate,
+                ),
+                Svf::new(
+                    if piece == CRASH { 4000.0 } else { 7000.0 } * tune,
+                    0.7,
+                    rate,
+                ),
             ),
             COWBELL => (Svf::new(700.0 * tune, 2.0, rate), Svf::default()),
             _ => (Svf::default(), Svf::default()),
@@ -383,7 +453,10 @@ impl Drums {
         l: &mut [f32],
         r: &mut [f32],
     ) {
-        for n in live.iter().filter(|n| n.on && n.velocity > 0 && n.key < 128) {
+        for n in live
+            .iter()
+            .filter(|n| n.on && n.velocity > 0 && n.key < 128)
+        {
             self.hit(p, n.key, n.velocity, rate);
         }
         let volume = 10f32.powf(p[param::VOLUME].clamp(-24.0, 6.0) / 20.0) * 0.5;
@@ -452,10 +525,25 @@ mod tests {
             for &(name, key) in &PIECES {
                 let mut p = InstrumentKind::Drums.defaults();
                 p[param::KIT] = kit as f32;
-                let (l, r) = run(&p, &[PlayNote { start: 0, end: 4800, key, velocity: 120 }], 48_000 * 4);
+                let (l, r) = run(
+                    &p,
+                    &[PlayNote {
+                        start: 0,
+                        end: 4800,
+                        key,
+                        velocity: 120,
+                    }],
+                    48_000 * 4,
+                );
                 assert!(peak(&l[..9600]) > 0.01, "{name} in kit {kit} is silent");
-                assert!(l.iter().chain(&r).all(|s| s.is_finite() && s.abs() < 4.0), "{name} kit {kit}");
-                assert!(peak(&l[48_000 * 3..]) < 1e-3, "{name} in kit {kit} never stops");
+                assert!(
+                    l.iter().chain(&r).all(|s| s.is_finite() && s.abs() < 4.0),
+                    "{name} kit {kit}"
+                );
+                assert!(
+                    peak(&l[48_000 * 3..]) < 1e-3,
+                    "{name} in kit {kit} never stops"
+                );
             }
         }
     }
@@ -463,18 +551,49 @@ mod tests {
     #[test]
     fn other_keys_are_ignored_and_pan_moves_pieces() {
         let mut p = InstrumentKind::Drums.defaults();
-        let (l, _) = run(&p, &[PlayNote { start: 0, end: 100, key: 61, velocity: 100 }], 4800);
+        let (l, _) = run(
+            &p,
+            &[PlayNote {
+                start: 0,
+                end: 100,
+                key: 61,
+                velocity: 100,
+            }],
+            4800,
+        );
         assert_eq!(peak(&l), 0.0);
         p[param::FIRST_PIECE + param::PAN] = -1.0; // kick hard left
-        let (l, r) = run(&p, &[PlayNote { start: 0, end: 100, key: 36, velocity: 100 }], 4800);
+        let (l, r) = run(
+            &p,
+            &[PlayNote {
+                start: 0,
+                end: 100,
+                key: 36,
+                velocity: 100,
+            }],
+            4800,
+        );
         assert!(peak(&l) > 0.1 && peak(&r) < 1e-3);
     }
 
     #[test]
     fn a_closed_hat_chokes_the_open_one() {
         let p = InstrumentKind::Drums.defaults();
-        let open = [PlayNote { start: 0, end: 100, key: 46, velocity: 120 }];
-        let choked = [open[0], PlayNote { start: 4800, end: 4900, key: 42, velocity: 120 }];
+        let open = [PlayNote {
+            start: 0,
+            end: 100,
+            key: 46,
+            velocity: 120,
+        }];
+        let choked = [
+            open[0],
+            PlayNote {
+                start: 4800,
+                end: 4900,
+                key: 42,
+                velocity: 120,
+            },
+        ];
         let (ring, _) = run(&p, &open, 24_000);
         let (cut, _) = run(&p, &choked, 24_000);
         assert!(peak(&cut[14_400..]) < peak(&ring[14_400..]) * 0.2);

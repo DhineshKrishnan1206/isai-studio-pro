@@ -1034,7 +1034,7 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                         width: 6; height: 6; radius: 3
                         color: editor.grHold < -0.5 ? editor.amber : "#3A2A1E"
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: Theme.fast } }
                     }
                 }
             }
@@ -1308,7 +1308,7 @@ Item {
             Item {
                 anchors.fill: parent
                 rotation: -135 + 270 * mk.pos
-                Behavior on rotation { enabled: !mkArea.pressed; NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                Behavior on rotation { enabled: !mkArea.pressed; NumberAnimation { duration: Theme.fast; easing.type: Easing.OutCubic } }
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: 6
@@ -1363,7 +1363,7 @@ Item {
         implicitHeight: 46
         hoverEnabled: true
         scale: down ? 0.96 : 1
-        Behavior on scale { NumberAnimation { duration: 80 } }
+        Behavior on scale { NumberAnimation { duration: Theme.fast } }
         background: Rectangle {
             radius: 10
             gradient: Gradient {
@@ -1471,8 +1471,8 @@ Item {
             border.width: 2
             x: 1 + (tg.inputDb + 60) / 60 * w - 5
             y: 1 + h - (tg.curve(tg.inputDb) + 60) / 60 * h - 5
-            Behavior on x { NumberAnimation { duration: 60 } }
-            Behavior on y { NumberAnimation { duration: 60 } }
+            Behavior on x { NumberAnimation { duration: Theme.fast } }
+            Behavior on y { NumberAnimation { duration: Theme.fast } }
         }
         DText {
             anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 8

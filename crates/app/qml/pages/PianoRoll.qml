@@ -52,7 +52,8 @@ Item {
     x: margin
     width: parent.width - margin * 2
     height: Math.max(260, Math.min(parent.height * 0.75, dockHeight))
-    y: parent.height - height - margin
+    y: shown ? parent.height - height - margin : parent.height
+    Behavior on y { NumberAnimation { duration: Theme.slow; easing.type: Easing.OutCubic } }
     visible: opacity > 0 && !!region
     opacity: shown ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: Theme.fast } }
@@ -504,7 +505,7 @@ Item {
                                 height: roll.keyHeight
                                 readonly property bool lit: roll.sounding === key || (roll.listening && roll.activity.lit(key))
                                 color: lit ? roll.tint : black ? "#1A1A1D" : "#ECECEF"
-                                Behavior on color { ColorAnimation { duration: 90 } }
+                                Behavior on color { ColorAnimation { duration: Theme.fast } }
                                 border.color: Theme.tint("#000000", 0.25)
                                 DText {
                                     visible: parent.key % 12 === 0
@@ -849,7 +850,7 @@ Item {
         id: typingKeys
         focus: roll.typing
         Keys.onPressed: e => {
-            if (!roll.typing || e.isAutoRepeat) { e.accepted = roll.typing; return }
+            if (!roll.typing || e.isAutoRepeat) { e.accepted = true; return }
             if (e.key === Qt.Key_R) roll.recordHere()
             else if (e.key === Qt.Key_Space) roll.app.togglePlay()
             else if (e.key === Qt.Key_Z) roll.octave = Math.max(0, roll.octave - 1)

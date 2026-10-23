@@ -1,4 +1,49 @@
-# Where we left off (2026-10-14)
+# Where we left off (2026-10-22)
+
+State: clippy clean (`-D warnings`), all tests pass (`cargo test --workspace`).
+
+## Roadmap items completed in this pass
+
+- Backups: File → Restore earlier version… lists `Backups/` (newest first); a restore
+  is one undoable edit. `storage::backup_time` reads the time from the file name.
+- Alternatives: File → Save as alternative… writes `<folder>/<name>.isai` next to the
+  main version and opens it; File → Open alternative… lists the others (through the
+  unsaved-work guard). They share the folder's `Audio/`.
+- Punch: `Project::punch` (Transport → Punch recording). Finished takes are cut to the
+  cycle region (`record_ops::punch_clip`, tested); the take file still holds the whole recording.
+- MIDI import: one instrument track per MIDI track (`Project::import_midi`).
+- Reduce motion: `app/src/motion.rs` reads macOS `reduceMotion`, Windows
+  "Show animations" (UserPreferencesMask bit 0x02) and GNOME `enable-animations`.
+  Checked at start and when the window gains focus; "reduced" motion (90 ms) when on.
+  Windows and GNOME paths are untested here.
+
+Still not done: multitrack recording (needs several input channels at once in the
+engine and device layer), take comping (needs take lanes in the region model and UI),
+disk streaming for long audio (needs a reader thread feeding the audio thread), and
+DAWproject export/import (needs the format spec and a validator). Real Windows and
+Linux testing needs those machines.
+
+## MIDI files (roadmap 2)
+
+- `crates/project/src/midi_file.rs`: Standard MIDI File reader/writer, no new
+  dependency. Reads format 0/1, running status, tempo, time signature; refuses
+  SMPTE timing; damaged files return errors (tested with every truncation).
+- `Project::import_midi` merges a file's tracks into one region on the selected
+  instrument track at the playhead; `Project::export_midi` writes a region's
+  notes as they play. Menu: Tracks → Import MIDI file… / Export MIDI file….
+- Not done: importing each file track onto its own instrument track.
+
+## Project backups (roadmap 1)
+
+- Every save that changes the project keeps the previous `.isai` in
+  `<project>/Backups/` as `<name> <unix millis>.isai`; the newest 20 are kept.
+  Saving unchanged text adds nothing. `storage::list_backups` lists them, newest first.
+- Not done: a restore screen in the app, and the audio is not backed up
+  (only the project file).
+
+---
+
+## Earlier: 2026-10-14
 
 State: **builds, launches with a clean log, clippy clean, all 120 tests pass** (`cargo test --workspace`).
 
@@ -206,9 +251,11 @@ work, crash recovery, and window dragging. Screenshots look right.
 - Window drag when not maximized: fixed for macOS (manual move); needs a check by hand.
 - Fade handle: now a round knob on the curve with a length readout; fades
   survived a scripted 3× zoom. Ask the user how they zoomed if it still resets.
-- "Changing tempo should speed up / slow down the song": planned as **time-stretch**
-  with a per-region "Follow tempo" option (Phase 3, `signalsmith-stretch`); the
-  region needs its original tempo (detected or typed in).
+- "Changing tempo should speed up / slow down the song": fixed. Audio regions without
+  their own tempo are pinned to the tempo they play at (`Project::pin_audio_tempo`, run by
+  `set_tempo_at`), so the next tempo change stretches them (WSOLA, `engine::stretch`, made
+  in the background). MIDI already followed. Until a stretch is ready, the region plays at its
+  recorded speed for a moment.
 
 ## Main window
 - Plain `Qt.Window` on every platform with the system title bar. Drawing under the macOS
@@ -354,3 +401,25 @@ work, crash recovery, and window dragging. Screenshots look right.
 - Settings › Appearance › "Interface size" (Segmented 75/100/125/150/200%).
 - Test: `cargo test -p isai-settings` (default is 100).
 
+
+## Video for scoring
+
+- Model: `Project.videos` (`VideoClip { id, name, file, start }`, `start` in beats, serde default).
+  `add_video` / `remove_video`; save copies each video into `Video/` (`ProjectPaths::video_dir`,
+  `resolve_video`), same as audio.
+- Controller: `videos_json` (published with the project; `path`, `start` in seconds, `beat`),
+  `import_video(url)` at the playhead and `remove_video(id)`, both undoable.
+- Player: `crates/app/qml/pages/VideoWindow.qml`, a separate `Window` with Qt Multimedia
+  (`MediaPlayer` + `VideoOutput`). It plays the clip under the playhead and follows `app.playing`
+  and `app.position`, correcting drift over 150 ms. Muted by default. Docks to the left, right,
+  top or bottom of the main window (buttons, or drop it within 28 px of an edge). Keep on top.
+- Formats: every platform plays through Qt's FFmpeg backend (`main.rs` sets
+  `QT_MEDIA_BACKEND=ffmpeg` before startup). Headless probe (MediaPlayer, FFmpeg 8.1) opened
+  MP4, HEVC MP4, MOV, MKV, WebM, AVI, WMV, FLV, MPEG-PS, M2TS, Ogg/VP8, 3GP, MXF and M4V.
+  Probe clips: generated with ffmpeg; the probe is in the scratchpad, not the repo.
+- macOS Qt: Homebrew's qtmultimedia has no FFmpeg backend, so it was rebuilt from the official
+  6.12.0 source with FFmpeg 8.1 (`qt-cmake`, `Qt6ShaderTools_DIR` set, `PKG_CONFIG_PATH` to
+  `/opt/homebrew/opt/ffmpeg/lib/pkgconfig`). That build is in `/opt/homebrew/Cellar/qtmultimedia/6.12.0_1`,
+  so `brew reinstall qtmultimedia` will replace it with the plain bottle.
+- Build: `build.rs` links `Multimedia`; the packaging scripts and the Windows and Linux workflow
+  install `qtmultimedia`.

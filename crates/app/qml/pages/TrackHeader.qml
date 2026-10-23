@@ -28,11 +28,18 @@ Rectangle {
 
     readonly property color tint: Theme.trackColor(track.color)
 
-    radius: Theme.radiusMd
-    color: dragging ? Theme.raised : selected ? Theme.tint(tint, Theme.dark ? 0.16 : 0.12) : Theme.surface
-    border.color: selected ? Theme.tint(tint, 0.7) : Theme.line
+    // A flat row, like a DAW's track list: a hairline separates it from the next track.
+    radius: 0
+    color: dragging ? Theme.raised : selected ? Theme.tint(tint, Theme.dark ? 0.12 : 0.09) : Theme.surface
     opacity: track.audible ? 1 : 0.55
     Behavior on color { ColorAnimation { duration: Theme.fast } }
+
+    Rectangle {
+        anchors.bottom: parent.bottom
+        width: parent.width
+        height: 1
+        color: Theme.line
+    }
 
     MouseArea {
         anchors.fill: parent

@@ -17,7 +17,11 @@ const HIGH_SHELF: usize = 9;
 const HIGH_CUT: usize = 10;
 
 /// Butterworth stage Qs for each slope (12, 24 and 48 dB/oct; 6 is first order).
-const BUTTERWORTH: [&[f32]; 3] = [&[std::f32::consts::FRAC_1_SQRT_2], &[0.541_196_1, 1.306_563], &[0.509_795_6, 0.601_344_9, 0.899_976_2, 2.562_915_4]];
+const BUTTERWORTH: [&[f32]; 3] = [
+    &[std::f32::consts::FRAC_1_SQRT_2],
+    &[0.541_196_1, 1.306_563],
+    &[0.509_795_6, 0.601_344_9, 0.899_976_2, 2.562_915_4],
+];
 
 /// Parameter indices (see `EQ_PARAMS`).
 pub mod param {
@@ -58,16 +62,25 @@ fn design(p: &[f32; MAX_PARAMS], rate: f32) -> [Option<Coeffs>; SLOTS] {
     use param::*;
     let mut out = [None; SLOTS];
     let on = |i: usize| p[i] >= 0.5;
-    let cut = |out: &mut [Option<Coeffs>; SLOTS], first: usize, freq: f32, slope: f32, high: bool| {
-        let slope = slope.round().clamp(0.0, 3.0) as usize;
-        if slope == 0 {
-            out[first] = Some(if high { Coeffs::highpass1(freq, rate) } else { Coeffs::lowpass1(freq, rate) });
-        } else {
-            for (k, &q) in BUTTERWORTH[slope - 1].iter().enumerate() {
-                out[first + k] = Some(if high { Coeffs::highpass(freq, q, rate) } else { Coeffs::lowpass(freq, q, rate) });
+    let cut =
+        |out: &mut [Option<Coeffs>; SLOTS], first: usize, freq: f32, slope: f32, high: bool| {
+            let slope = slope.round().clamp(0.0, 3.0) as usize;
+            if slope == 0 {
+                out[first] = Some(if high {
+                    Coeffs::highpass1(freq, rate)
+                } else {
+                    Coeffs::lowpass1(freq, rate)
+                });
+            } else {
+                for (k, &q) in BUTTERWORTH[slope - 1].iter().enumerate() {
+                    out[first + k] = Some(if high {
+                        Coeffs::highpass(freq, q, rate)
+                    } else {
+                        Coeffs::lowpass(freq, q, rate)
+                    });
+                }
             }
-        }
-    };
+        };
     if on(LC_ON) {
         cut(&mut out, LOW_CUT, p[LC_FREQ], p[LC_SLOPE], true);
     }
@@ -91,7 +104,12 @@ fn design(p: &[f32; MAX_PARAMS], rate: f32) -> [Option<Coeffs>; SLOTS] {
 
 impl Eq {
     pub fn new() -> Self {
-        Self { stages: [Biquad::new(); SLOTS], active: [false; SLOTS], last: [f32::NAN; MAX_PARAMS], last_rate: 0.0 }
+        Self {
+            stages: [Biquad::new(); SLOTS],
+            active: [false; SLOTS],
+            last: [f32::NAN; MAX_PARAMS],
+            last_rate: 0.0,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -112,7 +130,12 @@ impl Eq {
             self.last = *p;
             self.last_rate = ctx.sample_rate;
         }
-        for (stage, _) in self.stages.iter_mut().zip(self.active).filter(|(_, on)| *on) {
+        for (stage, _) in self
+            .stages
+            .iter_mut()
+            .zip(self.active)
+            .filter(|(_, on)| *on)
+        {
             stage.process(l, r);
         }
         let out = p[param::OUTPUT];
@@ -126,16 +149,35 @@ impl Eq {
     /// the bells, 6 high shelf, 7 high cut); `None` while a band is off or flat.
     pub fn band_curves(p: &[f32; MAX_PARAMS], freqs: &[f32], rate: f32) -> [Option<Vec<f32>>; 8] {
         let design = design(p, rate);
-        let ranges = [LOW_CUT..LOW_SHELF, LOW_SHELF..BELLS, BELLS..BELLS + 1, BELLS + 1..BELLS + 2, BELLS + 2..BELLS + 3, BELLS + 3..HIGH_SHELF, HIGH_SHELF..HIGH_CUT, HIGH_CUT..SLOTS];
+        let ranges = [
+            LOW_CUT..LOW_SHELF,
+            LOW_SHELF..BELLS,
+            BELLS..BELLS + 1,
+            BELLS + 1..BELLS + 2,
+            BELLS + 2..BELLS + 3,
+            BELLS + 3..HIGH_SHELF,
+            HIGH_SHELF..HIGH_CUT,
+            HIGH_CUT..SLOTS,
+        ];
         ranges.map(|slots| {
             let stages: Vec<Coeffs> = design[slots].iter().flatten().copied().collect();
-            (!stages.is_empty()).then(|| freqs.iter().map(|&f| stages.iter().map(|c| c.response_db(f, rate)).sum()).collect())
+            (!stages.is_empty()).then(|| {
+                freqs
+                    .iter()
+                    .map(|&f| stages.iter().map(|c| c.response_db(f, rate)).sum())
+                    .collect()
+            })
         })
     }
 
     /// The EQ's overall gain in dB at `freq`, for drawing its curve.
     pub fn response_db(p: &[f32; MAX_PARAMS], freq: f32, rate: f32) -> f32 {
-        design(p, rate).iter().flatten().map(|c| c.response_db(freq, rate)).sum::<f32>() + p[param::OUTPUT]
+        design(p, rate)
+            .iter()
+            .flatten()
+            .map(|c| c.response_db(freq, rate))
+            .sum::<f32>()
+            + p[param::OUTPUT]
     }
 
     pub fn reset(&mut self) {
@@ -175,7 +217,10 @@ mod tests {
         let gentle = Eq::response_db(&p, 100.0, 48_000.0);
         p[LC_SLOPE] = 3.0;
         let steep = Eq::response_db(&p, 100.0, 48_000.0);
-        assert!((gentle + 12.3).abs() < 1.0 && (steep + 48.0).abs() < 2.0, "{gentle} {steep}");
+        assert!(
+            (gentle + 12.3).abs() < 1.0 && (steep + 48.0).abs() < 2.0,
+            "{gentle} {steep}"
+        );
         p[OUTPUT] = -3.0;
         assert!((Eq::response_db(&p, 1000.0, 48_000.0) - 3.0).abs() < 0.1);
     }
@@ -188,7 +233,10 @@ mod tests {
         p[LC_ON] = 1.0;
         let freqs = [50.0, 1000.0, 5000.0];
         let bands = Eq::band_curves(&p, &freqs, 48_000.0);
-        assert!(bands[1].is_none() && bands[3].is_none(), "flat or off bands have no curve");
+        assert!(
+            bands[1].is_none() && bands[3].is_none(),
+            "flat or off bands have no curve"
+        );
         for (i, &f) in freqs.iter().enumerate() {
             let sum: f32 = bands.iter().flatten().map(|c| c[i]).sum();
             assert!((sum - Eq::response_db(&p, f, 48_000.0)).abs() < 1e-3);
@@ -201,7 +249,9 @@ mod tests {
         let mut p = EffectKind::Eq.defaults();
         p[LC_ON] = 1.0;
         p[LC_FREQ] = 200.0;
-        let sine: Vec<f32> = (0..48_000).map(|i| (i as f32 * 30.0 * std::f32::consts::TAU / 48_000.0).sin()).collect();
+        let sine: Vec<f32> = (0..48_000)
+            .map(|i| (i as f32 * 30.0 * std::f32::consts::TAU / 48_000.0).sin())
+            .collect();
         let (mut l, mut r) = (sine.clone(), sine);
         for (cl, cr) in l.chunks_mut(512).zip(r.chunks_mut(512)) {
             eq.process(&p, &CTX, cl, cr);

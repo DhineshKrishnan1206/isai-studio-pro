@@ -12,6 +12,12 @@ Qt Quick Shapes, Qt Quick Effects, Qt Quick Dialogs, Qt Labs Folder List
 Model, Qt Network and Qt OpenGL. Qt Shader Tools, used while building, is
 under the GPL-3.0, which is compatible because Isai is GPL-3.0 too.
 
+Qt Multimedia (video playback) is also LGPL-3.0. Video is decoded by FFmpeg
+(https://ffmpeg.org) through Qt's FFmpeg backend. The macOS build bundles the
+Homebrew FFmpeg build, which is GPL-3.0-or-later because it includes GPL codecs;
+that is compatible with Isai's GPL-3.0. Windows and Linux use the FFmpeg build
+that ships with Qt. The FFmpeg source is at https://ffmpeg.org.
+
 Isai links to Qt's shared libraries, so you can replace them with your own
 build of Qt. Qt's source code is available from
 <https://download.qt.io/official_releases/qt/>. Any release package of Isai

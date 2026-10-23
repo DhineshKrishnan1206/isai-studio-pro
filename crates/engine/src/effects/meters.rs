@@ -78,7 +78,12 @@ impl Meters {
     /// last call, then resets them.
     pub fn take(&self) -> ([f32; 4], f32) {
         let take = |a: &AtomicU32| f32::from_bits(a.swap(0, Relaxed));
-        let levels = [take(&self.input[0]), take(&self.input[1]), take(&self.output[0]), take(&self.output[1])];
+        let levels = [
+            take(&self.input[0]),
+            take(&self.input[1]),
+            take(&self.output[0]),
+            take(&self.output[1]),
+        ];
         let reduction = f32::from_bits(self.reduction.swap(0f32.to_bits(), Relaxed));
         (levels, reduction)
     }
@@ -95,7 +100,9 @@ impl Meters {
 
     fn ring(&self, ring: &[AtomicU32]) -> Vec<f32> {
         let pos = self.scope_pos.load(Relaxed);
-        (0..SCOPE).map(|i| f32::from_bits(ring[(pos + i) % SCOPE].load(Relaxed))).collect()
+        (0..SCOPE)
+            .map(|i| f32::from_bits(ring[(pos + i) % SCOPE].load(Relaxed)))
+            .collect()
     }
 }
 

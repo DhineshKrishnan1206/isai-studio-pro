@@ -10,7 +10,10 @@ use std::time::Instant;
 use isai_engine::effects::PlayInsert;
 use isai_engine::instruments::{PlayInstrument, PlayNote};
 use isai_engine::{Arrangement, AutoTarget, PlayBus, PlayLane, PlayRegion, PlayTrack};
-use isai_project::{BeatNote, EffectKind, History, Insert, InstrumentKind, Project, ProjectPaths, Track, apply_midi_fx, db_to_gain};
+use isai_project::{
+    BeatNote, EffectKind, History, Insert, InstrumentKind, Project, ProjectPaths, Track,
+    apply_midi_fx, db_to_gain,
+};
 use serde_json::json;
 
 use crate::pool::{AudioPool, AudioState};
@@ -20,11 +23,12 @@ const DECLICK_SECS: f64 = 0.003;
 
 /// Lowers an instrument's settings to its lightest quality, for Eco mode.
 fn eco_params(kind: InstrumentKind, params: &mut [f32; isai_project::MAX_INST_PARAMS]) {
-    let set = |params: &mut [f32; isai_project::MAX_INST_PARAMS], key: &str, f: &dyn Fn(f32) -> f32| {
-        if let Some(i) = kind.params().iter().position(|d| d.key == key) {
-            params[i] = f(params[i]);
-        }
-    };
+    let set =
+        |params: &mut [f32; isai_project::MAX_INST_PARAMS], key: &str, f: &dyn Fn(f32) -> f32| {
+            if let Some(i) = kind.params().iter().position(|d| d.key == key) {
+                params[i] = f(params[i]);
+            }
+        };
     match kind {
         InstrumentKind::Piano => set(params, "quality", &|_| 1.0),
         // Unison is a choice index: 1 = two voices.
@@ -107,7 +111,12 @@ pub fn effect_kinds_json() -> String {
 
 impl Session {
     pub fn new(project: Project, paths: Option<ProjectPaths>) -> Self {
-        Self { project, paths, history: History::default(), dirty: false }
+        Self {
+            project,
+            paths,
+            history: History::default(),
+            dirty: false,
+        }
     }
 
     /// Applies an edit as one undoable step. `f` returns whether it changed
@@ -153,7 +162,11 @@ impl Session {
     }
 
     pub fn audio_paths(&self) -> Vec<PathBuf> {
-        self.project.audio_files().iter().map(|f| self.resolve(f)).collect()
+        self.project
+            .audio_files()
+            .iter()
+            .map(|f| self.resolve(f))
+            .collect()
     }
 
     /// Saves to `paths` (the current location, or a new one for Save As).
@@ -181,7 +194,15 @@ impl Session {
         let inserts = |chain: &[Insert]| -> Vec<PlayInsert> {
             chain
                 .iter()
-                .filter_map(|i| Some(PlayInsert { plugin: None, id: i.id, kind: i.effect_kind()?, enabled: i.enabled, params: i.values() }))
+                .filter_map(|i| {
+                    Some(PlayInsert {
+                        plugin: None,
+                        id: i.id,
+                        kind: i.effect_kind()?,
+                        enabled: i.enabled,
+                        params: i.values(),
+                    })
+                })
                 .collect()
         };
         let tracks = self
@@ -192,7 +213,9 @@ impl Session {
                 let mut regions: Vec<PlayRegion> = Vec::new();
                 for r in track.regions.iter().filter(|r| r.midi.is_none()) {
                     let path = self.resolve(&r.file);
-                    let Some(source) = pool.ready(&path) else { continue };
+                    let Some(source) = pool.ready(&path) else {
+                        continue;
+                    };
                     // Following the tempo: the stretched copy, once it's made.
                     let ratio = self.project.stretch_ratio(r);
                     let (audio, scale) = match pool.stretched(&path, ratio) {
@@ -210,7 +233,10 @@ impl Session {
                         // Audio not following the tempo keeps its speed through tempo changes.
                         let len = if r.tempo.is_none() {
                             let from = r.start + pass;
-                            secs(map.beats_to_secs(from + (span - pass).min(beats)) - map.beats_to_secs(from))
+                            secs(
+                                map.beats_to_secs(from + (span - pass).min(beats))
+                                    - map.beats_to_secs(from),
+                            )
                         } else {
                             secs(local.beats_to_secs((span - pass).min(beats)) * scale)
                         }
@@ -219,7 +245,8 @@ impl Session {
                             break;
                         }
                         // A shorter last pass of a reversed region still starts from the end of the audio.
-                        let offset = secs(r.offset * scale) + if r.reverse { full - len } else { 0 };
+                        let offset =
+                            secs(r.offset * scale) + if r.reverse { full - len } else { 0 };
                         regions.push(PlayRegion {
                             audio: Arc::clone(audio),
                             start: map.beats_to_samples(r.start + pass, rate),
@@ -235,7 +262,8 @@ impl Session {
                 }
                 crossfade_overlaps(&mut regions);
                 let automation = self.play_lanes(track, rate);
-                let automated = |bus: usize| automation.iter().any(|l| l.target == AutoTarget::Send(bus));
+                let automated =
+                    |bus: usize| automation.iter().any(|l| l.target == AutoTarget::Send(bus));
                 let mut sends: Vec<(usize, f32)> = track
                     .sends
                     .iter()
@@ -265,16 +293,31 @@ impl Session {
                         }
                         let mut play = PlayInstrument::new(i.id, kind, params);
                         // The sampler's sound (once loaded) and its slices in samples.
-                        play.sample = i.sample.as_ref().and_then(|f| pool.ready(&self.resolve(f)).cloned());
-                        play.slices = i.slices.iter().map(|&s| (s * f64::from(rate)).round() as u64).collect();
+                        play.sample = i
+                            .sample
+                            .as_ref()
+                            .and_then(|f| pool.ready(&self.resolve(f)).cloned());
+                        play.slices = i
+                            .slices
+                            .iter()
+                            .map(|&s| (s * f64::from(rate)).round() as u64)
+                            .collect();
                         Some(play)
                     }),
-                    notes: if track.instrument.is_some() { self.play_notes(track, rate) } else { Vec::new() },
+                    notes: if track.instrument.is_some() {
+                        self.play_notes(track, rate)
+                    } else {
+                        Vec::new()
+                    },
                     regions,
                 };
                 // Frozen (and its audio loaded): just the rendered file, with no
                 // instrument or effects running. Fader, pan and sends stay live.
-                if let Some(audio) = track.frozen.as_ref().and_then(|f| pool.ready(&self.resolve(f))) {
+                if let Some(audio) = track
+                    .frozen
+                    .as_ref()
+                    .and_then(|f| pool.ready(&self.resolve(f)))
+                {
                     let len = audio.frames() as u64;
                     play.regions = vec![PlayRegion {
                         audio: Arc::clone(audio),
@@ -289,7 +332,8 @@ impl Session {
                     play.instrument = None;
                     play.notes = Vec::new();
                     play.inserts = Vec::new();
-                    play.automation.retain(|l| !matches!(l.target, AutoTarget::Param { .. }));
+                    play.automation
+                        .retain(|l| !matches!(l.target, AutoTarget::Param { .. }));
                 }
                 play
             })
@@ -298,10 +342,25 @@ impl Session {
             .project
             .buses
             .iter()
-            .map(|b| PlayBus { gain: db_to_gain(b.volume_db), pan: b.pan, audible: !b.mute, inserts: inserts(&b.inserts) })
+            .map(|b| PlayBus {
+                gain: db_to_gain(b.volume_db),
+                pan: b.pan,
+                audible: !b.mute,
+                inserts: inserts(&b.inserts),
+            })
             .collect();
-        let tempo_changes = map.tempos().skip(1).map(|(beat, bpm)| (map.beats_to_samples(beat, rate), bpm as f32)).collect();
-        Arrangement { tracks, buses, master: inserts(&self.project.master_inserts), bpm: self.project.tempo as f32, tempo_changes }
+        let tempo_changes = map
+            .tempos()
+            .skip(1)
+            .map(|(beat, bpm)| (map.beats_to_samples(beat, rate), bpm as f32))
+            .collect();
+        Arrangement {
+            tracks,
+            buses,
+            master: inserts(&self.project.master_inserts),
+            bpm: self.project.tempo as f32,
+            tempo_changes,
+        }
     }
 
     /// Every note an instrument track plays, in samples, sorted by start.
@@ -321,14 +380,22 @@ impl Session {
                 (0..passes).flat_map(move |k| {
                     let pass = r.start + k as f64 * m.length;
                     let pass_end = (pass + m.length).min(r.start + span);
-                    m.notes.iter().filter(|n| n.start >= m.offset && n.start < m.offset + m.length).filter_map(move |n| {
-                        let start = pass + (n.start - m.offset);
-                        if start >= pass_end {
-                            return None;
-                        }
-                        let end = (start + n.length).min(pass_end);
-                        Some(BeatNote { start, end, key: n.key, velocity: n.velocity })
-                    })
+                    m.notes
+                        .iter()
+                        .filter(|n| n.start >= m.offset && n.start < m.offset + m.length)
+                        .filter_map(move |n| {
+                            let start = pass + (n.start - m.offset);
+                            if start >= pass_end {
+                                return None;
+                            }
+                            let end = (start + n.length).min(pass_end);
+                            Some(BeatNote {
+                                start,
+                                end,
+                                key: n.key,
+                                velocity: n.velocity,
+                            })
+                        })
                 })
             })
             .collect();
@@ -369,12 +436,23 @@ impl Session {
                     }
                     ("fx", Some(insert), Some(key)) => {
                         let insert: u64 = insert.parse().ok()?;
-                        let kind = track.inserts.iter().find(|i| i.id == insert)?.effect_kind()?;
-                        AutoTarget::Param { insert, index: kind.params().iter().position(|d| d.key == key)? }
+                        let kind = track
+                            .inserts
+                            .iter()
+                            .find(|i| i.id == insert)?
+                            .effect_kind()?;
+                        AutoTarget::Param {
+                            insert,
+                            index: kind.params().iter().position(|d| d.key == key)?,
+                        }
                     }
                     _ => return None,
                 };
-                let points = lane.points.iter().map(|p| (meter.beats_to_samples(p.beat, rate), p.value)).collect();
+                let points = lane
+                    .points
+                    .iter()
+                    .map(|p| (meter.beats_to_samples(p.beat, rate), p.value))
+                    .collect();
                 Some(PlayLane { target, points })
             })
             .collect()
@@ -383,14 +461,25 @@ impl Session {
     /// What a track's automation can control, for the lane picker:
     /// [{ key, label, min, max, value, points: [[beat, value]…] }].
     fn auto_targets_json(&self, track: &Track) -> serde_json::Value {
-        let mut keys: Vec<(String, String, &str)> = vec![("volume".into(), "Volume".into(), "dB"), ("pan".into(), "Pan".into(), "pan")];
+        let mut keys: Vec<(String, String, &str)> = vec![
+            ("volume".into(), "Volume".into(), "dB"),
+            ("pan".into(), "Pan".into(), "pan"),
+        ];
         for b in &self.project.buses {
-            keys.push((format!("send:{}", b.id), format!("Send to {}", b.name), "dB"));
+            keys.push((
+                format!("send:{}", b.id),
+                format!("Send to {}", b.name),
+                "dB",
+            ));
         }
         for i in &track.inserts {
             if let Some(kind) = i.effect_kind() {
                 for d in kind.params().iter().filter(|d| d.choices.is_empty()) {
-                    keys.push((format!("fx:{}:{}", i.id, d.key), format!("{}: {}", kind.label(), d.label), d.unit));
+                    keys.push((
+                        format!("fx:{}:{}", i.id, d.key),
+                        format!("{}: {}", kind.label(), d.label),
+                        d.unit,
+                    ));
                 }
             }
         }
@@ -415,8 +504,38 @@ impl Session {
 
     /// Markers as JSON: [{ id, beat, name }], sorted by beat.
     pub fn markers_json(&self) -> String {
-        let markers: Vec<_> = self.project.markers.iter().map(|m| json!({ "id": m.id, "beat": m.beat, "name": m.name })).collect();
+        let markers: Vec<_> = self
+            .project
+            .markers
+            .iter()
+            .map(|m| json!({ "id": m.id, "beat": m.beat, "name": m.name }))
+            .collect();
         serde_json::Value::Array(markers).to_string()
+    }
+
+    /// Videos as JSON: [{ id, name, path, start, beat, beats }]. `start` is in seconds;
+    /// `beat` and `beats` (the length) are in beats.
+    pub fn videos_json(&self) -> String {
+        let map = self.project.tempo_map();
+        let videos: Vec<_> = self
+            .project
+            .videos
+            .iter()
+            .map(|v| {
+                let path = match &self.paths {
+                    Some(p) => p.resolve_video(&v.file),
+                    None => PathBuf::from(&v.file),
+                };
+                // A video of unknown length gets a short block so it still shows.
+                let beats = if v.length > 0.0 {
+                    map.secs_to_beats(map.beats_to_secs(v.start) + v.length) - v.start
+                } else {
+                    8.0
+                };
+                json!({ "id": v.id, "name": v.name, "path": path.to_string_lossy(), "start": map.beats_to_secs(v.start), "beat": v.start, "beats": beats, "track": v.track })
+            })
+            .collect();
+        serde_json::Value::Array(videos).to_string()
     }
 
     /// Buses as JSON for the mixer.
@@ -485,6 +604,7 @@ impl Session {
                     "name": t.name,
                     "frozen": t.frozen.is_some(),
                     "folder": t.folder,
+                    "video": t.video,
                     "midiFx": t.midi_fx.as_ref().map(|f| f.kind.clone()),
                     "group": t.group,
                     "color": t.color,
@@ -564,8 +684,22 @@ mod tests {
 
     #[test]
     fn overlapping_regions_crossfade() {
-        let audio = Arc::new(isai_engine::Clip { name: String::new(), sample_rate: 100, left: vec![1.0; 100], right: vec![1.0; 100] });
-        let region = |start| PlayRegion { audio: audio.clone(), start, offset: 0, len: 100, fade_in: 1, fade_out: 1, gain: 1.0, reverse: false };
+        let audio = Arc::new(isai_engine::Clip {
+            name: String::new(),
+            sample_rate: 100,
+            left: vec![1.0; 100],
+            right: vec![1.0; 100],
+        });
+        let region = |start| PlayRegion {
+            audio: audio.clone(),
+            start,
+            offset: 0,
+            len: 100,
+            fade_in: 1,
+            fade_out: 1,
+            gain: 1.0,
+            reverse: false,
+        };
         let mut regions = vec![region(80), region(0)];
         crossfade_overlaps(&mut regions);
         assert_eq!(regions[0].start, 0);
@@ -586,7 +720,11 @@ mod tests {
         let track = s.project.track(synth).unwrap().clone();
         let starts: Vec<u64> = s.play_notes(&track, 100).iter().map(|n| n.start).collect();
         // 120 BPM at 100 samples a second: a beat is 50 samples.
-        assert_eq!(starts, vec![50, 250, 450], "three passes, the last one cut short");
+        assert_eq!(
+            starts,
+            vec![50, 250, 450],
+            "three passes, the last one cut short"
+        );
     }
 
     #[test]
@@ -604,9 +742,15 @@ mod tests {
             i.params[i.kind.params().iter().position(|d| d.key == key).unwrap()]
         };
         let full = s.arrangement(&pool, false);
-        assert_eq!((value(&full, 0, "quality"), value(&full, 1, "unison")), (0.0, 6.0));
+        assert_eq!(
+            (value(&full, 0, "quality"), value(&full, 1, "unison")),
+            (0.0, 6.0)
+        );
         let eco = s.arrangement(&pool, true);
-        assert_eq!((value(&eco, 0, "quality"), value(&eco, 1, "unison")), (1.0, 1.0));
+        assert_eq!(
+            (value(&eco, 0, "quality"), value(&eco, 1, "unison")),
+            (1.0, 1.0)
+        );
     }
 
     #[test]

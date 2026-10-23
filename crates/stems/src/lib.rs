@@ -18,8 +18,8 @@ mod unet;
 
 use std::sync::Arc;
 
-use realfft::num_complex::Complex32;
 use realfft::RealFftPlanner;
+use realfft::num_complex::Complex32;
 
 pub use model::Weights;
 use unet::{Tensor, UNet};
@@ -43,7 +43,11 @@ pub struct Separator {
 
 impl Separator {
     pub fn new(weights: &Weights) -> Result<Self, String> {
-        Ok(Self { nets: (0..4).map(|i| UNet::load(weights, i)).collect::<Result<_, _>>()? })
+        Ok(Self {
+            nets: (0..4)
+                .map(|i| UNet::load(weights, i))
+                .collect::<Result<_, _>>()?,
+        })
     }
 
     /// Splits stereo audio at 44.1 kHz. `out(stem, left, right)` receives each
@@ -58,7 +62,14 @@ impl Separator {
         progress: impl Fn(f32),
         cancel: impl Fn() -> bool,
     ) -> bool {
-        separate_with(left, right, out, progress, cancel, &|mag: &Tensor, stem: usize| self.nets[stem].forward(mag, threads))
+        separate_with(
+            left,
+            right,
+            out,
+            progress,
+            cancel,
+            &|mag: &Tensor, stem: usize| self.nets[stem].forward(mag, threads),
+        )
     }
 }
 
@@ -86,7 +97,9 @@ fn separate_with(
             }
         };
 
-        let window: Vec<f32> = (0..FRAME).map(|i| 0.5 - 0.5 * (std::f32::consts::TAU * i as f32 / FRAME as f32).cos()).collect();
+        let window: Vec<f32> = (0..FRAME)
+            .map(|i| 0.5 - 0.5 * (std::f32::consts::TAU * i as f32 / FRAME as f32).cos())
+            .collect();
         let mut planner = RealFftPlanner::<f32>::new();
         let fwd: Arc<dyn realfft::RealToComplex<f32>> = planner.plan_fft_forward(FRAME);
         let inv: Arc<dyn realfft::ComplexToReal<f32>> = planner.plan_fft_inverse(FRAME);
@@ -178,8 +191,14 @@ fn separate_with(
             if done_upto > emitted {
                 let (from, to) = (emitted - base, done_upto - base);
                 for (stem, bufs) in acc.iter().enumerate() {
-                    let l: Vec<f32> = bufs[0][from..to].iter().map(|v| v * WINDOW_COMPENSATION).collect();
-                    let r: Vec<f32> = bufs[1][from..to].iter().map(|v| v * WINDOW_COMPENSATION).collect();
+                    let l: Vec<f32> = bufs[0][from..to]
+                        .iter()
+                        .map(|v| v * WINDOW_COMPENSATION)
+                        .collect();
+                    let r: Vec<f32> = bufs[1][from..to]
+                        .iter()
+                        .map(|v| v * WINDOW_COMPENSATION)
+                        .collect();
                     out(stem, &l, &r);
                 }
                 emitted = done_upto;
@@ -227,7 +246,12 @@ mod tests {
         // These tones are far below bin 1024 (~11 kHz), where the masks apply.
         // (Their abrupt start and end aren't: skip a frame at each edge.)
         for i in (FRAME..n - FRAME).step_by(997) {
-            assert!((l0[i] * 4.0 - left[i]).abs() < 1e-3, "left {i}: {} vs {}", l0[i] * 4.0, left[i]);
+            assert!(
+                (l0[i] * 4.0 - left[i]).abs() < 1e-3,
+                "left {i}: {} vs {}",
+                l0[i] * 4.0,
+                left[i]
+            );
             assert!((r0[i] * 4.0 - right[i]).abs() < 1e-3, "right {i}");
         }
     }

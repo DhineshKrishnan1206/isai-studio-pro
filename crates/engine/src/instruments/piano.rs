@@ -82,13 +82,23 @@ struct Partial {
 }
 
 impl Partial {
-    const OFF: Partial = Partial { re: 0.0, im: 0.0, c: 1.0, s: 0.0 };
+    const OFF: Partial = Partial {
+        re: 0.0,
+        im: 0.0,
+        c: 1.0,
+        s: 0.0,
+    };
 
     fn new(amp: f32, freq: f32, t60_secs: f32, rate: f32) -> Self {
         let w = TAU * freq / rate;
         let d = t60(t60_secs, rate);
         // Starts at zero (a sine), so the note doesn't begin with a jump.
-        Partial { re: amp, im: 0.0, c: w.cos() * d, s: w.sin() * d }
+        Partial {
+            re: amp,
+            im: 0.0,
+            c: w.cos() * d,
+            s: w.sin() * d,
+        }
     }
 }
 
@@ -229,7 +239,11 @@ impl Piano {
     }
 
     pub fn keys(&mut self) -> (u128, u128) {
-        let held = self.voices.iter().filter(|v| v.on && !v.released).fold(0u128, |m, v| m | 1 << (v.key & 127));
+        let held = self
+            .voices
+            .iter()
+            .filter(|v| v.on && !v.released)
+            .fold(0u128, |m, v| m | 1 << (v.key & 127));
         (held, std::mem::take(&mut self.struck))
     }
 
@@ -252,7 +266,15 @@ impl Piano {
         self.room_tail = 0;
     }
 
-    fn note_on(&mut self, p: &[f32; MAX_INST_PARAMS], key: u8, velocity: u8, end: u64, live: bool, rate: f32) {
+    fn note_on(
+        &mut self,
+        p: &[f32; MAX_INST_PARAMS],
+        key: u8,
+        velocity: u8,
+        end: u64,
+        live: bool,
+        rate: f32,
+    ) {
         use param::*;
         let light = p[QUALITY] >= 0.5;
         let voices = if light { LIGHT_VOICES } else { VOICES };
@@ -262,7 +284,11 @@ impl Piano {
         // A free voice, else the quietest (cut, but by then it's nearly silent).
         let i = (0..voices)
             .find(|&i| !self.voices[i].on)
-            .unwrap_or_else(|| (0..voices).min_by(|&a, &b| self.voices[a].level.total_cmp(&self.voices[b].level)).unwrap_or(0));
+            .unwrap_or_else(|| {
+                (0..voices)
+                    .min_by(|&a, &b| self.voices[a].level.total_cmp(&self.voices[b].level))
+                    .unwrap_or(0)
+            });
 
         let key = key.min(127);
         self.struck |= 1 << key;
@@ -281,15 +307,35 @@ impl Piano {
         let place = ((f32::from(key) - 64.0) / 36.0).clamp(-1.0, 1.0) * width;
         let angle = (place + 1.0) * FRAC_PI_4;
 
-        let mut v = Voice { on: true, key, end, live, freq, pan_l: angle.cos() * 2f32.sqrt(), pan_r: angle.sin() * 2f32.sqrt(), ..Voice::OFF };
+        let mut v = Voice {
+            on: true,
+            key,
+            end,
+            live,
+            freq,
+            pan_l: angle.cos() * 2f32.sqrt(),
+            pan_r: angle.sin() * 2f32.sqrt(),
+            ..Voice::OFF
+        };
         let max_partials = if light { LIGHT_PARTIALS } else { PARTIALS };
         match tone {
             tone::ELECTRIC | tone::WURLI => {
                 let wurli = tone == tone::WURLI;
                 v.kind = Kind::Fm;
                 v.ratio = 1.0;
-                v.index = if wurli { (1.6 + 3.0 * bright) * (0.4 + 0.6 * vel) } else { (1.2 + 4.0 * bright) * (0.35 + 0.65 * vel) };
-                v.index_decay = t60(if wurli { 0.25 } else { 0.35 + 0.4 * (1.0 - bright) }, rate);
+                v.index = if wurli {
+                    (1.6 + 3.0 * bright) * (0.4 + 0.6 * vel)
+                } else {
+                    (1.2 + 4.0 * bright) * (0.35 + 0.65 * vel)
+                };
+                v.index_decay = t60(
+                    if wurli {
+                        0.25
+                    } else {
+                        0.35 + 0.4 * (1.0 - bright)
+                    },
+                    rate,
+                );
                 v.amp = loud * if wurli { 0.42 } else { 0.55 };
                 v.amp_decay = t60(ring * if wurli { 0.55 } else { 0.8 }, rate);
                 // A Wurlitzer's reed growls when hit hard.
@@ -300,8 +346,15 @@ impl Piano {
             tone::TOY | tone::MUSIC_BOX | tone::CELESTA => {
                 // Struck metal bars and tines: few, clangy partials.
                 let (ratios, amps, length, attack): (&[f32], &[f32], f32, f32) = match tone {
-                    tone::TOY => (&[1.0, 2.76, 5.40, 8.93], &[1.0, 0.55, 0.3, 0.15], 0.35, 0.001),
-                    tone::MUSIC_BOX => (&[1.0, 3.0, 5.93, 9.8], &[1.0, 0.3, 0.18, 0.08], 0.55, 0.001),
+                    tone::TOY => (
+                        &[1.0, 2.76, 5.40, 8.93],
+                        &[1.0, 0.55, 0.3, 0.15],
+                        0.35,
+                        0.001,
+                    ),
+                    tone::MUSIC_BOX => {
+                        (&[1.0, 3.0, 5.93, 9.8], &[1.0, 0.3, 0.18, 0.08], 0.55, 0.001)
+                    }
                     _ => (&[1.0, 4.0, 10.0], &[1.0, 0.22, 0.06], 0.75, 0.003),
                 };
                 let mut total = 0.0;
@@ -340,7 +393,11 @@ impl Piano {
                 let length = if clav { 0.3 } else { 1.0 };
                 // The second string: a few tenths of a cent off (or a lot, honky-tonk).
                 let unison = (p[STRINGS] / 100.0).clamp(0.0, 1.0);
-                let cents = if honky { 14.0 + 6.0 * unison } else { unison * (0.6 + 1.6 * (1.0 - f32::from(key) / 127.0)) };
+                let cents = if honky {
+                    14.0 + 6.0 * unison
+                } else {
+                    unison * (0.6 + 1.6 * (1.0 - f32::from(key) / 127.0))
+                };
                 let two = !light && (cents > 0.05);
                 let detune = 2f32.powf(cents / 1200.0);
                 let mut total = 0.0;
@@ -353,10 +410,12 @@ impl Piano {
                     }
                     let comb = (PI * k * strike).sin().abs().max(0.15);
                     let a = comb / k.powf(tilt.max(0.6));
-                    let secs = ring * length / (1.0 + 0.45 * (k - 1.0) * if felt { 2.0 } else { 1.0 });
+                    let secs =
+                        ring * length / (1.0 + 0.45 * (k - 1.0) * if felt { 2.0 } else { 1.0 });
                     if two {
                         v.partials[n] = Partial::new(a * 0.5, f, secs, rate);
-                        v.partials[PARTIALS + n] = Partial::new(a * 0.5, f * detune, secs * 1.15, rate);
+                        v.partials[PARTIALS + n] =
+                            Partial::new(a * 0.5, f * detune, secs * 1.15, rate);
                     } else {
                         v.partials[n] = Partial::new(a, f, secs, rate);
                     }
@@ -369,7 +428,10 @@ impl Piano {
                 let norm = loud * 0.5 / total.max(0.3);
                 v.partials.iter_mut().for_each(|p| p.re *= norm);
                 // A soft thump of the hammer, felt more than heard.
-                v.knock = if felt { 0.012 } else { 0.03 } * vel * (0.5 + 0.5 * bright) * (0.3 + 1.4 * mech);
+                v.knock = if felt { 0.012 } else { 0.03 }
+                    * vel
+                    * (0.5 + 0.5 * bright)
+                    * (0.3 + 1.4 * mech);
                 // Felt has a softer start; the others rise in 2 ms.
                 v.attack_step = 1.0 / (if felt { 0.012 } else { 0.002 } * rate);
             }
@@ -440,7 +502,12 @@ impl Piano {
         l: &mut [f32],
         r: &mut [f32],
     ) {
-        for (i, ((pos, l), r)) in positions.chunks(CHUNK).zip(l.chunks_mut(CHUNK)).zip(r.chunks_mut(CHUNK)).enumerate() {
+        for (i, ((pos, l), r)) in positions
+            .chunks(CHUNK)
+            .zip(l.chunks_mut(CHUNK))
+            .zip(r.chunks_mut(CHUNK))
+            .enumerate()
+        {
             self.render_chunk(p, notes, pos, if i == 0 { live } else { &[] }, rate, l, r);
         }
     }
@@ -487,7 +554,11 @@ impl Piano {
         let light = p[QUALITY] >= 0.5;
 
         // The wooden body: warmth low down, a little "box", less harshness.
-        let body = if light { 0.0 } else { (p[BODY] / 100.0).clamp(0.0, 1.0) };
+        let body = if light {
+            0.0
+        } else {
+            (p[BODY] / 100.0).clamp(0.0, 1.0)
+        };
         if body > 0.0 && (body, rate) != self.body_for {
             self.body[0].c = Coeffs::peak(110.0, 4.0 * body, 0.9, rate);
             self.body[1].c = Coeffs::peak(420.0, 2.0 * body, 1.4, rate);
@@ -520,7 +591,11 @@ impl Piano {
                 if !self.voices[i].on {
                     continue;
                 }
-                let n = if self.voices[i].knock > 1e-5 { self.noise() } else { 0.0 };
+                let n = if self.voices[i].knock > 1e-5 {
+                    self.noise()
+                } else {
+                    0.0
+                };
                 let v = &mut self.voices[i];
                 if v.released {
                     v.damp *= release_rate;
@@ -598,7 +673,12 @@ impl Piano {
                     a + (b - a) * f
                 };
                 let wl = tap(self.mod_phase, 0, &self.chorus, self.chorus_pos);
-                let wr = tap(self.mod_phase + TAU * 0.25, 1, &self.chorus, self.chorus_pos);
+                let wr = tap(
+                    self.mod_phase + TAU * 0.25,
+                    1,
+                    &self.chorus,
+                    self.chorus_pos,
+                );
                 let mix = 0.5 * mod_depth;
                 ol = ol * (1.0 - mix) + wl * mix;
                 or = or * (1.0 - mix) + wr * mix;
@@ -624,7 +704,8 @@ impl Piano {
 
         // The pedal lets the strings and body ring along: more room while it's down.
         let target = if self.pedal { 1.0 } else { 0.0 };
-        self.pedal_amount += (target - self.pedal_amount) * (frames as f32 / (0.15 * rate)).min(1.0);
+        self.pedal_amount +=
+            (target - self.pedal_amount) * (frames as f32 / (0.15 * rate)).min(1.0);
         let resonance = (p[RESONANCE] / 100.0).clamp(0.0, 1.0) * self.pedal_amount;
 
         // The room: rings on after the notes for a few seconds.
@@ -646,8 +727,16 @@ impl Piano {
             rp[rv::MODULATION] = 30.0;
             rp[rv::WIDTH] = 100.0;
             rp[rv::MIX] = 55.0 * wet;
-            let ctx = Context { sample_rate: rate, bpm: 120.0 };
-            self.room.process(&rp, &ctx, &mut self.buf_l[..frames], &mut self.buf_r[..frames]);
+            let ctx = Context {
+                sample_rate: rate,
+                bpm: 120.0,
+            };
+            self.room.process(
+                &rp,
+                &ctx,
+                &mut self.buf_l[..frames],
+                &mut self.buf_r[..frames],
+            );
         } else {
             self.room_tail = 0;
         }
@@ -663,7 +752,12 @@ mod tests {
     use super::super::InstrumentKind;
     use super::*;
 
-    fn run(piano: &mut Piano, p: &[f32; MAX_INST_PARAMS], notes: &[PlayNote], frames: usize) -> (Vec<f32>, Vec<f32>) {
+    fn run(
+        piano: &mut Piano,
+        p: &[f32; MAX_INST_PARAMS],
+        notes: &[PlayNote],
+        frames: usize,
+    ) -> (Vec<f32>, Vec<f32>) {
         let positions: Vec<u64> = (0..frames as u64).collect();
         let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
         piano.render(p, notes, &positions, &[], 48_000.0, &mut l, &mut r);
@@ -685,13 +779,24 @@ mod tests {
                 p[param::TREM_DEPTH] = 50.0;
                 p[param::DRIVE] = 40.0;
                 let mut piano = Piano::new();
-                let notes = [PlayNote { start: 0, end: 24_000, key: 60, velocity: 110 }];
+                let notes = [PlayNote {
+                    start: 0,
+                    end: 24_000,
+                    key: 60,
+                    velocity: 110,
+                }];
                 let (out, _) = run(&mut piano, &p, &notes, 96_000);
-                assert!(out.iter().all(|s| s.is_finite() && s.abs() < 1.5), "tone {tone}");
+                assert!(
+                    out.iter().all(|s| s.is_finite() && s.abs() < 1.5),
+                    "tone {tone}"
+                );
                 let early = loudness(&out[1000..6000]);
                 let late = loudness(&out[60_000..96_000]);
                 assert!(early > 0.01, "tone {tone} sounds: {early}");
-                assert!(late < early * 0.1, "tone {tone} fades after release: {early} → {late}");
+                assert!(
+                    late < early * 0.1,
+                    "tone {tone} fades after release: {early} → {late}"
+                );
             }
         }
     }
@@ -701,7 +806,17 @@ mod tests {
         let p = InstrumentKind::Piano.defaults();
         let play = |velocity| {
             let mut piano = Piano::new();
-            let (out, _) = run(&mut piano, &p, &[PlayNote { start: 0, end: 48_000, key: 64, velocity }], 12_000);
+            let (out, _) = run(
+                &mut piano,
+                &p,
+                &[PlayNote {
+                    start: 0,
+                    end: 48_000,
+                    key: 64,
+                    velocity,
+                }],
+                12_000,
+            );
             loudness(&out)
         };
         assert!(play(120) > play(30) * 1.5);
@@ -710,7 +825,11 @@ mod tests {
     #[test]
     fn notes_start_and_restart_without_a_click() {
         // A click is a sudden jump between neighbouring samples.
-        let biggest_step = |out: &[f32]| out.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
+        let biggest_step = |out: &[f32]| {
+            out.windows(2)
+                .map(|w| (w[1] - w[0]).abs())
+                .fold(0.0f32, f32::max)
+        };
         for tone in 0..9 {
             let mut p = InstrumentKind::Piano.defaults();
             p[param::TONE] = tone as f32;
@@ -718,15 +837,28 @@ mod tests {
             let mut piano = Piano::new();
             // The same key twice: the second hit lands while the first still rings.
             let notes = [
-                PlayNote { start: 100, end: 20_000, key: 60, velocity: 127 },
-                PlayNote { start: 4000, end: 20_000, key: 60, velocity: 127 },
+                PlayNote {
+                    start: 100,
+                    end: 20_000,
+                    key: 60,
+                    velocity: 127,
+                },
+                PlayNote {
+                    start: 4000,
+                    end: 20_000,
+                    key: 60,
+                    velocity: 127,
+                },
             ];
             let (out, _) = run(&mut piano, &p, &notes, 8000);
             // Compared with the note's own steepest slope once it's ringing.
             let ringing = biggest_step(&out[500..1500]);
             let start = biggest_step(&out[95..400]);
             let again = biggest_step(&out[3995..4300]);
-            assert!(start < ringing * 1.6 && again < ringing * 1.6, "tone {tone}: ringing {ringing}, steps {start} {again}");
+            assert!(
+                start < ringing * 1.6 && again < ringing * 1.6,
+                "tone {tone}: ringing {ringing}, steps {start} {again}"
+            );
         }
     }
 
@@ -735,10 +867,25 @@ mod tests {
         let p = InstrumentKind::Piano.defaults();
         let side = |key| {
             let mut piano = Piano::new();
-            let (l, r) = run(&mut piano, &p, &[PlayNote { start: 0, end: 48_000, key, velocity: 100 }], 9600);
+            let (l, r) = run(
+                &mut piano,
+                &p,
+                &[PlayNote {
+                    start: 0,
+                    end: 48_000,
+                    key,
+                    velocity: 100,
+                }],
+                9600,
+            );
             loudness(&l) / loudness(&r)
         };
-        assert!(side(36) > 1.2 && side(96) < 0.8, "{} {}", side(36), side(96));
+        assert!(
+            side(36) > 1.2 && side(96) < 0.8,
+            "{} {}",
+            side(36),
+            side(96)
+        );
     }
 
     #[test]
@@ -751,9 +898,24 @@ mod tests {
             let frames = 4800;
             let positions = vec![SILENT; frames];
             let (mut l, mut r) = (vec![0.0; frames], vec![0.0; frames]);
-            let mut live = vec![LiveNote { on: pedal, key: SUSTAIN_PEDAL, velocity: 0 }, LiveNote { on: true, key: 60, velocity: 100 }];
+            let mut live = vec![
+                LiveNote {
+                    on: pedal,
+                    key: SUSTAIN_PEDAL,
+                    velocity: 0,
+                },
+                LiveNote {
+                    on: true,
+                    key: 60,
+                    velocity: 100,
+                },
+            ];
             piano.render(&p, &[], &positions, &live, 48_000.0, &mut l, &mut r);
-            live = vec![LiveNote { on: false, key: 60, velocity: 0 }];
+            live = vec![LiveNote {
+                on: false,
+                key: 60,
+                velocity: 0,
+            }];
             for _ in 0..10 {
                 l.fill(0.0);
                 r.fill(0.0);
@@ -764,7 +926,10 @@ mod tests {
         };
         let (with, held_with) = ring_after_release(true);
         let (without, _) = ring_after_release(false);
-        assert!(with > without * 10.0, "pedal keeps it ringing: {with} vs {without}");
+        assert!(
+            with > without * 10.0,
+            "pedal keeps it ringing: {with} vs {without}"
+        );
         assert_eq!(held_with, 1 << 60, "still shown as playing");
     }
 }

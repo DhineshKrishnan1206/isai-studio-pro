@@ -12,11 +12,13 @@ use std::io::Read;
 use sha2::{Digest, Sha256};
 
 /// Deezer's release of the model (MIT licence) and its published SHA-256.
-pub const MODEL_URL: &str = "https://github.com/deezer/spleeter/releases/download/v1.4.0/4stems.tar.gz";
+pub const MODEL_URL: &str =
+    "https://github.com/deezer/spleeter/releases/download/v1.4.0/4stems.tar.gz";
 pub const MODEL_SHA256: &str = "3adb4a50ad4eb18c7c4d65fcf4cf2367a07d48408a5eb7d03cd20067429dfaa8";
 /// Its size, for showing download progress.
 pub const MODEL_BYTES: u64 = 146_308_147;
-pub const LICENSE: &str = "Spleeter 4-stem model (c) Deezer Research, MIT License, https://github.com/deezer/spleeter";
+pub const LICENSE: &str =
+    "Spleeter 4-stem model (c) Deezer Research, MIT License, https://github.com/deezer/spleeter";
 
 const MAGIC: &[u8; 10] = b"ISAISTEMS2";
 
@@ -188,7 +190,12 @@ pub fn convert_release(tar_gz: &[u8]) -> Result<Vec<u8>, String> {
     let (mut index, mut data) = (None, None);
     for entry in archive.entries().map_err(|e| e.to_string())? {
         let mut entry = entry.map_err(|e| e.to_string())?;
-        let name = entry.path().map_err(|e| e.to_string())?.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = entry
+            .path()
+            .map_err(|e| e.to_string())?
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
         let mut bytes = Vec::new();
         if name == "model.index" || name.starts_with("model.data-") {
             entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
@@ -199,12 +206,17 @@ pub fn convert_release(tar_gz: &[u8]) -> Result<Vec<u8>, String> {
             }
         }
     }
-    let (index, data) = (index.ok_or("the archive has no model index")?, data.ok_or("the archive has no model data")?);
+    let (index, data) = (
+        index.ok_or("the archive has no model index")?,
+        data.ok_or("the archive has no model data")?,
+    );
     let entries = index_entries(&index).ok_or("couldn't read the model index")?;
     let mut tensors = Vec::new();
     let mut blob: Vec<u8> = Vec::new();
     for (name, offset, len, shape) in entries {
-        let raw = data.get(offset as usize..(offset + len) as usize).ok_or("the model data is cut short")?;
+        let raw = data
+            .get(offset as usize..(offset + len) as usize)
+            .ok_or("the model data is cut short")?;
         tensors.push(serde_json::json!({ "name": name, "shape": shape, "offset": blob.len() / 2 }));
         for chunk in raw.as_chunks::<4>().0 {
             let v = f32::from_le_bytes(*chunk);
@@ -230,24 +242,45 @@ impl Weights {
         if file.get(..MAGIC.len()) != Some(&MAGIC[..]) {
             return Err("not an Isai stem model file".into());
         }
-        let hlen = u32::from_le_bytes(file.get(10..14).ok_or("short file")?.try_into().map_err(|_| "short file")?) as usize;
-        let header: serde_json::Value = serde_json::from_slice(file.get(14..14 + hlen).ok_or("short file")?).map_err(|e| e.to_string())?;
+        let hlen = u32::from_le_bytes(
+            file.get(10..14)
+                .ok_or("short file")?
+                .try_into()
+                .map_err(|_| "short file")?,
+        ) as usize;
+        let header: serde_json::Value =
+            serde_json::from_slice(file.get(14..14 + hlen).ok_or("short file")?)
+                .map_err(|e| e.to_string())?;
         let blob = &file[14 + hlen..];
         let mut tensors = HashMap::new();
         for t in header["tensors"].as_array().ok_or("bad header")? {
             let name = t["name"].as_str().ok_or("bad header")?.to_owned();
-            let shape: Vec<usize> = t["shape"].as_array().ok_or("bad header")?.iter().filter_map(|d| d.as_u64().map(|v| v as usize)).collect();
+            let shape: Vec<usize> = t["shape"]
+                .as_array()
+                .ok_or("bad header")?
+                .iter()
+                .filter_map(|d| d.as_u64().map(|v| v as usize))
+                .collect();
             let count: usize = shape.iter().product();
             let at = t["offset"].as_u64().ok_or("bad header")? as usize * 2;
-            let raw = blob.get(at..at + count * 2).ok_or("the model file is cut short")?;
-            let values = raw.as_chunks::<2>().0.iter().map(|c| f16_to_f32(u16::from_le_bytes(*c))).collect();
+            let raw = blob
+                .get(at..at + count * 2)
+                .ok_or("the model file is cut short")?;
+            let values = raw
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| f16_to_f32(u16::from_le_bytes(*c)))
+                .collect();
             tensors.insert(name, (shape, values));
         }
         Ok(Self { tensors })
     }
 
     pub fn get(&self, name: &str) -> Result<&(Vec<usize>, Vec<f32>), String> {
-        self.tensors.get(name).ok_or_else(|| format!("the model has no {name}"))
+        self.tensors
+            .get(name)
+            .ok_or_else(|| format!("the model has no {name}"))
     }
 }
 

@@ -25,9 +25,21 @@ pub fn send(slot: &LiveSlot, note: LiveNote) {
 pub fn parse(msg: &[u8]) -> Option<LiveNote> {
     let (&status, key, velocity) = (msg.first()?, *msg.get(1)?, *msg.get(2)?);
     match status & 0xF0 {
-        0x90 if velocity > 0 => Some(LiveNote { on: true, key: key & 0x7F, velocity }),
-        0x90 | 0x80 => Some(LiveNote { on: false, key: key & 0x7F, velocity: 0 }),
-        0xB0 if key == 64 => Some(LiveNote { on: velocity >= 64, key: isai_engine::instruments::SUSTAIN_PEDAL, velocity: 0 }),
+        0x90 if velocity > 0 => Some(LiveNote {
+            on: true,
+            key: key & 0x7F,
+            velocity,
+        }),
+        0x90 | 0x80 => Some(LiveNote {
+            on: false,
+            key: key & 0x7F,
+            velocity: 0,
+        }),
+        0xB0 if key == 64 => Some(LiveNote {
+            on: velocity >= 64,
+            key: isai_engine::instruments::SUSTAIN_PEDAL,
+            velocity: 0,
+        }),
         _ => None,
     }
 }
@@ -43,10 +55,16 @@ impl MidiInputs {
     pub fn open_all(slot: &LiveSlot) -> Self {
         let mut connections = Vec::new();
         let mut names = Vec::new();
-        let ports = midir::MidiInput::new("Isai").map(|m| m.ports()).unwrap_or_default();
+        let ports = midir::MidiInput::new("Isai")
+            .map(|m| m.ports())
+            .unwrap_or_default();
         for port in ports {
-            let Ok(input) = midir::MidiInput::new("Isai") else { continue };
-            let name = input.port_name(&port).unwrap_or_else(|_| "MIDI input".into());
+            let Ok(input) = midir::MidiInput::new("Isai") else {
+                continue;
+            };
+            let name = input
+                .port_name(&port)
+                .unwrap_or_else(|_| "MIDI input".into());
             let slot = slot.clone();
             let connected = input.connect(
                 &port,
@@ -63,7 +81,10 @@ impl MidiInputs {
                 names.push(name);
             }
         }
-        Self { _connections: connections, names }
+        Self {
+            _connections: connections,
+            names,
+        }
     }
 }
 
@@ -73,12 +94,53 @@ mod tests {
 
     #[test]
     fn reads_note_on_and_off_on_any_channel() {
-        assert_eq!(parse(&[0x93, 60, 100]), Some(LiveNote { on: true, key: 60, velocity: 100 }));
-        assert_eq!(parse(&[0x90, 60, 0]), Some(LiveNote { on: false, key: 60, velocity: 0 }), "velocity 0 is off");
-        assert_eq!(parse(&[0x81, 62, 40]), Some(LiveNote { on: false, key: 62, velocity: 0 }));
-        assert_eq!(parse(&[0xB0, 7, 100]), None, "other controllers are ignored for now");
-        assert_eq!(parse(&[0xB0, 64, 127]), Some(LiveNote { on: true, key: isai_engine::instruments::SUSTAIN_PEDAL, velocity: 0 }), "sustain pedal");
-        assert_eq!(parse(&[0xB2, 64, 0]), Some(LiveNote { on: false, key: isai_engine::instruments::SUSTAIN_PEDAL, velocity: 0 }));
+        assert_eq!(
+            parse(&[0x93, 60, 100]),
+            Some(LiveNote {
+                on: true,
+                key: 60,
+                velocity: 100
+            })
+        );
+        assert_eq!(
+            parse(&[0x90, 60, 0]),
+            Some(LiveNote {
+                on: false,
+                key: 60,
+                velocity: 0
+            }),
+            "velocity 0 is off"
+        );
+        assert_eq!(
+            parse(&[0x81, 62, 40]),
+            Some(LiveNote {
+                on: false,
+                key: 62,
+                velocity: 0
+            })
+        );
+        assert_eq!(
+            parse(&[0xB0, 7, 100]),
+            None,
+            "other controllers are ignored for now"
+        );
+        assert_eq!(
+            parse(&[0xB0, 64, 127]),
+            Some(LiveNote {
+                on: true,
+                key: isai_engine::instruments::SUSTAIN_PEDAL,
+                velocity: 0
+            }),
+            "sustain pedal"
+        );
+        assert_eq!(
+            parse(&[0xB2, 64, 0]),
+            Some(LiveNote {
+                on: false,
+                key: isai_engine::instruments::SUSTAIN_PEDAL,
+                velocity: 0
+            })
+        );
         assert_eq!(parse(&[0x90]), None);
     }
 }

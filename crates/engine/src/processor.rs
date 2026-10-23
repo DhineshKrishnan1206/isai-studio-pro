@@ -14,28 +14,39 @@
 
 use std::f32::consts::TAU;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, Ordering::Relaxed};
+use std::sync::atomic::{
+    AtomicBool, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, Ordering::Relaxed,
+};
 use std::time::Instant;
 
 use cpal::{FromSample, Sample};
 
 use crate::arrangement::{Arrangement, MAX_BUSES, MAX_TRACKS};
+use crate::clip::Clip;
 use crate::effects::{Effect, EffectBank};
 use crate::instruments::{Instrument, InstrumentBank, LiveNote, PlayedNote};
-use crate::clip::Clip;
 use crate::mixer::{BLOCK, Block, Mixer, SILENT};
 use crate::time::{Meter, TempoMap};
 
 pub(crate) enum Command {
     /// Start playback, first counting in this many bars on the metronome.
-    Play { count_in_bars: u32 },
+    Play {
+        count_in_bars: u32,
+    },
     Stop,
     Seek(u64),
     /// Loop between two timeline positions (in samples) while `on`.
-    SetCycle { on: bool, start: u64, end: u64 },
+    SetCycle {
+        on: bool,
+        start: u64,
+        end: u64,
+    },
     /// The song's tempo and time signatures (built on the UI thread).
     SetTempo(Box<TempoMap>),
-    SetMetronome { on: bool, volume: f32 },
+    SetMetronome {
+        on: bool,
+        volume: f32,
+    },
     SetVolume(f32),
     SetArrangement(Arc<Arrangement>),
     /// Live input as stereo interleaved samples at the output's rate.
@@ -57,14 +68,20 @@ pub(crate) enum Command {
     SetCaptureNotes(bool),
     /// Play a sound on its own, after everything else (the browser's preview).
     /// With `sync` while playing, it starts on the next bar. `None` stops it.
-    Preview { clip: Option<Arc<Clip>>, sync: bool },
+    Preview {
+        clip: Option<Arc<Clip>>,
+        sync: bool,
+    },
 }
 
 /// Things the audio thread replaced and hands back to the UI thread to free.
 pub(crate) enum Garbage {
     Arrangement(#[allow(dead_code)] Arc<Arrangement>),
     Input(#[allow(dead_code)] rtrb::Consumer<f32>),
-    Effect(#[allow(dead_code)] Box<Effect>, #[allow(dead_code)] Option<Arc<crate::effects::Meters>>),
+    Effect(
+        #[allow(dead_code)] Box<Effect>,
+        #[allow(dead_code)] Option<Arc<crate::effects::Meters>>,
+    ),
     Instrument(#[allow(dead_code)] Box<Instrument>),
     Clip(#[allow(dead_code)] Arc<Clip>),
     Tempo(#[allow(dead_code)] Box<TempoMap>),
@@ -126,7 +143,9 @@ impl Default for Shared {
             input_peak_l: AtomicU32::new(0),
             input_peak_r: AtomicU32::new(0),
             record_dropped: AtomicU64::new(0),
-            track_peaks: (0..(MAX_TRACKS + MAX_BUSES) * 2).map(|_| AtomicU32::new(0)).collect(),
+            track_peaks: (0..(MAX_TRACKS + MAX_BUSES) * 2)
+                .map(|_| AtomicU32::new(0))
+                .collect(),
             keys_held: [AtomicU64::new(0), AtomicU64::new(0)],
             keys_struck: [AtomicU64::new(0), AtomicU64::new(0)],
             key_velocities: (0..128).map(|_| AtomicU8::new(0)).collect(),
@@ -165,7 +184,13 @@ struct Click {
 impl Click {
     fn new(sample_rate: f32) -> Self {
         // Falls to -60 dB in about 40 ms: crisp, and never smears into the next beat.
-        Self { phase: 0.0, inc: 0.0, env: 0.0, decay: (0.001f32.ln() / (0.04 * sample_rate)).exp(), level: 0.0 }
+        Self {
+            phase: 0.0,
+            inc: 0.0,
+            env: 0.0,
+            decay: (0.001f32.ln() / (0.04 * sample_rate)).exp(),
+            level: 0.0,
+        }
     }
 
     fn trigger(&mut self, accent: bool, sample_rate: f32, volume: f32) {
@@ -351,7 +376,10 @@ impl Processor {
         if self.capture && self.playing {
             // During a count-in the playhead waits at the start, so early notes land there.
             for &note in &self.live {
-                let _ = self.played.push(PlayedNote { pos: self.pos as u64, note });
+                let _ = self.played.push(PlayedNote {
+                    pos: self.pos as u64,
+                    note,
+                });
             }
         }
 
@@ -375,7 +403,12 @@ impl Processor {
                 &mut self.effects,
                 &mut self.instruments,
                 self.sample_rate,
-                &Block { positions: &self.positions[..n], fades: &self.fades[..n], live, live_track: self.live_track },
+                &Block {
+                    positions: &self.positions[..n],
+                    fades: &self.fades[..n],
+                    live,
+                    live_track: self.live_track,
+                },
                 &mut self.mix_l[..n],
                 &mut self.mix_r[..n],
             );
@@ -442,7 +475,9 @@ impl Processor {
     /// The tempo and time signature at the playhead, for the count-in.
     fn local_meter(&mut self) {
         let rate = self.sample_rate as u32;
-        self.meter = self.tempo.meter_at(self.tempo.samples_to_beats(self.pos as u64, rate));
+        self.meter = self
+            .tempo
+            .meter_at(self.tempo.samples_to_beats(self.pos as u64, rate));
         self.samples_per_beat = self.meter.samples_per_beat(rate);
     }
 
@@ -537,7 +572,9 @@ impl Processor {
                     }
                     self.preview_pos = 0;
                     self.preview_wait = sync;
-                    self.shared.previewing.store(self.preview.is_some(), Relaxed);
+                    self.shared
+                        .previewing
+                        .store(self.preview.is_some(), Relaxed);
                 }
             }
         }
@@ -569,7 +606,8 @@ impl Processor {
     }
 
     fn click(&mut self, accent: bool) {
-        self.click.trigger(accent, self.sample_rate, self.click_volume);
+        self.click
+            .trigger(accent, self.sample_rate, self.click_volume);
         self.clicks += 1;
         if accent {
             self.accents += 1;
@@ -580,7 +618,11 @@ impl Processor {
     /// mix (or `SILENT`), the start/stop fade for the song, the master
     /// volume, and what to add on top of the mix.
     fn next_frame(&mut self) -> (u64, f32, f32, f32, f32) {
-        let fade_target = if self.playing && self.count_in_left == 0 { 1.0 } else { 0.0 };
+        let fade_target = if self.playing && self.count_in_left == 0 {
+            1.0
+        } else {
+            0.0
+        };
         if self.fade < fade_target {
             self.fade = (self.fade + self.fade_step).min(1.0);
         } else if self.fade > fade_target {
@@ -599,13 +641,17 @@ impl Processor {
             raise_peak(&self.shared.input_peak_r, ir.abs());
             let at = self.shared.input_scope_pos.load(Relaxed);
             self.shared.input_scope[at % INPUT_SCOPE].store(((il + ir) * 0.5).to_bits(), Relaxed);
-            self.shared.input_scope_pos.store(at.wrapping_add(1), Relaxed);
+            self.shared
+                .input_scope_pos
+                .store(at.wrapping_add(1), Relaxed);
         }
 
         if self.playing && self.count_in_left > 0 {
             // Count-in: the metronome plays bars of clicks while the playhead waits.
             let beat = (self.count_in_pos as f64 / self.samples_per_beat).floor() as i64;
-            if self.count_in_pos == 0 || beat != ((self.count_in_pos - 1) as f64 / self.samples_per_beat).floor() as i64 {
+            if self.count_in_pos == 0
+                || beat != ((self.count_in_pos - 1) as f64 / self.samples_per_beat).floor() as i64
+            {
                 self.click(beat % num == 0);
             }
             self.count_in_pos += 1;
@@ -706,15 +752,44 @@ mod tests {
     use crate::arrangement::{PlayRegion, PlayTrack};
     use crate::clip::Clip;
 
-    type Setup = (Processor, rtrb::Producer<Command>, rtrb::Consumer<Garbage>, Arc<Shared>);
+    type Setup = (
+        Processor,
+        rtrb::Producer<Command>,
+        rtrb::Consumer<Garbage>,
+        Arc<Shared>,
+    );
 
     fn audio(frames: usize, l: f32, r: f32) -> Arc<Clip> {
-        Arc::new(Clip { name: "test".into(), sample_rate: RATE, left: vec![l; frames], right: vec![r; frames] })
+        Arc::new(Clip {
+            name: "test".into(),
+            sample_rate: RATE,
+            left: vec![l; frames],
+            right: vec![r; frames],
+        })
     }
 
     fn one_track(audio: Arc<Clip>, gain: f32, pan: f32, audible: bool) -> PlayTrack {
         let len = audio.frames() as u64;
-        PlayTrack { gain, pan, audible, sends: vec![], inserts: vec![], automation: vec![], instrument: None, notes: vec![], regions: vec![PlayRegion { audio, start: 0, offset: 0, len, fade_in: 0, fade_out: 0, gain: 1.0, reverse: false }] }
+        PlayTrack {
+            gain,
+            pan,
+            audible,
+            sends: vec![],
+            inserts: vec![],
+            automation: vec![],
+            instrument: None,
+            notes: vec![],
+            regions: vec![PlayRegion {
+                audio,
+                start: 0,
+                offset: 0,
+                len,
+                fade_in: 0,
+                fade_out: 0,
+                gain: 1.0,
+                reverse: false,
+            }],
+        }
     }
 
     fn setup(clip_frames: usize) -> Setup {
@@ -724,13 +799,25 @@ mod tests {
         let (record, _record_rx) = rtrb::RingBuffer::new(16);
         let (_live_tx, live_rx) = rtrb::RingBuffer::new(4);
         let (played, _played_rx) = rtrb::RingBuffer::new(4);
-        let mut p = Processor::new(rx, gtx, shared.clone(), RATE, Arc::new(Arrangement::default()), record, live_rx, played);
+        let mut p = Processor::new(
+            rx,
+            gtx,
+            shared.clone(),
+            RATE,
+            Arc::new(Arrangement::default()),
+            record,
+            live_rx,
+            played,
+        );
         // Skip the click-free fades so sample values are easy to check.
         p.fade_step = 1.0;
         p.mixer.set_all_gains(1.0);
         if clip_frames > 0 {
             let track = one_track(audio(clip_frames, 0.5, -0.5), 1.0, 0.0, true);
-            let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement { tracks: vec![track], ..Default::default() })));
+            let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement {
+                tracks: vec![track],
+                ..Default::default()
+            })));
         }
         (p, tx, grx, shared)
     }
@@ -748,7 +835,10 @@ mod tests {
     #[test]
     fn previews_play_alone_and_wait_for_the_bar_when_in_time() {
         let (mut p, mut tx, mut garbage, shared) = setup(0);
-        let _ = tx.push(Command::Preview { clip: Some(audio(200, 1.0, 1.0)), sync: true });
+        let _ = tx.push(Command::Preview {
+            clip: Some(audio(200, 1.0, 1.0)),
+            sync: true,
+        });
         let out = run(&mut p, 100);
         assert!(out[2 * 99] > 0.7, "stopped: starts at once");
         assert!(shared.previewing.load(Relaxed));
@@ -759,11 +849,17 @@ mod tests {
         // Playing at beat 1 of 4/4 (500 samples a beat): it waits for bar 2 at 2000.
         let _ = tx.push(Command::Seek(1000));
         play(&mut tx);
-        let _ = tx.push(Command::Preview { clip: Some(audio(2000, 1.0, 1.0)), sync: true });
+        let _ = tx.push(Command::Preview {
+            clip: Some(audio(2000, 1.0, 1.0)),
+            sync: true,
+        });
         let out = run(&mut p, 1100);
         assert!(out[2 * 900].abs() < 1e-6, "still waiting");
         assert!(out[2 * 1099] > 0.7, "started on the bar");
-        let _ = tx.push(Command::Preview { clip: None, sync: false });
+        let _ = tx.push(Command::Preview {
+            clip: None,
+            sync: false,
+        });
         let out = run(&mut p, 10);
         assert!(out.iter().all(|s| s.abs() < 1e-6), "stopped");
     }
@@ -791,7 +887,10 @@ mod tests {
         play(&mut tx);
         let out = run(&mut p, 30);
         assert_eq!(out[2 * 25], 0.0, "silence after the clip ends");
-        assert!(shared.playing.load(Relaxed), "a DAW keeps playing past the last region");
+        assert!(
+            shared.playing.load(Relaxed),
+            "a DAW keeps playing past the last region"
+        );
         assert_eq!(shared.position.load(Relaxed), 30);
 
         let (mut empty, mut tx, _g, shared) = setup(0);
@@ -803,7 +902,11 @@ mod tests {
     #[test]
     fn cycle_loops_between_its_bounds() {
         let (mut p, mut tx, _g, shared) = setup(1000);
-        let _ = tx.push(Command::SetCycle { on: true, start: 100, end: 300 });
+        let _ = tx.push(Command::SetCycle {
+            on: true,
+            start: 100,
+            end: 300,
+        });
         let _ = tx.push(Command::Seek(100));
         play(&mut tx);
         run(&mut p, 250);
@@ -813,7 +916,10 @@ mod tests {
     #[test]
     fn metronome_clicks_once_per_beat_with_accented_downbeats() {
         let (mut p, mut tx, _g, _shared) = setup(0);
-        let _ = tx.push(Command::SetMetronome { on: true, volume: 1.0 });
+        let _ = tx.push(Command::SetMetronome {
+            on: true,
+            volume: 1.0,
+        });
         play(&mut tx);
         run(&mut p, 4000); // two bars of 4/4
         assert_eq!(p.clicks, 8);
@@ -824,8 +930,15 @@ mod tests {
     fn metronome_follows_the_time_signature() {
         let (mut p, mut tx, _g, _shared) = setup(0);
         // 3/4 at 120: beats of 500 samples, bars of 1500.
-        let _ = tx.push(Command::SetTempo(Box::new(TempoMap::constant(Meter { bpm: 120.0, numerator: 3, denominator: 4 }))));
-        let _ = tx.push(Command::SetMetronome { on: true, volume: 1.0 });
+        let _ = tx.push(Command::SetTempo(Box::new(TempoMap::constant(Meter {
+            bpm: 120.0,
+            numerator: 3,
+            denominator: 4,
+        }))));
+        let _ = tx.push(Command::SetMetronome {
+            on: true,
+            volume: 1.0,
+        });
         play(&mut tx);
         run(&mut p, 3000);
         assert_eq!((p.clicks, p.accents), (6, 2));
@@ -839,11 +952,21 @@ mod tests {
         // (2000 samples), then 60 BPM (1000-sample beats) and 3/4 from bar 2.
         let map = TempoMap::new(
             Meter::default(),
-            &[TempoPoint { beat: 4.0, bpm: 60.0 }],
-            &[SigChange { bar: 2, numerator: 3, denominator: 4 }],
+            &[TempoPoint {
+                beat: 4.0,
+                bpm: 60.0,
+            }],
+            &[SigChange {
+                bar: 2,
+                numerator: 3,
+                denominator: 4,
+            }],
         );
         let _ = tx.push(Command::SetTempo(Box::new(map)));
-        let _ = tx.push(Command::SetMetronome { on: true, volume: 1.0 });
+        let _ = tx.push(Command::SetMetronome {
+            on: true,
+            volume: 1.0,
+        });
         play(&mut tx);
         // 2000 samples of 4/4 (4 clicks) + 6000 of 3/4 at 60 (two bars, 6 clicks).
         run(&mut p, 8000);
@@ -870,7 +993,10 @@ mod tests {
         run(&mut p, 1);
         let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement::default())));
         run(&mut p, 1);
-        assert!(garbage.pop().is_ok(), "old arrangement handed back to the UI thread");
+        assert!(
+            garbage.pop().is_ok(),
+            "old arrangement handed back to the UI thread"
+        );
     }
 
     #[test]
@@ -888,7 +1014,10 @@ mod tests {
             one_track(audio(100, 0.25, 0.25), 1.0, 0.0, true),
             one_track(audio(100, 0.5, 0.5), 1.0, 0.0, true),
         ];
-        let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement { tracks, ..Default::default() })));
+        let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement {
+            tracks,
+            ..Default::default()
+        })));
         play(&mut tx);
         let out = run(&mut p, 4);
         assert!((out[0] - 0.75).abs() < 1e-6 && (out[1] - 0.75).abs() < 1e-6);
@@ -898,7 +1027,10 @@ mod tests {
     fn muted_tracks_fade_to_silence() {
         let (mut p, mut tx, _g, _s) = setup(0);
         let tracks = vec![one_track(audio(10_000, 0.5, 0.5), 1.0, 0.0, false)];
-        let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement { tracks, ..Default::default() })));
+        let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement {
+            tracks,
+            ..Default::default()
+        })));
         play(&mut tx);
         let out = run(&mut p, 5_000);
         assert!(out[0] > 0.0, "the gain glides down rather than cutting");
@@ -910,14 +1042,21 @@ mod tests {
         let (mut p, mut tx, _g, _s) = setup(0);
         let mut track = one_track(audio(10, 1.0, 1.0), 1.0, 0.0, true);
         track.regions[0].start = 5;
-        let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement { tracks: vec![track], ..Default::default() })));
+        let _ = tx.push(Command::SetArrangement(Arc::new(Arrangement {
+            tracks: vec![track],
+            ..Default::default()
+        })));
         play(&mut tx);
         let out = run(&mut p, 8);
         assert_eq!(out[2 * 4], 0.0);
         assert_eq!(out[2 * 5], 1.0);
     }
 
-    fn with_input(p: &mut Processor, tx: &mut rtrb::Producer<Command>, frames: usize) -> rtrb::Consumer<f32> {
+    fn with_input(
+        p: &mut Processor,
+        tx: &mut rtrb::Producer<Command>,
+        frames: usize,
+    ) -> rtrb::Consumer<f32> {
         // Replace the record queue with one we can read, and feed a ramp as input.
         let (record, record_rx) = rtrb::RingBuffer::new(frames * 2 + 16);
         p.record = record;
@@ -938,9 +1077,17 @@ mod tests {
         let _ = tx.push(Command::SetRecording(true));
         let _ = tx.push(Command::Play { count_in_bars: 1 }); // 2000 samples of count-in
         run(&mut p, 2500);
-        assert_eq!(shared.record_start.load(Relaxed), 100, "first recorded sample's timeline position");
+        assert_eq!(
+            shared.record_start.load(Relaxed),
+            100,
+            "first recorded sample's timeline position"
+        );
         let n = recorded.slots();
-        assert_eq!(n, 500 * 2, "only the samples after the count-in are recorded");
+        assert_eq!(
+            n,
+            500 * 2,
+            "only the samples after the count-in are recorded"
+        );
         // The first recorded frame is the input that arrived right as playback started.
         assert_eq!(recorded.pop().unwrap(), 2000.0);
         assert_eq!(recorded.pop().unwrap(), -2000.0);
@@ -971,7 +1118,16 @@ mod tests {
         let (mut p, mut tx, _g, shared) = setup(0);
         let mut track = one_track(audio(2000, 0.5, 0.5), 1.0, 0.0, true);
         track.sends = vec![(0, 0.5)];
-        let arrangement = Arrangement { tracks: vec![track], buses: vec![PlayBus { gain: 1.0, pan: 0.0, audible: true, inserts: vec![] }], ..Default::default() };
+        let arrangement = Arrangement {
+            tracks: vec![track],
+            buses: vec![PlayBus {
+                gain: 1.0,
+                pan: 0.0,
+                audible: true,
+                inserts: vec![],
+            }],
+            ..Default::default()
+        };
         let _ = tx.push(Command::SetArrangement(Arc::new(arrangement)));
         play(&mut tx);
         let out = run(&mut p, 1500);
@@ -987,8 +1143,21 @@ mod tests {
         let (record, _record_rx) = rtrb::RingBuffer::new(16);
         let (mut live_tx, live_rx) = rtrb::RingBuffer::new(4);
         let (played, mut played_rx) = rtrb::RingBuffer::new(4);
-        let mut p = Processor::new(rx, gtx, shared, RATE, Arc::new(Arrangement::default()), record, live_rx, played);
-        let note = LiveNote { on: true, key: 60, velocity: 100 };
+        let mut p = Processor::new(
+            rx,
+            gtx,
+            shared,
+            RATE,
+            Arc::new(Arrangement::default()),
+            record,
+            live_rx,
+            played,
+        );
+        let note = LiveNote {
+            on: true,
+            key: 60,
+            velocity: 100,
+        };
         // Not captured while stopped, or with capture off.
         let _ = live_tx.push(note);
         let _ = tx.push(Command::SetCaptureNotes(true));

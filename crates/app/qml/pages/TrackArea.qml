@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Shapes
 import Isai
 
 // The arrangement: a toolbar, the bar ruler, track headers and lanes.
@@ -33,6 +34,7 @@ Rectangle {
     readonly property var newTrackItems: [
         { header: "AUDIO" },
         { label: "Audio track", shortcut: "⌥⌘N", action: () => app.addTrack() },
+        { label: "Video track", shortcut: "Scoring picture", action: () => videoTrackRequested() },
         { separator: true },
         { header: "INSTRUMENTS" },
         { label: "Piano", shortcut: "Isai Piano", action: () => addInstrument("piano") },
@@ -60,10 +62,17 @@ Rectangle {
     property bool keysEnabled: true
     /// Space covered by the docked mixer at the bottom.
     property real bottomInset: 0
+    signal importVideoRequested()
+    /// A new video track was asked for: the page adds it and picks its video.
+    signal videoTrackRequested()
+    signal videoOpened()
     color: Theme.bg
 
     readonly property int headerWidth: 236
     readonly property int laneHeight: 90
+    readonly property var videos: {
+        try { return JSON.parse(app.videosJson || "[]") } catch (e) { return [] }
+    }
     readonly property int pad: 12
     readonly property int columnWidth: app.waveformDetail === "high" ? 1 : app.waveformDetail === "low" ? 4 : 2
 
@@ -188,7 +197,7 @@ Rectangle {
             }
             Item { Layout.fillWidth: true }
 
-            // Windows, FL Studio style: Playlist (F5), Piano Roll (F7), Mixer (F9).
+            // Drawers that slide up under the arrangement: Piano Roll (P), Mixer (X).
             Rectangle {
                 implicitWidth: windowRow.implicitWidth + 6
                 implicitHeight: 30
@@ -201,12 +210,10 @@ Rectangle {
                     spacing: 2
                     Repeater {
                         model: [
-                            { glyph: Icons.waveform, label: "Playlist", key: "F5", on: !area.pianoRollShown && !area.mixerShown,
-                              tip: "Just the tracks", act: () => area.playlistRequested() },
-                            { glyph: Icons.pianoKeys, label: "Piano Roll", key: "F7", on: area.pianoRollShown,
-                              tip: "Opens the selected MIDI region, or makes one at the playhead", act: () => area.pianoRollToggled() },
-                            { glyph: Icons.sliders, label: "Mixer", key: "F9", on: area.mixerShown,
-                              tip: "Faders, sends and effects", act: () => area.mixerToggled() }
+                            { glyph: Icons.pianoKeys, label: "Piano Roll", key: "P", on: area.pianoRollShown,
+                              tip: "Slides up under the arrangement. Opens the selected MIDI region, or the one under the playhead", act: () => area.pianoRollToggled() },
+                            { glyph: Icons.sliders, label: "Mixer", key: "X", on: area.mixerShown,
+                              tip: "Slides up under the arrangement: faders, sends and effects", act: () => area.mixerToggled() }
                         ]
                         delegate: AbstractButton {
                             id: win
@@ -264,6 +271,7 @@ Rectangle {
                 implicitWidth: 28; implicitHeight: 26; iconSize: 15
                 glyph: Icons.clock
                 active: historyPopup.opened
+                visible: area.width > 1100
                 tip: "Undo history: jump back several steps (⌥⌘Z)"
                 onClicked: historyPopup.opened ? historyPopup.close() : historyPopup.open()
                 HistoryPopup { id: historyPopup; app: area.app; y: parent.height + 4; x: parent.width - width }
@@ -279,12 +287,14 @@ Rectangle {
                 implicitWidth: 28; implicitHeight: 26; iconSize: 15
                 glyph: Icons.gauge
                 active: area.tunerShown
+                visible: area.width > 1100
                 tip: "Tuner: tune a guitar, bass or voice from your input"
                 onClicked: area.tunerToggled()
             }
             IconButton {
                 implicitWidth: 28; implicitHeight: 26; iconSize: 15
                 glyph: Icons.keyboard
+                visible: area.width > 1100
                 tip: "Keyboard shortcuts (?)"
                 onClicked: area.shortcutsRequested()
             }
@@ -326,6 +336,7 @@ Rectangle {
                 onClicked: area.app.toggleSnap()
             }
             Segmented {
+                visible: area.width > 900
                 implicitHeight: 28
                 minItemWidth: 44
                 opacity: area.app.snap ? 1 : 0.5
@@ -625,6 +636,17 @@ Rectangle {
                 border.color: Theme.vivid ? "transparent" : Theme.tint(Theme.line, 0.6)
                 // The lane holding the dragged region draws above the others.
                 z: area.app.selectedTrack === modelData.id ? 1 : 0
+                // A video track shows its clips, each with its picture.
+                Repeater {
+                    model: lane.modelData.video ? area.videos.filter(v => v.track === lane.modelData.id) : []
+                    delegate: VideoClipBlock {
+                        required property var modelData
+                        clipData: modelData
+                        app: area.app
+                        pxPerBeat: area.pxPerBeat
+                        onOpened: area.videoOpened()
+                    }
+                }
                 AutomationLane {
                     visible: !!lane.modelData.automationView
                     y: area.laneHeight - lane.gap + 2
@@ -679,22 +701,32 @@ Rectangle {
     }
 
     // ------------------------------------------------------------- playhead
+    // A 1px beam from the top of the ruler down through every track, with an
+    // inverted triangle badge in the ruler.
     Item {
         x: area.timelineX
-        y: rulerView.y + ruler.cycleY + ruler.stripHeight
+        y: rulerView.y
         width: area.timelineWidth
         height: area.height - y
         clip: true
         Item {
-            x: area.app.positionBeats * area.pxPerBeat - lanes.contentX - 1
-            width: 2
+            x: area.app.positionBeats * area.pxPerBeat - lanes.contentX - 0.5
+            width: 1
             height: parent.height
             Rectangle { anchors.fill: parent; color: Theme.playhead; opacity: 0.9 }
-            Rectangle {
-                width: 11; height: 11; radius: 2
-                rotation: 45
-                x: -4.5; y: -3
-                color: Theme.playhead
+            Shape {
+                x: -5.5
+                y: 0
+                width: 11
+                height: 9
+                antialiasing: true
+                ShapePath {
+                    fillColor: Theme.playhead
+                    strokeColor: "transparent"
+                    startX: 0; startY: 0
+                    PathLine { x: 11; y: 0 }
+                    PathLine { x: 5.5; y: 9 }
+                }
             }
         }
     }

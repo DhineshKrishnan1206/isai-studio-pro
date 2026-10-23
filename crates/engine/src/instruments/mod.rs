@@ -37,8 +37,25 @@ pub enum InstrumentKind {
     Plugin,
 }
 
-const fn p(key: &'static str, label: &'static str, min: f32, max: f32, default: f32, unit: &'static str, log: bool) -> ParamDef {
-    ParamDef { key, label, min, max, default, unit, log, choices: &[] }
+const fn p(
+    key: &'static str,
+    label: &'static str,
+    min: f32,
+    max: f32,
+    default: f32,
+    unit: &'static str,
+    log: bool,
+) -> ParamDef {
+    ParamDef {
+        key,
+        label,
+        min,
+        max,
+        default,
+        unit,
+        log,
+        choices: &[],
+    }
 }
 
 pub const WAVES: &[&str] = &["Saw", "Square", "Triangle", "Sine", "Pulse", "Noise"];
@@ -50,8 +67,22 @@ pub const OCTAVES: &[&str] = &["-2", "-1", "0", "+1", "+2"];
 pub const SUB_OCTAVES: &[&str] = &["-1 oct", "-2 oct"];
 pub const LFO_SHAPES: &[&str] = &["Sine", "Triangle", "Square", "Saw", "Random"];
 
-const fn choice(key: &'static str, label: &'static str, choices: &'static [&'static str], default: f32) -> ParamDef {
-    ParamDef { key, label, min: 0.0, max: (choices.len() - 1) as f32, default, unit: "", log: false, choices }
+const fn choice(
+    key: &'static str,
+    label: &'static str,
+    choices: &'static [&'static str],
+    default: f32,
+) -> ParamDef {
+    ParamDef {
+        key,
+        label,
+        min: 0.0,
+        max: (choices.len() - 1) as f32,
+        default,
+        unit: "",
+        log: false,
+        choices,
+    }
 }
 
 // The first ten keep the original synth's keys, so older projects still load.
@@ -116,7 +147,15 @@ const DRUM_PARAMS: &[ParamDef] = &[
     p("rim_tune", "Rim tune", -12.0, 12.0, 0.0, "st", false),
     p("rim_decay", "Rim length", 0.1, 4.0, 1.0, "×", true),
     p("rim_pan", "Rim pan", -1.0, 1.0, -0.2, "", false),
-    p("chh_level", "Closed hat level", -60.0, 6.0, 0.0, "dB", false),
+    p(
+        "chh_level",
+        "Closed hat level",
+        -60.0,
+        6.0,
+        0.0,
+        "dB",
+        false,
+    ),
     p("chh_tune", "Closed hat tune", -12.0, 12.0, 0.0, "st", false),
     p("chh_decay", "Closed hat length", 0.1, 4.0, 1.0, "×", true),
     p("chh_pan", "Closed hat pan", -1.0, 1.0, 0.3, "", false),
@@ -136,8 +175,24 @@ const DRUM_PARAMS: &[ParamDef] = &[
     p("crash_tune", "Crash tune", -12.0, 12.0, 0.0, "st", false),
     p("crash_decay", "Crash length", 0.1, 4.0, 1.0, "×", true),
     p("crash_pan", "Crash pan", -1.0, 1.0, -0.3, "", false),
-    p("cowbell_level", "Cowbell level", -60.0, 6.0, -3.0, "dB", false),
-    p("cowbell_tune", "Cowbell tune", -12.0, 12.0, 0.0, "st", false),
+    p(
+        "cowbell_level",
+        "Cowbell level",
+        -60.0,
+        6.0,
+        -3.0,
+        "dB",
+        false,
+    ),
+    p(
+        "cowbell_tune",
+        "Cowbell tune",
+        -12.0,
+        12.0,
+        0.0,
+        "st",
+        false,
+    ),
     p("cowbell_decay", "Cowbell length", 0.1, 4.0, 1.0, "×", true),
     p("cowbell_pan", "Cowbell pan", -1.0, 1.0, 0.2, "", false),
 ];
@@ -166,12 +221,31 @@ const SAMPLER_PARAMS: &[ParamDef] = &[
     choice("slice_count", "Slices", SLICE_COUNTS, 1.0),
 ];
 
-pub const PIANO_TONES: &[&str] = &["Grand", "Electric", "Felt", "Reed", "Funk", "Toy", "Music box", "Celesta", "Honky-tonk"];
+pub const PIANO_TONES: &[&str] = &[
+    "Grand",
+    "Electric",
+    "Felt",
+    "Reed",
+    "Funk",
+    "Toy",
+    "Music box",
+    "Celesta",
+    "Honky-tonk",
+];
 pub const QUALITIES: &[&str] = &["Full", "Light"];
 pub const PAN_MODES: &[&str] = &["Tremolo", "Auto-pan"];
 
 const PIANO_PARAMS: &[ParamDef] = &[
-    ParamDef { key: "tone", label: "Tone", min: 0.0, max: 8.0, default: 0.0, unit: "", log: false, choices: PIANO_TONES },
+    ParamDef {
+        key: "tone",
+        label: "Tone",
+        min: 0.0,
+        max: 8.0,
+        default: 0.0,
+        unit: "",
+        log: false,
+        choices: PIANO_TONES,
+    },
     p("brightness", "Brightness", 0.0, 100.0, 55.0, "%", false),
     p("decay", "Decay", 0.5, 20.0, 6.0, "s", true),
     p("release", "Release", 20.0, 2000.0, 250.0, "ms", true),
@@ -180,7 +254,16 @@ const PIANO_PARAMS: &[ParamDef] = &[
     p("mod_depth", "Depth", 0.0, 100.0, 0.0, "%", false),
     p("trem_rate", "Rate", 0.5, 12.0, 4.5, "Hz", true),
     p("trem_depth", "Depth", 0.0, 100.0, 0.0, "%", false),
-    ParamDef { key: "autopan", label: "Mode", min: 0.0, max: 1.0, default: 0.0, unit: "", log: false, choices: PAN_MODES },
+    ParamDef {
+        key: "autopan",
+        label: "Mode",
+        min: 0.0,
+        max: 1.0,
+        default: 0.0,
+        unit: "",
+        log: false,
+        choices: PAN_MODES,
+    },
     p("volume", "Volume", -24.0, 6.0, -4.0, "dB", false),
     p("space", "Space", 0.0, 100.0, 15.0, "%", false),
     p("stereo", "Width", 0.0, 100.0, 60.0, "%", false),
@@ -189,11 +272,25 @@ const PIANO_PARAMS: &[ParamDef] = &[
     p("mechanics", "Mechanics", 0.0, 100.0, 35.0, "%", false),
     p("resonance", "Resonance", 0.0, 100.0, 40.0, "%", false),
     p("drive", "Drive", 0.0, 100.0, 0.0, "%", false),
-    ParamDef { key: "quality", label: "Quality", min: 0.0, max: 1.0, default: 0.0, unit: "", log: false, choices: QUALITIES },
+    ParamDef {
+        key: "quality",
+        label: "Quality",
+        min: 0.0,
+        max: 1.0,
+        default: 0.0,
+        unit: "",
+        log: false,
+        choices: QUALITIES,
+    },
 ];
 
 impl InstrumentKind {
-    pub const ALL: [InstrumentKind; 4] = [InstrumentKind::Synth, InstrumentKind::Piano, InstrumentKind::Drums, InstrumentKind::Sampler];
+    pub const ALL: [InstrumentKind; 4] = [
+        InstrumentKind::Synth,
+        InstrumentKind::Piano,
+        InstrumentKind::Drums,
+        InstrumentKind::Sampler,
+    ];
 
     pub fn key(self) -> &'static str {
         match self {
@@ -257,7 +354,15 @@ pub struct PlayInstrument {
 impl PlayInstrument {
     /// An instrument with no sample (everything but the sampler).
     pub fn new(id: u64, kind: InstrumentKind, params: [f32; MAX_INST_PARAMS]) -> Self {
-        Self { id, kind, params, sample: None, slices: Vec::new(), plugin: None, bpm: 120.0 }
+        Self {
+            id,
+            kind,
+            params,
+            sample: None,
+            slices: Vec::new(),
+            plugin: None,
+            bpm: 120.0,
+        }
     }
 }
 
@@ -305,7 +410,9 @@ impl Instrument {
             InstrumentKind::Piano => Instrument::Piano(Piano::new()),
             InstrumentKind::Drums => Instrument::Drums(Drums::new()),
             InstrumentKind::Sampler => Instrument::Sampler(Sampler::new()),
-            InstrumentKind::Plugin => Instrument::Plugin(crate::plugin::PluginInstrument::new(None, false)),
+            InstrumentKind::Plugin => {
+                Instrument::Plugin(crate::plugin::PluginInstrument::new(None, false))
+            }
         }
     }
 
@@ -337,9 +444,23 @@ impl Instrument {
             Instrument::Synth(s) => s.render(params, notes, positions, live, sample_rate, l, r),
             Instrument::Piano(s) => s.render(params, notes, positions, live, sample_rate, l, r),
             Instrument::Drums(s) => s.render(params, notes, positions, live, sample_rate, l, r),
-            Instrument::Sampler(s) => s.render(params, inst.sample.as_deref(), &inst.slices, notes, positions, live, sample_rate, l, r),
+            Instrument::Sampler(s) => s.render(
+                params,
+                inst.sample.as_deref(),
+                &inst.slices,
+                notes,
+                positions,
+                live,
+                sample_rate,
+                l,
+                r,
+            ),
             Instrument::Plugin(p) => {
-                let transport = crate::plugin::Transport { bpm: inst.bpm, playing: positions.iter().any(|&p| p != crate::mixer::SILENT), sample_rate };
+                let transport = crate::plugin::Transport {
+                    bpm: inst.bpm,
+                    playing: positions.iter().any(|&p| p != crate::mixer::SILENT),
+                    sample_rate,
+                };
                 p.render(notes, positions, live, &transport, l, r)
             }
         }
@@ -398,7 +519,9 @@ pub struct InstrumentBank {
 
 impl Default for InstrumentBank {
     fn default() -> Self {
-        Self { slots: Vec::with_capacity(MAX_INSTRUMENTS) }
+        Self {
+            slots: Vec::with_capacity(MAX_INSTRUMENTS),
+        }
     }
 }
 
@@ -408,7 +531,9 @@ impl InstrumentBank {
         let mut bank = Self::default();
         for i in instruments {
             let instrument = match (&i.plugin, i.kind) {
-                (Some(p), InstrumentKind::Plugin) => Instrument::Plugin(crate::plugin::PluginInstrument::new(Some(p.clone()), true)),
+                (Some(p), InstrumentKind::Plugin) => {
+                    Instrument::Plugin(crate::plugin::PluginInstrument::new(Some(p.clone()), true))
+                }
                 _ => Instrument::new(i.kind),
             };
             let _ = bank.add(i.id, Box::new(instrument));
@@ -430,7 +555,10 @@ impl InstrumentBank {
     }
 
     pub fn get_mut(&mut self, id: u64, kind: InstrumentKind) -> Option<&mut Instrument> {
-        self.slots.iter_mut().find(|(i, inst)| *i == id && inst.kind() == kind).map(|(_, inst)| &mut **inst)
+        self.slots
+            .iter_mut()
+            .find(|(i, inst)| *i == id && inst.kind() == kind)
+            .map(|(_, inst)| &mut **inst)
     }
 
     pub fn any_active(&self) -> bool {

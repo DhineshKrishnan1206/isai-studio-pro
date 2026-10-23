@@ -38,7 +38,13 @@ impl Default for Compressor {
 
 impl Compressor {
     pub fn new() -> Self {
-        Self { reduction: 0.0, block_reduction: 0.0, mean_square: 0.0, sidechain: Biquad::new(), sc_freq: 0.0 }
+        Self {
+            reduction: 0.0,
+            block_reduction: 0.0,
+            mean_square: 0.0,
+            sidechain: Biquad::new(),
+            sc_freq: 0.0,
+        }
     }
 
     /// Gain change in dB for an input level, from the static curve.
@@ -65,7 +71,11 @@ impl Compressor {
         let (threshold, ratio, knee) = (p[THRESHOLD], p[RATIO], p[KNEE]);
         let coeff = |ms: f32| (-1.0 / (ms.max(0.01) * 0.001 * ctx.sample_rate)).exp();
         let (att, rel) = (coeff(p[ATTACK]), coeff(p[RELEASE]));
-        let auto = if p[AUTO_MAKEUP] >= 0.5 { Self::auto_makeup(threshold, ratio, knee) } else { 0.0 };
+        let auto = if p[AUTO_MAKEUP] >= 0.5 {
+            Self::auto_makeup(threshold, ratio, knee)
+        } else {
+            0.0
+        };
         let makeup = db(p[MAKEUP] + auto);
         let wet = (p[MIX] / 100.0).clamp(0.0, 1.0);
         let rms = p[DETECT] >= 0.5;
@@ -74,7 +84,8 @@ impl Compressor {
         let sc = p[SC_HPF];
         let use_sc = sc > 20.5;
         if use_sc && (sc - self.sc_freq).abs() > 0.01 {
-            self.sidechain.c = Coeffs::highpass(sc, std::f32::consts::FRAC_1_SQRT_2, ctx.sample_rate);
+            self.sidechain.c =
+                Coeffs::highpass(sc, std::f32::consts::FRAC_1_SQRT_2, ctx.sample_rate);
             self.sc_freq = sc;
         }
 
@@ -127,8 +138,14 @@ mod tests {
     #[test]
     fn static_curve_follows_threshold_and_ratio() {
         assert_eq!(Compressor::curve(-30.0, -20.0, 4.0, 0.0), 0.0);
-        assert!((Compressor::curve(-8.0, -20.0, 4.0, 0.0) + 9.0).abs() < 1e-5, "12 dB over at 4:1 → 3 dB over");
-        assert!(Compressor::curve(-21.0, -20.0, 4.0, 6.0) < 0.0, "soft knee starts early");
+        assert!(
+            (Compressor::curve(-8.0, -20.0, 4.0, 0.0) + 9.0).abs() < 1e-5,
+            "12 dB over at 4:1 → 3 dB over"
+        );
+        assert!(
+            Compressor::curve(-21.0, -20.0, 4.0, 6.0) < 0.0,
+            "soft knee starts early"
+        );
         assert!((Compressor::auto_makeup(-20.0, 4.0, 0.0) - 7.5).abs() < 1e-5);
     }
 
@@ -151,7 +168,9 @@ mod tests {
         let mut p = EffectKind::Compressor.defaults();
         p[THRESHOLD] = -20.0;
         p[KNEE] = 0.0;
-        let bass: Vec<f32> = (0..512).map(|i| 0.5 * (i as f32 * 40.0 * std::f32::consts::TAU / 48_000.0).sin()).collect();
+        let bass: Vec<f32> = (0..512)
+            .map(|i| 0.5 * (i as f32 * 40.0 * std::f32::consts::TAU / 48_000.0).sin())
+            .collect();
         let run = |sc: f32| {
             let mut c = Compressor::new();
             let mut p = p;

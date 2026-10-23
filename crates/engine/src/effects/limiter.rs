@@ -118,7 +118,11 @@ mod tests {
         l[0] = 0.5;
         r[0] = 0.5;
         lim.process(&EffectKind::Limiter.defaults(), &CTX, &mut l, &mut r);
-        assert!((l[n] - 0.5).abs() < 1e-4, "delayed by {n} samples: {}", l[n]);
+        assert!(
+            (l[n] - 0.5).abs() < 1e-4,
+            "delayed by {n} samples: {}",
+            l[n]
+        );
     }
 
     #[test]
@@ -134,6 +138,10 @@ mod tests {
         let ceiling = db(-1.0);
         assert!(l.iter().all(|s| s.abs() <= ceiling + 1e-6));
         // The gain is already well down when the peak plays (no hard clipping needed).
-        assert!(l[1000 + n] < ceiling * 1.001 && l[1000 + n] > ceiling * 0.8, "{}", l[1000 + n]);
+        assert!(
+            l[1000 + n] < ceiling * 1.001 && l[1000 + n] > ceiling * 0.8,
+            "{}",
+            l[1000 + n]
+        );
     }
 }

@@ -21,7 +21,13 @@ pub struct Gate {
 
 impl Gate {
     pub fn new() -> Self {
-        Self { env: 0.0, gain: 0.0, hold: 0, open: false, reduction: 0.0 }
+        Self {
+            env: 0.0,
+            gain: 0.0,
+            hold: 0,
+            open: false,
+            reduction: 0.0,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -37,7 +43,11 @@ impl Gate {
         let mut lowest = 1.0f32;
         for (a, b) in l.iter_mut().zip(r.iter_mut()) {
             let level = a.abs().max(b.abs());
-            self.env = if level > self.env { level } else { flush(level + (self.env - level) * detect) };
+            self.env = if level > self.env {
+                level
+            } else {
+                flush(level + (self.env - level) * detect)
+            };
             if self.env > open_at {
                 self.open = true;
                 self.hold = hold;
@@ -89,7 +99,14 @@ pub struct DeEsser {
 
 impl DeEsser {
     pub fn new() -> Self {
-        Self { low: [Biquad::new(); 2], high: [Biquad::new(); 2], env: 0.0, gain: 1.0, last: (f32::NAN, f32::NAN), reduction: 0.0 }
+        Self {
+            low: [Biquad::new(); 2],
+            high: [Biquad::new(); 2],
+            env: 0.0,
+            gain: 1.0,
+            last: (f32::NAN, f32::NAN),
+            reduction: 0.0,
+        }
     }
 
     pub fn process(&mut self, p: &[f32; MAX_PARAMS], ctx: &Context, l: &mut [f32], r: &mut [f32]) {
@@ -142,7 +159,10 @@ impl DeEsser {
     }
 
     pub fn reset(&mut self) {
-        self.low.iter_mut().chain(&mut self.high).for_each(Biquad::reset);
+        self.low
+            .iter_mut()
+            .chain(&mut self.high)
+            .for_each(Biquad::reset);
         self.env = 0.0;
         self.gain = 1.0;
         self.reduction = 0.0;

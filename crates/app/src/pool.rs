@@ -49,7 +49,15 @@ impl AudioPool {
     pub fn new(rate: u32) -> Self {
         let (tx, rx) = mpsc::channel();
         let (stretch_tx, stretch_rx) = mpsc::channel();
-        Self { rate, entries: HashMap::new(), tx, rx, stretched: HashMap::new(), stretch_tx, stretch_rx }
+        Self {
+            rate,
+            entries: HashMap::new(),
+            tx,
+            rx,
+            stretched: HashMap::new(),
+            stretch_tx,
+            stretch_rx,
+        }
     }
 
     pub fn rate(&self) -> u32 {
@@ -76,7 +84,9 @@ impl AudioPool {
         if key == 10_000 || self.stretched.get(path).is_some_and(|(k, _)| *k == key) {
             return;
         }
-        let Some(clip) = self.ready(path).cloned() else { return };
+        let Some(clip) = self.ready(path).cloned() else {
+            return;
+        };
         self.stretched.insert(path.to_path_buf(), (key, None));
         let (tx, path, rate) = (self.stretch_tx.clone(), path.to_path_buf(), self.rate);
         std::thread::spawn(move || {
@@ -99,7 +109,8 @@ impl AudioPool {
         while let Ok((path, key, rate, clip)) = self.stretch_rx.try_recv() {
             // Only the stretch still wanted, at the current sample rate.
             if rate == self.rate && self.stretched.get(&path).is_some_and(|(k, _)| *k == key) {
-                self.stretched.insert(path.clone(), (key, Some(Arc::new(clip))));
+                self.stretched
+                    .insert(path.clone(), (key, Some(Arc::new(clip))));
                 done.push(path);
             }
         }
@@ -111,7 +122,13 @@ impl AudioPool {
             let state = match result {
                 Ok(clip) => {
                     let peaks = Peaks::compute(&clip);
-                    shared::set_peaks(&path, Arc::new(WavePeaks { peaks, sample_rate: clip.sample_rate }));
+                    shared::set_peaks(
+                        &path,
+                        Arc::new(WavePeaks {
+                            peaks,
+                            sample_rate: clip.sample_rate,
+                        }),
+                    );
                     AudioState::Ready(Arc::new(clip))
                 }
                 Err(err) => AudioState::Failed(format!("{err:#}")),
@@ -134,7 +151,10 @@ impl AudioPool {
     }
 
     pub fn is_loading(&self) -> bool {
-        self.entries.values().any(|s| matches!(s, AudioState::Loading)) || self.stretched.values().any(|(_, c)| c.is_none())
+        self.entries
+            .values()
+            .any(|s| matches!(s, AudioState::Loading))
+            || self.stretched.values().any(|(_, c)| c.is_none())
     }
 
     /// The device's sample rate changed: everything must be decoded again.

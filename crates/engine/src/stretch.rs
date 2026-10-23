@@ -15,7 +15,12 @@ pub fn stretch(clip: &Clip, ratio: f64) -> Clip {
     let ratio = ratio.clamp(0.25, 4.0);
     let len = clip.frames();
     if (ratio - 1.0).abs() < 1e-4 || len < 64 {
-        return Clip { name: clip.name.clone(), sample_rate: clip.sample_rate, left: clip.left.clone(), right: clip.right.clone() };
+        return Clip {
+            name: clip.name.clone(),
+            sample_rate: clip.sample_rate,
+            left: clip.left.clone(),
+            right: clip.right.clone(),
+        };
     }
     let rate = clip.sample_rate as f64;
     // Grains of about 40 ms, overlapping four times.
@@ -23,18 +28,34 @@ pub fn stretch(clip: &Clip, ratio: f64) -> Clip {
     let hs = n / 4;
     let ha = hs as f64 / ratio;
     let tol = n / 4;
-    let window: Vec<f32> = (0..n).map(|i| (0.5 - 0.5 * (std::f64::consts::TAU * i as f64 / n as f64).cos()) as f32).collect();
+    let window: Vec<f32> = (0..n)
+        .map(|i| (0.5 - 0.5 * (std::f64::consts::TAU * i as f64 / n as f64).cos()) as f32)
+        .collect();
 
     // A quarter-rate mono copy to search on.
     const DOWN: usize = 4;
     let mono: Vec<f32> = (0..len / DOWN)
-        .map(|i| (0..DOWN).map(|k| clip.left[i * DOWN + k] + clip.right[i * DOWN + k]).sum::<f32>())
+        .map(|i| {
+            (0..DOWN)
+                .map(|k| clip.left[i * DOWN + k] + clip.right[i * DOWN + k])
+                .sum::<f32>()
+        })
         .collect();
-    let at = |i: isize| -> f32 { if i >= 0 && (i as usize) < mono.len() { mono[i as usize] } else { 0.0 } };
+    let at = |i: isize| -> f32 {
+        if i >= 0 && (i as usize) < mono.len() {
+            mono[i as usize]
+        } else {
+            0.0
+        }
+    };
 
     let out_len = (len as f64 * ratio).round() as usize;
     let total = out_len + n;
-    let (mut l, mut r, mut norm) = (vec![0.0f32; total], vec![0.0f32; total], vec![0.0f32; total]);
+    let (mut l, mut r, mut norm) = (
+        vec![0.0f32; total],
+        vec![0.0f32; total],
+        vec![0.0f32; total],
+    );
     let mut prev: isize = 0;
     let mut k = 0usize;
     while k * hs < out_len {
@@ -84,7 +105,12 @@ pub fn stretch(clip: &Clip, ratio: f64) -> Clip {
     }
     l.truncate(out_len);
     r.truncate(out_len);
-    Clip { name: clip.name.clone(), sample_rate: clip.sample_rate, left: l, right: r }
+    Clip {
+        name: clip.name.clone(),
+        sample_rate: clip.sample_rate,
+        left: l,
+        right: r,
+    }
 }
 
 #[cfg(test)]
@@ -92,23 +118,42 @@ mod tests {
     use super::*;
 
     fn sine(hz: f32, secs: f32) -> Clip {
-        let s: Vec<f32> = (0..(secs * 48_000.0) as usize).map(|i| 0.5 * (i as f32 * hz / 48_000.0 * std::f32::consts::TAU).sin()).collect();
-        Clip { name: "t".into(), sample_rate: 48_000, left: s.clone(), right: s }
+        let s: Vec<f32> = (0..(secs * 48_000.0) as usize)
+            .map(|i| 0.5 * (i as f32 * hz / 48_000.0 * std::f32::consts::TAU).sin())
+            .collect();
+        Clip {
+            name: "t".into(),
+            sample_rate: 48_000,
+            left: s.clone(),
+            right: s,
+        }
     }
 
     fn hz(s: &[f32]) -> f32 {
-        s.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f32 / (s.len() as f32 / 48_000.0)
+        s.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f32
+            / (s.len() as f32 / 48_000.0)
     }
 
     #[test]
     fn stretching_changes_length_but_not_pitch() {
         for ratio in [0.5, 0.8, 1.25, 2.0] {
             let out = stretch(&sine(440.0, 1.0), ratio);
-            assert_eq!(out.frames(), (48_000.0 * ratio).round() as usize, "length ×{ratio}");
+            assert_eq!(
+                out.frames(),
+                (48_000.0 * ratio).round() as usize,
+                "length ×{ratio}"
+            );
             let mid = &out.left[out.frames() / 8..out.frames() * 7 / 8];
-            assert!((hz(mid) - 440.0).abs() < 6.0, "pitch at ×{ratio}: {}", hz(mid));
+            assert!(
+                (hz(mid) - 440.0).abs() < 6.0,
+                "pitch at ×{ratio}: {}",
+                hz(mid)
+            );
             // Smooth joins: no sample jumps much more than a 440 Hz sine's steepest step.
-            let steepest = mid.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
+            let steepest = mid
+                .windows(2)
+                .map(|w| (w[1] - w[0]).abs())
+                .fold(0.0f32, f32::max);
             assert!(steepest < 0.05, "a seam at ×{ratio}: {steepest}");
         }
     }

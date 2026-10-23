@@ -16,11 +16,23 @@ pub struct Coeffs {
 impl Coeffs {
     /// Passes everything unchanged.
     pub const fn identity() -> Self {
-        Self { b0: 1.0, b1: 0.0, b2: 0.0, a1: 0.0, a2: 0.0 }
+        Self {
+            b0: 1.0,
+            b1: 0.0,
+            b2: 0.0,
+            a1: 0.0,
+            a2: 0.0,
+        }
     }
 
     fn normalized(b0: f32, b1: f32, b2: f32, a0: f32, a1: f32, a2: f32) -> Self {
-        Self { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 }
+        Self {
+            b0: b0 / a0,
+            b1: b1 / a0,
+            b2: b2 / a0,
+            a1: a1 / a0,
+            a2: a2 / a0,
+        }
     }
 
     fn omega(freq: f32, rate: f32) -> (f32, f32) {
@@ -31,20 +43,41 @@ impl Coeffs {
     pub fn highpass(freq: f32, q: f32, rate: f32) -> Self {
         let (cos, sin) = Self::omega(freq, rate);
         let alpha = sin / (2.0 * q);
-        Self::normalized((1.0 + cos) / 2.0, -(1.0 + cos), (1.0 + cos) / 2.0, 1.0 + alpha, -2.0 * cos, 1.0 - alpha)
+        Self::normalized(
+            (1.0 + cos) / 2.0,
+            -(1.0 + cos),
+            (1.0 + cos) / 2.0,
+            1.0 + alpha,
+            -2.0 * cos,
+            1.0 - alpha,
+        )
     }
 
     pub fn lowpass(freq: f32, q: f32, rate: f32) -> Self {
         let (cos, sin) = Self::omega(freq, rate);
         let alpha = sin / (2.0 * q);
-        Self::normalized((1.0 - cos) / 2.0, 1.0 - cos, (1.0 - cos) / 2.0, 1.0 + alpha, -2.0 * cos, 1.0 - alpha)
+        Self::normalized(
+            (1.0 - cos) / 2.0,
+            1.0 - cos,
+            (1.0 - cos) / 2.0,
+            1.0 + alpha,
+            -2.0 * cos,
+            1.0 - alpha,
+        )
     }
 
     pub fn peak(freq: f32, gain_db: f32, q: f32, rate: f32) -> Self {
         let a = 10f32.powf(gain_db / 40.0);
         let (cos, sin) = Self::omega(freq, rate);
         let alpha = sin / (2.0 * q);
-        Self::normalized(1.0 + alpha * a, -2.0 * cos, 1.0 - alpha * a, 1.0 + alpha / a, -2.0 * cos, 1.0 - alpha / a)
+        Self::normalized(
+            1.0 + alpha * a,
+            -2.0 * cos,
+            1.0 - alpha * a,
+            1.0 + alpha / a,
+            -2.0 * cos,
+            1.0 - alpha / a,
+        )
     }
 
     /// First-order (6 dB per octave) high-pass.
@@ -98,7 +131,8 @@ impl Coeffs {
         let num_im = -(self.b1 * s1 + self.b2 * s2);
         let den_re = 1.0 + self.a1 * c1 + self.a2 * c2;
         let den_im = -(self.a1 * s1 + self.a2 * s2);
-        let mag = ((num_re * num_re + num_im * num_im) / (den_re * den_re + den_im * den_im)).sqrt();
+        let mag =
+            ((num_re * num_re + num_im * num_im) / (den_re * den_re + den_im * den_im)).sqrt();
         20.0 * mag.max(1e-9).log10()
     }
 }
@@ -112,7 +146,10 @@ pub struct Biquad {
 
 impl Biquad {
     pub fn new() -> Self {
-        Self { c: Coeffs::identity(), z: [[0.0; 2]; 2] }
+        Self {
+            c: Coeffs::identity(),
+            z: [[0.0; 2]; 2],
+        }
     }
 
     #[inline]
@@ -159,7 +196,10 @@ mod tests {
         assert!((high.response_db(20000.0, rate) - 4.0).abs() < 0.6);
         let hp1 = Coeffs::highpass1(1000.0, rate);
         assert!((hp1.response_db(1000.0, rate) + 3.0).abs() < 0.1);
-        assert!((hp1.response_db(100.0, rate) + 20.0).abs() < 0.5, "6 dB per octave");
+        assert!(
+            (hp1.response_db(100.0, rate) + 20.0).abs() < 0.5,
+            "6 dB per octave"
+        );
         let lp1 = Coeffs::lowpass1(1000.0, rate);
         assert!((lp1.response_db(1000.0, rate) + 3.0).abs() < 0.1);
     }

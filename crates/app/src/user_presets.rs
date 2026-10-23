@@ -31,7 +31,11 @@ fn store(all: &Map<String, Value>) -> anyhow::Result<()> {
 
 /// The saved presets for `kind`, as a JSON array.
 pub fn list(kind: &str) -> String {
-    load().get(kind).cloned().unwrap_or_else(|| json!([])).to_string()
+    load()
+        .get(kind)
+        .cloned()
+        .unwrap_or_else(|| json!([]))
+        .to_string()
 }
 
 /// Saves (or replaces, by name) a preset.
@@ -39,7 +43,9 @@ pub fn save(kind: &str, name: &str, values: &str) -> anyhow::Result<()> {
     let values: Value = serde_json::from_str(values)?;
     let mut all = load();
     let list = all.entry(kind.to_owned()).or_insert_with(|| json!([]));
-    let items = list.as_array_mut().ok_or_else(|| anyhow::anyhow!("presets file is damaged"))?;
+    let items = list
+        .as_array_mut()
+        .ok_or_else(|| anyhow::anyhow!("presets file is damaged"))?;
     items.retain(|p| p.get("name").and_then(Value::as_str) != Some(name));
     items.push(json!({ "name": name, "values": values }));
     store(&all)

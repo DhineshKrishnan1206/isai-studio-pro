@@ -25,7 +25,12 @@ pub struct Tensor {
 
 impl Tensor {
     pub fn zeros(h: usize, w: usize, c: usize) -> Self {
-        Self { h, w, c, d: vec![0.0; h * w * c] }
+        Self {
+            h,
+            w,
+            c,
+            d: vec![0.0; h * w * c],
+        }
     }
 }
 
@@ -64,7 +69,11 @@ pub struct UNet {
 }
 
 fn suffix(n: usize) -> String {
-    if n == 0 { String::new() } else { format!("_{n}") }
+    if n == 0 {
+        String::new()
+    } else {
+        format!("_{n}")
+    }
 }
 
 impl UNet {
@@ -74,7 +83,15 @@ impl UNet {
         let conv = |n: usize, stride: usize, dilation: usize| -> Result<Conv, String> {
             let (shape, w) = weights.get(&format!("conv2d{}/kernel", suffix(n)))?;
             let (_, b) = weights.get(&format!("conv2d{}/bias", suffix(n)))?;
-            Ok(Conv { k: shape[0], cin: shape[2], cout: shape[3], stride, dilation, w: w.clone(), b: b.clone() })
+            Ok(Conv {
+                k: shape[0],
+                cin: shape[2],
+                cout: shape[3],
+                stride,
+                dilation,
+                w: w.clone(),
+                b: b.clone(),
+            })
         };
         let conv_t = |n: usize| -> Result<ConvT, String> {
             let (shape, w) = weights.get(&format!("conv2d_transpose{}/kernel", suffix(n)))?;
@@ -85,23 +102,50 @@ impl UNet {
                 for kx in 0..k {
                     for co in 0..cout {
                         for ci in 0..cin {
-                            r[((ci * k + ky) * k + kx) * cout + co] = w[((ky * k + kx) * cout + co) * cin + ci];
+                            r[((ci * k + ky) * k + kx) * cout + co] =
+                                w[((ky * k + kx) * cout + co) * cin + ci];
                         }
                     }
                 }
             }
-            Ok(ConvT { k, cin, cout, w: r, b: b.clone() })
+            Ok(ConvT {
+                k,
+                cin,
+                cout,
+                w: r,
+                b: b.clone(),
+            })
         };
         let bn = |n: usize| -> Result<Bn, String> {
-            let g = |p: &str| weights.get(&format!("batch_normalization{}/{p}", suffix(n))).map(|t| t.1.clone());
-            let (gamma, beta, mean, var) = (g("gamma")?, g("beta")?, g("moving_mean")?, g("moving_variance")?);
-            let scale: Vec<f32> = gamma.iter().zip(&var).map(|(g, v)| g / (v + BN_EPS).sqrt()).collect();
-            let shift = beta.iter().zip(&mean).zip(&scale).map(|((b, m), s)| b - m * s).collect();
+            let g = |p: &str| {
+                weights
+                    .get(&format!("batch_normalization{}/{p}", suffix(n)))
+                    .map(|t| t.1.clone())
+            };
+            let (gamma, beta, mean, var) = (
+                g("gamma")?,
+                g("beta")?,
+                g("moving_mean")?,
+                g("moving_variance")?,
+            );
+            let scale: Vec<f32> = gamma
+                .iter()
+                .zip(&var)
+                .map(|(g, v)| g / (v + BN_EPS).sqrt())
+                .collect();
+            let shift = beta
+                .iter()
+                .zip(&mean)
+                .zip(&scale)
+                .map(|((b, m), s)| b - m * s)
+                .collect();
             Ok(Bn { scale, shift })
         };
         let (c0, t0, b0) = (7 * index, 6 * index, 12 * index);
         Ok(Self {
-            enc: (0..6).map(|i| conv(c0 + i, 2, 1)).collect::<Result<_, _>>()?,
+            enc: (0..6)
+                .map(|i| conv(c0 + i, 2, 1))
+                .collect::<Result<_, _>>()?,
             enc_bn: (0..5).map(|i| bn(b0 + i)).collect::<Result<_, _>>()?,
             dec: (0..6).map(|i| conv_t(t0 + i)).collect::<Result<_, _>>()?,
             dec_bn: (6..12).map(|i| bn(b0 + i)).collect::<Result<_, _>>()?,
@@ -161,7 +205,12 @@ fn batch_norm(t: &mut Tensor, bn: &Bn) {
 fn concat(a: &Tensor, b: &Tensor) -> Tensor {
     let c = a.c + b.c;
     let mut out = Tensor::zeros(a.h, a.w, c);
-    for ((o, pa), pb) in out.d.chunks_exact_mut(c).zip(a.d.chunks_exact(a.c)).zip(b.d.chunks_exact(b.c)) {
+    for ((o, pa), pb) in out
+        .d
+        .chunks_exact_mut(c)
+        .zip(a.d.chunks_exact(a.c))
+        .zip(b.d.chunks_exact(b.c))
+    {
         o[..a.c].copy_from_slice(pa);
         o[a.c..].copy_from_slice(pb);
     }
@@ -177,14 +226,32 @@ fn pad_before(input: usize, output: usize, stride: usize, effective_k: usize) ->
 fn gemm(m: usize, k: usize, n: usize, a: &[f32], b: &[f32], c: &mut [f32]) {
     // SAFETY: the slices hold at least m×k, k×n and m×n values with these strides.
     unsafe {
-        matrixmultiply::sgemm(m, k, n, 1.0, a.as_ptr(), k as isize, 1, b.as_ptr(), n as isize, 1, 0.0, c.as_mut_ptr(), n as isize, 1);
+        matrixmultiply::sgemm(
+            m,
+            k,
+            n,
+            1.0,
+            a.as_ptr(),
+            k as isize,
+            1,
+            b.as_ptr(),
+            n as isize,
+            1,
+            0.0,
+            c.as_mut_ptr(),
+            n as isize,
+            1,
+        );
     }
 }
 
 fn conv(x: &Tensor, l: &Conv, threads: usize) -> Tensor {
     let ke = (l.k - 1) * l.dilation + 1;
     let (oh, ow) = (x.h.div_ceil(l.stride), x.w.div_ceil(l.stride));
-    let (pt, pl) = (pad_before(x.h, oh, l.stride, ke), pad_before(x.w, ow, l.stride, ke));
+    let (pt, pl) = (
+        pad_before(x.h, oh, l.stride, ke),
+        pad_before(x.w, ow, l.stride, ke),
+    );
     let kk = l.k * l.k * l.cin;
     let mut out = Tensor::zeros(oh, ow, l.cout);
     let rows_per = oh.div_ceil(threads.max(1)).max(1);
@@ -212,7 +279,8 @@ fn conv(x: &Tensor, l: &Conv, threads: usize) -> Tensor {
                                     continue;
                                 }
                                 for kx in 0..l.k {
-                                    let ix = (ox * l.stride + kx * l.dilation) as isize - pl as isize;
+                                    let ix =
+                                        (ox * l.stride + kx * l.dilation) as isize - pl as isize;
                                     if ix < 0 || ix >= x.w as isize {
                                         continue;
                                     }
@@ -295,7 +363,10 @@ mod tests {
     fn naive(x: &Tensor, l: &Conv) -> Tensor {
         let ke = (l.k - 1) * l.dilation + 1;
         let (oh, ow) = (x.h.div_ceil(l.stride), x.w.div_ceil(l.stride));
-        let (pt, pl) = (pad_before(x.h, oh, l.stride, ke), pad_before(x.w, ow, l.stride, ke));
+        let (pt, pl) = (
+            pad_before(x.h, oh, l.stride, ke),
+            pad_before(x.w, ow, l.stride, ke),
+        );
         let mut out = Tensor::zeros(oh, ow, l.cout);
         for oy in 0..oh {
             for ox in 0..ow {
@@ -309,7 +380,8 @@ mod tests {
                                 continue;
                             }
                             for ci in 0..l.cin {
-                                s += x.d[(iy as usize * x.w + ix as usize) * x.c + ci] * l.w[((ky * l.k + kx) * l.cin + ci) * l.cout + co];
+                                s += x.d[(iy as usize * x.w + ix as usize) * x.c + ci]
+                                    * l.w[((ky * l.k + kx) * l.cin + ci) * l.cout + co];
                             }
                         }
                     }
@@ -322,18 +394,32 @@ mod tests {
 
     fn pseudo(n: usize, seed: u32) -> Vec<f32> {
         let mut s = seed;
-        (0..n).map(|_| {
-            s = s.wrapping_mul(1_103_515_245).wrapping_add(12345);
-            ((s >> 16) as f32 / 65536.0) - 0.5
-        })
-        .collect()
+        (0..n)
+            .map(|_| {
+                s = s.wrapping_mul(1_103_515_245).wrapping_add(12345);
+                ((s >> 16) as f32 / 65536.0) - 0.5
+            })
+            .collect()
     }
 
     #[test]
     fn im2col_convolution_matches_the_direct_one() {
-        let x = Tensor { h: 9, w: 12, c: 3, d: pseudo(9 * 12 * 3, 1) };
+        let x = Tensor {
+            h: 9,
+            w: 12,
+            c: 3,
+            d: pseudo(9 * 12 * 3, 1),
+        };
         for (stride, dilation, k) in [(2, 1, 5), (1, 2, 4)] {
-            let l = Conv { k, cin: 3, cout: 4, stride, dilation, w: pseudo(k * k * 3 * 4, 2), b: pseudo(4, 3) };
+            let l = Conv {
+                k,
+                cin: 3,
+                cout: 4,
+                stride,
+                dilation,
+                w: pseudo(k * k * 3 * 4, 2),
+                b: pseudo(4, 3),
+            };
             let (a, b) = (conv(&x, &l, 3), naive(&x, &l));
             assert_eq!((a.h, a.w, a.c), (b.h, b.w, b.c));
             for (p, q) in a.d.iter().zip(&b.d) {
@@ -344,7 +430,12 @@ mod tests {
 
     #[test]
     fn transposed_convolution_doubles_and_matches_the_definition() {
-        let x = Tensor { h: 3, w: 4, c: 2, d: pseudo(24, 5) };
+        let x = Tensor {
+            h: 3,
+            w: 4,
+            c: 2,
+            d: pseudo(24, 5),
+        };
         let k = 5;
         // TensorFlow layout [kh][kw][cout][cin], reordered as `load` does.
         let tf = pseudo(k * k * 3 * 2, 6);
@@ -353,12 +444,19 @@ mod tests {
             for kx in 0..k {
                 for co in 0..3 {
                     for ci in 0..2 {
-                        w[((ci * k + ky) * k + kx) * 3 + co] = tf[((ky * k + kx) * 3 + co) * 2 + ci];
+                        w[((ci * k + ky) * k + kx) * 3 + co] =
+                            tf[((ky * k + kx) * 3 + co) * 2 + ci];
                     }
                 }
             }
         }
-        let l = ConvT { k, cin: 2, cout: 3, w, b: vec![0.0; 3] };
+        let l = ConvT {
+            k,
+            cin: 2,
+            cout: 3,
+            w,
+            b: vec![0.0; 3],
+        };
         let out = conv_t(&x, &l, 2);
         assert_eq!((out.h, out.w, out.c), (6, 8, 3));
         // Definition: out[2i + ky - 1][2j + kx - 1][co] += x[i][j][ci] * W[ky][kx][co][ci].
@@ -367,13 +465,18 @@ mod tests {
             for j in 0..4 {
                 for ky in 0..k {
                     for kx in 0..k {
-                        let (y, xx) = (2 * i as isize + ky as isize - 1, 2 * j as isize + kx as isize - 1);
+                        let (y, xx) = (
+                            2 * i as isize + ky as isize - 1,
+                            2 * j as isize + kx as isize - 1,
+                        );
                         if y < 0 || xx < 0 || y >= 6 || xx >= 8 {
                             continue;
                         }
                         for co in 0..3 {
                             for ci in 0..2 {
-                                want[(y as usize * 8 + xx as usize) * 3 + co] += x.d[(i * 4 + j) * 2 + ci] * tf[((ky * k + kx) * 3 + co) * 2 + ci];
+                                want[(y as usize * 8 + xx as usize) * 3 + co] += x.d
+                                    [(i * 4 + j) * 2 + ci]
+                                    * tf[((ky * k + kx) * 3 + co) * 2 + ci];
                             }
                         }
                     }

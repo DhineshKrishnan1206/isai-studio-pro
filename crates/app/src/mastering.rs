@@ -44,7 +44,11 @@ struct Bq {
 
 impl Bq {
     fn new(b: [f64; 3], a: [f64; 3]) -> Self {
-        Self { b: [b[0] / a[0], b[1] / a[0], b[2] / a[0]], a: [a[1] / a[0], a[2] / a[0]], z: [0.0; 2] }
+        Self {
+            b: [b[0] / a[0], b[1] / a[0], b[2] / a[0]],
+            a: [a[1] / a[0], a[2] / a[0]],
+            z: [0.0; 2],
+        }
     }
 
     fn high_shelf(f0: f64, gain_db: f64, q: f64, rate: f64) -> Self {
@@ -54,8 +58,16 @@ impl Bq {
         let c = w.cos();
         let s = 2.0 * a.sqrt() * alpha;
         Self::new(
-            [a * ((a + 1.0) + (a - 1.0) * c + s), -2.0 * a * ((a - 1.0) + (a + 1.0) * c), a * ((a + 1.0) + (a - 1.0) * c - s)],
-            [(a + 1.0) - (a - 1.0) * c + s, 2.0 * ((a - 1.0) - (a + 1.0) * c), (a + 1.0) - (a - 1.0) * c - s],
+            [
+                a * ((a + 1.0) + (a - 1.0) * c + s),
+                -2.0 * a * ((a - 1.0) + (a + 1.0) * c),
+                a * ((a + 1.0) + (a - 1.0) * c - s),
+            ],
+            [
+                (a + 1.0) - (a - 1.0) * c + s,
+                2.0 * ((a - 1.0) - (a + 1.0) * c),
+                (a + 1.0) - (a - 1.0) * c - s,
+            ],
         )
     }
 
@@ -63,14 +75,20 @@ impl Bq {
         let w = std::f64::consts::TAU * f0 / rate;
         let alpha = w.sin() / (2.0 * q);
         let c = w.cos();
-        Self::new([(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0], [1.0 + alpha, -2.0 * c, 1.0 - alpha])
+        Self::new(
+            [(1.0 + c) / 2.0, -(1.0 + c), (1.0 + c) / 2.0],
+            [1.0 + alpha, -2.0 * c, 1.0 - alpha],
+        )
     }
 
     fn low_pass(f0: f64, q: f64, rate: f64) -> Self {
         let w = std::f64::consts::TAU * f0 / rate;
         let alpha = w.sin() / (2.0 * q);
         let c = w.cos();
-        Self::new([(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0], [1.0 + alpha, -2.0 * c, 1.0 - alpha])
+        Self::new(
+            [(1.0 - c) / 2.0, 1.0 - c, (1.0 - c) / 2.0],
+            [1.0 + alpha, -2.0 * c, 1.0 - alpha],
+        )
     }
 
     #[inline]
@@ -86,7 +104,10 @@ impl Bq {
 pub fn loudness(audio: &[f32], rate: u32) -> f32 {
     let r = f64::from(rate);
     // K-weighting: a shelf for the head's effect, then a gentle high-pass.
-    let mut k = [[Bq::high_shelf(1681.97, 4.0, 0.7072, r), Bq::high_pass(38.13, 0.5003, r)]; 2];
+    let mut k = [[
+        Bq::high_shelf(1681.97, 4.0, 0.7072, r),
+        Bq::high_pass(38.13, 0.5003, r),
+    ]; 2];
     let frames = audio.len() / 2;
     let step = (rate as usize) / 10; // 100 ms
     let mut sums: Vec<f64> = Vec::with_capacity(frames / step + 1);
@@ -103,9 +124,16 @@ pub fn loudness(audio: &[f32], rate: u32) -> f32 {
         }
     }
     // 400 ms blocks, 75 % overlap: four 100 ms steps each.
-    let blocks: Vec<f64> = sums.windows(4).map(|w| w.iter().sum::<f64>() / (4 * step) as f64).collect();
+    let blocks: Vec<f64> = sums
+        .windows(4)
+        .map(|w| w.iter().sum::<f64>() / (4 * step) as f64)
+        .collect();
     let lufs = |ms: f64| -0.691 + 10.0 * ms.max(1e-12).log10();
-    let loud: Vec<f64> = blocks.iter().copied().filter(|&ms| lufs(ms) > -70.0).collect();
+    let loud: Vec<f64> = blocks
+        .iter()
+        .copied()
+        .filter(|&ms| lufs(ms) > -70.0)
+        .collect();
     if loud.is_empty() {
         return -70.0;
     }
@@ -130,7 +158,12 @@ pub fn analyse(audio: &[f32], rate: u32) -> Analysis {
         hi += h * h;
     }
     let share = |x: f64| (10.0 * (x / total.max(1e-12)).max(1e-9).log10()) as f32;
-    Analysis { lufs: loudness(audio, rate), peak_db: 20.0 * peak.max(1e-6).log10(), low_db: share(lo), high_db: share(hi) }
+    Analysis {
+        lufs: loudness(audio, rate),
+        peak_db: 20.0 * peak.max(1e-6).log10(),
+        low_db: share(lo),
+        high_db: share(hi),
+    }
 }
 
 /// Sets named parameters on an effect's defaults.
@@ -146,7 +179,10 @@ fn params(kind: EffectKind, set: &[(&str, f32)]) -> [f32; MAX_PARAMS] {
 
 /// Runs a chain of effects over stereo interleaved audio.
 fn run(chain: &[(EffectKind, [f32; MAX_PARAMS])], audio: &[f32], rate: u32) -> Vec<f32> {
-    let ctx = Context { sample_rate: rate as f32, bpm: 120.0 };
+    let ctx = Context {
+        sample_rate: rate as f32,
+        bpm: 120.0,
+    };
     let mut fx: Vec<Effect> = chain.iter().map(|(k, _)| Effect::new(*k, rate)).collect();
     let mut out = Vec::with_capacity(audio.len());
     let (mut l, mut r) = (Vec::with_capacity(512), Vec::with_capacity(512));
@@ -199,7 +235,17 @@ pub fn plan(audio: &[f32], rate: u32, target: f32, cancel: &dyn Fn() -> bool) ->
         ("makeup", 0.0),
         ("mix", 100.0),
     ];
-    let shaped = run(&[(EffectKind::Eq, params(EffectKind::Eq, &eq)), (EffectKind::Compressor, params(EffectKind::Compressor, &compressor))], audio, rate);
+    let shaped = run(
+        &[
+            (EffectKind::Eq, params(EffectKind::Eq, &eq)),
+            (
+                EffectKind::Compressor,
+                params(EffectKind::Compressor, &compressor),
+            ),
+        ],
+        audio,
+        rate,
+    );
     // The limiter's gain: measure, adjust, and measure again.
     let mut gain = (target - loudness(&shaped, rate)).clamp(0.0, 18.0);
     let mut after = before;
@@ -208,7 +254,11 @@ pub fn plan(audio: &[f32], rate: u32, target: f32, cancel: &dyn Fn() -> bool) ->
             return None;
         }
         let limiter = [("gain", gain), ("ceiling", CEILING), ("release", 100.0)];
-        let out = run(&[(EffectKind::Limiter, params(EffectKind::Limiter, &limiter))], &shaped, rate);
+        let out = run(
+            &[(EffectKind::Limiter, params(EffectKind::Limiter, &limiter))],
+            &shaped,
+            rate,
+        );
         after = analyse(&out, rate);
         let miss = target - after.lufs;
         if miss.abs() < 0.3 {
@@ -216,8 +266,18 @@ pub fn plan(audio: &[f32], rate: u32, target: f32, cancel: &dyn Fn() -> bool) ->
         }
         gain = (gain + miss).clamp(0.0, 18.0);
     }
-    let limiter = vec![("gain", (gain * 10.0).round() / 10.0), ("ceiling", CEILING), ("release", 100.0)];
-    Some(Plan { before, after, eq, compressor, limiter })
+    let limiter = vec![
+        ("gain", (gain * 10.0).round() / 10.0),
+        ("ceiling", CEILING),
+        ("release", 100.0),
+    ];
+    Some(Plan {
+        before,
+        after,
+        eq,
+        compressor,
+        limiter,
+    })
 }
 
 #[cfg(test)]
@@ -226,11 +286,12 @@ mod tests {
 
     fn tone(hz: f32, amp: f32, secs: f32) -> Vec<f32> {
         let rate = 48_000.0;
-        (0..(secs * rate) as usize).flat_map(|i| {
-            let s = amp * (i as f32 * hz / rate * std::f32::consts::TAU).sin();
-            [s, s]
-        })
-        .collect()
+        (0..(secs * rate) as usize)
+            .flat_map(|i| {
+                let s = amp * (i as f32 * hz / rate * std::f32::consts::TAU).sin();
+                [s, s]
+            })
+            .collect()
     }
 
     #[test]
@@ -250,8 +311,16 @@ mod tests {
         }
         let plan = plan(&mix, 48_000, -14.0, &|| false).unwrap();
         assert!(plan.before.lufs < -18.0);
-        assert!((plan.after.lufs + 14.0).abs() < 1.0, "reached {}", plan.after.lufs);
-        assert!(plan.after.peak_db <= CEILING + 0.3, "peak {}", plan.after.peak_db);
+        assert!(
+            (plan.after.lufs + 14.0).abs() < 1.0,
+            "reached {}",
+            plan.after.lufs
+        );
+        assert!(
+            plan.after.peak_db <= CEILING + 0.3,
+            "peak {}",
+            plan.after.peak_db
+        );
         let low = plan.eq.iter().find(|(k, _)| *k == "ls_gain").unwrap().1;
         assert!(low < 0.0, "too much bass gets turned down: {low}");
     }

@@ -85,8 +85,19 @@ impl Reverb {
     pub fn new(rate: f32) -> Self {
         let samples = |ms: f32| ((ms * 0.001 * rate) as usize).max(1);
         Self {
-            lines: LINE_MS.map(|ms| Line { buf: vec![0.0; samples(ms + MOD_MS * 2.0) + 4], pos: 0, lp: 0.0 }),
-            diffusers: DIFFUSERS.iter().map(|&(ms, gain)| AllPass { buf: vec![0.0; samples(ms)], pos: 0, gain }).collect(),
+            lines: LINE_MS.map(|ms| Line {
+                buf: vec![0.0; samples(ms + MOD_MS * 2.0) + 4],
+                pos: 0,
+                lp: 0.0,
+            }),
+            diffusers: DIFFUSERS
+                .iter()
+                .map(|&(ms, gain)| AllPass {
+                    buf: vec![0.0; samples(ms)],
+                    pos: 0,
+                    gain,
+                })
+                .collect(),
             predelay: vec![0.0; samples(MAX_PREDELAY_MS) + 1],
             pre_pos: 0,
             low_cut: Biquad::new(),
@@ -106,7 +117,8 @@ impl Reverb {
         // Treble loss per trip: a one-pole low-pass at the damping frequency.
         let damp = (-std::f32::consts::TAU * p[DAMPING].clamp(500.0, 20_000.0) / rate).exp();
         let pre_len = self.predelay.len();
-        let pre = ((p[PREDELAY].clamp(0.0, MAX_PREDELAY_MS) * 0.001 * rate) as usize).min(pre_len - 1);
+        let pre =
+            ((p[PREDELAY].clamp(0.0, MAX_PREDELAY_MS) * 0.001 * rate) as usize).min(pre_len - 1);
         let cut = p[LOW_CUT];
         if (cut - self.low_cut_freq).abs() > 0.01 {
             self.low_cut.c = Coeffs::highpass(cut.max(10.0), std::f32::consts::FRAC_1_SQRT_2, rate);
@@ -155,8 +167,16 @@ impl Reverb {
             let mut ol = 0.0;
             let mut or = 0.0;
             for (i, t) in taps.iter().enumerate() {
-                if i % 2 == 0 { ol += t } else { or += t }
-                if i % 4 < 2 { or += t * 0.3 } else { ol += t * 0.3 }
+                if i % 2 == 0 {
+                    ol += t
+                } else {
+                    or += t
+                }
+                if i % 4 < 2 {
+                    or += t * 0.3
+                } else {
+                    ol += t * 0.3
+                }
             }
 
             // Mix and feed back, with the new input added to every line.

@@ -11,8 +11,16 @@ use std::f32::consts::PI;
 
 use super::{Context, MAX_PARAMS, flush};
 
-pub const KEYS: &[&str] = &["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
-pub const SCALES: &[&str] = &["Chromatic", "Major", "Minor", "Major pentatonic", "Minor pentatonic"];
+pub const KEYS: &[&str] = &[
+    "C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B",
+];
+pub const SCALES: &[&str] = &[
+    "Chromatic",
+    "Major",
+    "Minor",
+    "Major pentatonic",
+    "Minor pentatonic",
+];
 const SCALE_STEPS: [&[u8]; 5] = [
     &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     &[0, 2, 4, 5, 7, 9, 11],
@@ -92,7 +100,11 @@ impl PitchCorrect {
         }
         let (a, b, c) = (d[tau - 1], d[tau], d[tau + 1]);
         let den = a - 2.0 * b + c;
-        let shift = if den.abs() > 1e-9 { (0.5 * (a - c) / den).clamp(-1.0, 1.0) } else { 0.0 };
+        let shift = if den.abs() > 1e-9 {
+            (0.5 * (a - c) / den).clamp(-1.0, 1.0)
+        } else {
+            0.0
+        };
         Some(ANALYSIS_RATE / (tau as f32 + shift))
     }
 
@@ -116,7 +128,11 @@ impl PitchCorrect {
         let mix = (p[4] / 100.0).clamp(0.0, 1.0);
         let decimate = (rate / ANALYSIS_RATE).round().max(1.0) as usize;
         // How fast the shift follows its target (0 ms: at once).
-        let follow = if speed < 0.5 { 0.0 } else { (-1.0 / (speed * 0.001 * rate)).exp() };
+        let follow = if speed < 0.5 {
+            0.0
+        } else {
+            (-1.0 / (speed * 0.001 * rate)).exp()
+        };
         let grain = GRAIN * rate;
         let len = self.buf[0].len();
 
@@ -152,7 +168,11 @@ impl PitchCorrect {
             } else {
                 1.0
             };
-            self.ratio = if follow == 0.0 { want } else { want + (self.ratio - want) * follow };
+            self.ratio = if follow == 0.0 {
+                want
+            } else {
+                want + (self.ratio - want) * follow
+            };
 
             // 3. Shift: two taps sweeping through the grain, crossfaded.
             self.buf[0][self.pos] = flush(*a);
@@ -169,8 +189,10 @@ impl PitchCorrect {
             let p1 = self.phase;
             let p2 = (self.phase + 0.5) % 1.0;
             let (g1, g2) = ((PI * p1).sin().powi(2), (PI * p2).sin().powi(2));
-            let wet_l = read(&self.buf[0], 1.0 + p1 * grain) * g1 + read(&self.buf[0], 1.0 + p2 * grain) * g2;
-            let wet_r = read(&self.buf[1], 1.0 + p1 * grain) * g1 + read(&self.buf[1], 1.0 + p2 * grain) * g2;
+            let wet_l = read(&self.buf[0], 1.0 + p1 * grain) * g1
+                + read(&self.buf[0], 1.0 + p2 * grain) * g2;
+            let wet_r = read(&self.buf[1], 1.0 + p1 * grain) * g1
+                + read(&self.buf[1], 1.0 + p2 * grain) * g2;
             self.pos = (self.pos + 1) % len;
             *a += (wet_l - *a) * mix;
             *b += (wet_r - *b) * mix;

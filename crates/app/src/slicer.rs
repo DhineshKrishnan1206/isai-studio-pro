@@ -18,11 +18,17 @@ pub fn onsets(mono: &[f32], rate: u32, count: usize) -> Vec<usize> {
     if windows < 4 || count <= 1 {
         return vec![0];
     }
-    let energy: Vec<f32> = mono.chunks(HOP).map(|w| w.iter().map(|s| s * s).sum::<f32>() / w.len() as f32).collect();
+    let energy: Vec<f32> = mono
+        .chunks(HOP)
+        .map(|w| w.iter().map(|s| s * s).sum::<f32>() / w.len() as f32)
+        .collect();
     // How much louder each window is than the recent past (log scale, only rises).
     let mut flux: Vec<(usize, f32)> = (1..energy.len())
         .map(|i| {
-            let before = energy[i.saturating_sub(3)..i].iter().cloned().fold(0.0f32, f32::max);
+            let before = energy[i.saturating_sub(3)..i]
+                .iter()
+                .cloned()
+                .fold(0.0f32, f32::max);
             let rise = (energy[i] + 1e-7).log10() - (before + 1e-7).log10();
             (i, if energy[i] > 1e-6 { rise.max(0.0) } else { 0.0 })
         })
@@ -53,11 +59,17 @@ pub fn onsets(mono: &[f32], rate: u32, count: usize) -> Vec<usize> {
 /// the spacing at which that envelope best repeats.
 pub fn tempo(mono: &[f32], rate: u32) -> Option<f64> {
     const HOP: usize = 512;
-    let energy: Vec<f32> = mono.chunks(HOP).map(|w| w.iter().map(|s| s * s).sum::<f32>()).collect();
+    let energy: Vec<f32> = mono
+        .chunks(HOP)
+        .map(|w| w.iter().map(|s| s * s).sum::<f32>())
+        .collect();
     if energy.len() < 64 {
         return None;
     }
-    let flux: Vec<f32> = energy.windows(2).map(|w| ((w[1] + 1e-9).ln() - (w[0] + 1e-9).ln()).max(0.0)).collect();
+    let flux: Vec<f32> = energy
+        .windows(2)
+        .map(|w| ((w[1] + 1e-9).ln() - (w[0] + 1e-9).ln()).max(0.0))
+        .collect();
     let mean = flux.iter().sum::<f32>() / flux.len() as f32;
     let f: Vec<f32> = flux.iter().map(|x| x - mean).collect();
     let hops_per_sec = rate as f64 / HOP as f64;
@@ -66,17 +78,28 @@ pub fn tempo(mono: &[f32], rate: u32) -> Option<f64> {
     if hi + 2 >= f.len() {
         return None;
     }
-    let ac = |lag: usize| -> f32 { f.iter().zip(&f[lag..]).map(|(a, b)| a * b).sum::<f32>() / (f.len() - lag) as f32 };
+    let ac = |lag: usize| -> f32 {
+        f.iter().zip(&f[lag..]).map(|(a, b)| a * b).sum::<f32>() / (f.len() - lag) as f32
+    };
     let scores: Vec<(usize, f32)> = (lo..=hi).map(|lag| (lag, ac(lag))).collect();
     let &(best, score) = scores.iter().max_by(|a, b| a.1.total_cmp(&b.1))?;
     if score <= 0.0 {
         return None;
     }
     // Sharpen between whole lags.
-    let at = |l: usize| scores.iter().find(|(x, _)| *x == l).map_or(score, |(_, s)| *s);
+    let at = |l: usize| {
+        scores
+            .iter()
+            .find(|(x, _)| *x == l)
+            .map_or(score, |(_, s)| *s)
+    };
     let (a, b, c) = (at(best - 1), score, at(best + 1));
     let den = a - 2.0 * b + c;
-    let shift = if den.abs() > 1e-12 { (0.5 * (a - c) / den).clamp(-0.5, 0.5) } else { 0.0 };
+    let shift = if den.abs() > 1e-12 {
+        (0.5 * (a - c) / den).clamp(-0.5, 0.5)
+    } else {
+        0.0
+    };
     let mut bpm = 60.0 * hops_per_sec / (best as f64 + f64::from(shift));
     while bpm < 85.0 {
         bpm *= 2.0;
@@ -106,7 +129,11 @@ mod tests {
             for (i, s) in click.iter_mut().enumerate() {
                 let since = i % beat;
                 // A louder hit on every fourth beat, like a real bar.
-                let level = if (i / beat).is_multiple_of(4) { 0.9 } else { 0.5 };
+                let level = if (i / beat).is_multiple_of(4) {
+                    0.9
+                } else {
+                    0.5
+                };
                 *s = (since as f32 * 0.25).sin() * (-(since as f32) / 800.0).exp() * level;
             }
             let found = tempo(&click, rate).expect("a clear beat");

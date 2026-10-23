@@ -119,7 +119,11 @@ pub fn render(
     // Fresh effects, so an export never shares state with playback.
     let mut bank = EffectBank::for_inserts(arrangement.inserts(), sample_rate);
     let mut instruments = InstrumentBank::for_instruments(arrangement.instruments());
-    let (mut positions, mut l, mut r) = (Vec::with_capacity(BLOCK), vec![0.0f32; BLOCK], vec![0.0f32; BLOCK]);
+    let (mut positions, mut l, mut r) = (
+        Vec::with_capacity(BLOCK),
+        vec![0.0f32; BLOCK],
+        vec![0.0f32; BLOCK],
+    );
     let mut pos = start;
     while pos < end {
         if control.cancelled() {
@@ -129,8 +133,21 @@ pub fn render(
         let n = ((end - pos) as usize).min(BLOCK);
         positions.clear();
         positions.extend(pos..pos + n as u64);
-        let block = Block { positions: &positions, fades: &[], live: &[], live_track: None };
-        mixer.mix(arrangement, &mut bank, &mut instruments, sample_rate as f32, &block, &mut l[..n], &mut r[..n]);
+        let block = Block {
+            positions: &positions,
+            fades: &[],
+            live: &[],
+            live_track: None,
+        };
+        mixer.mix(
+            arrangement,
+            &mut bank,
+            &mut instruments,
+            sample_rate as f32,
+            &block,
+            &mut l[..n],
+            &mut r[..n],
+        );
         for k in 0..n {
             out.push(l[k] * gain);
             out.push(r[k] * gain);
@@ -141,11 +158,23 @@ pub fn render(
 }
 
 /// Renders and writes `arrangement` to `path` in the chosen format.
-pub fn export(arrangement: &Arrangement, opts: &ExportOptions, path: &Path, control: &ExportControl) -> anyhow::Result<ExportReport> {
+pub fn export(
+    arrangement: &Arrangement,
+    opts: &ExportOptions,
+    path: &Path,
+    control: &ExportControl,
+) -> anyhow::Result<ExportReport> {
     if opts.end <= opts.start {
         bail!("there's nothing to export in that range");
     }
-    let mut samples = render(arrangement, opts.sample_rate, opts.start, opts.end, opts.gain, control)?;
+    let mut samples = render(
+        arrangement,
+        opts.sample_rate,
+        opts.start,
+        opts.end,
+        opts.gain,
+        control,
+    )?;
     let peak = samples.iter().fold(0.0f32, |p, s| p.max(s.abs()));
     let peak_db = 20.0 * peak.max(1e-9).log10();
     if opts.normalize && peak > 0.0 {
@@ -162,7 +191,11 @@ pub fn export(arrangement: &Arrangement, opts: &ExportOptions, path: &Path, cont
         Format::Flac16 | Format::Flac24 => write_flac(&samples, opts, path)?,
     }
     control.set(1.0);
-    Ok(ExportReport { path: path.to_path_buf(), peak_db, clipped })
+    Ok(ExportReport {
+        path: path.to_path_buf(),
+        peak_db,
+        clipped,
+    })
 }
 
 /// Float to integer, with TPDF dither for 16-bit so quiet fades stay smooth.
@@ -189,8 +222,14 @@ fn write_wav(samples: &[f32], opts: &ExportOptions, path: &Path) -> anyhow::Resu
         Some(b) => (b as u16, hound::SampleFormat::Int),
         None => (32, hound::SampleFormat::Float),
     };
-    let spec = hound::WavSpec { channels: 2, sample_rate: opts.sample_rate, bits_per_sample: bits, sample_format: format };
-    let mut wav = hound::WavWriter::create(path, spec).with_context(|| format!("couldn't create {}", path.display()))?;
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: opts.sample_rate,
+        bits_per_sample: bits,
+        sample_format: format,
+    };
+    let mut wav = hound::WavWriter::create(path, spec)
+        .with_context(|| format!("couldn't create {}", path.display()))?;
     match opts.format.integer_bits() {
         Some(b) => {
             for s in to_int(samples, b) {
@@ -216,11 +255,18 @@ fn write_flac(samples: &[f32], opts: &ExportOptions, path: &Path) -> anyhow::Res
     let config = flacenc::config::Encoder::default()
         .into_verified()
         .map_err(|e| anyhow::anyhow!("FLAC settings: {e:?}"))?;
-    let source = flacenc::source::MemSource::from_samples(&ints, 2, bits as usize, opts.sample_rate as usize);
+    let source = flacenc::source::MemSource::from_samples(
+        &ints,
+        2,
+        bits as usize,
+        opts.sample_rate as usize,
+    );
     let stream = flacenc::encode_with_fixed_block_size(&config, source, config.block_size)
         .map_err(|e| anyhow::anyhow!("FLAC encoding failed: {e:?}"))?;
     let mut sink = flacenc::bitsink::ByteSink::new();
-    stream.write(&mut sink).map_err(|e| anyhow::anyhow!("FLAC encoding failed: {e:?}"))?;
+    stream
+        .write(&mut sink)
+        .map_err(|e| anyhow::anyhow!("FLAC encoding failed: {e:?}"))?;
     let mut bytes = sink.as_slice().to_vec();
     fix_min_block_size(&mut bytes);
     std::fs::write(path, &bytes).with_context(|| format!("couldn't write {}", path.display()))?;
@@ -249,21 +295,46 @@ mod tests {
     use crate::clip::Clip;
 
     fn arrangement(level: f32) -> Arrangement {
-        let audio = Arc::new(Clip { name: String::new(), sample_rate: 1000, left: vec![level; 1000], right: vec![level; 1000] });
+        let audio = Arc::new(Clip {
+            name: String::new(),
+            sample_rate: 1000,
+            left: vec![level; 1000],
+            right: vec![level; 1000],
+        });
         Arrangement {
             tracks: vec![PlayTrack {
-                sends: vec![], inserts: vec![], automation: vec![], instrument: None, notes: vec![],
+                sends: vec![],
+                inserts: vec![],
+                automation: vec![],
+                instrument: None,
+                notes: vec![],
                 gain: 1.0,
                 pan: 0.0,
                 audible: true,
-                regions: vec![PlayRegion { audio, start: 100, offset: 0, len: 1000, fade_in: 0, fade_out: 0, gain: 1.0, reverse: false }],
+                regions: vec![PlayRegion {
+                    audio,
+                    start: 100,
+                    offset: 0,
+                    len: 1000,
+                    fade_in: 0,
+                    fade_out: 0,
+                    gain: 1.0,
+                    reverse: false,
+                }],
             }],
             ..Default::default()
         }
     }
 
     fn opts(format: Format) -> ExportOptions {
-        ExportOptions { format, sample_rate: 1000, start: 0, end: 1200, gain: 1.0, normalize: false }
+        ExportOptions {
+            format,
+            sample_rate: 1000,
+            start: 0,
+            end: 1200,
+            gain: 1.0,
+            normalize: false,
+        }
     }
 
     #[test]
@@ -281,14 +352,30 @@ mod tests {
     #[test]
     fn writes_wav_and_flac_that_read_back() {
         let dir = std::env::temp_dir().join(format!("isai-export-{}", std::process::id()));
-        for format in [Format::Wav16, Format::Wav24, Format::Wav32Float, Format::Flac16, Format::Flac24] {
+        for format in [
+            Format::Wav16,
+            Format::Wav24,
+            Format::Wav32Float,
+            Format::Flac16,
+            Format::Flac24,
+        ] {
             let path = dir.join(format!("{format:?}.{}", format.extension()));
-            let report = export(&arrangement(0.5), &opts(format), &path, &ExportControl::default()).unwrap();
+            let report = export(
+                &arrangement(0.5),
+                &opts(format),
+                &path,
+                &ExportControl::default(),
+            )
+            .unwrap();
             assert!(!report.clipped);
             assert!((report.peak_db - (-6.02)).abs() < 0.1);
             let clip = Clip::load(&path, 1000).unwrap_or_else(|e| panic!("{format:?}: {e:#}"));
             assert_eq!(clip.frames(), 1200, "{format:?}");
-            assert!((clip.left[500] - 0.5).abs() < 0.001, "{format:?}: {}", clip.left[500]);
+            assert!(
+                (clip.left[500] - 0.5).abs() < 0.001,
+                "{format:?}: {}",
+                clip.left[500]
+            );
         }
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -307,7 +394,13 @@ mod tests {
     #[test]
     fn loud_mixes_report_clipping_in_integer_formats() {
         let path = std::env::temp_dir().join(format!("isai-clip-{}.wav", std::process::id()));
-        let report = export(&arrangement(1.5), &opts(Format::Wav16), &path, &ExportControl::default()).unwrap();
+        let report = export(
+            &arrangement(1.5),
+            &opts(Format::Wav16),
+            &path,
+            &ExportControl::default(),
+        )
+        .unwrap();
         assert!(report.clipped);
         let _ = std::fs::remove_file(&path);
     }
@@ -323,10 +416,19 @@ mod tests {
     fn exports_run_the_master_effects() {
         use crate::effects::{EffectKind, PlayInsert};
         let mut a = arrangement(1.5);
-        a.master = vec![PlayInsert { plugin: None, id: 1, kind: EffectKind::Limiter, enabled: true, params: EffectKind::Limiter.defaults() }];
+        a.master = vec![PlayInsert {
+            plugin: None,
+            id: 1,
+            kind: EffectKind::Limiter,
+            enabled: true,
+            params: EffectKind::Limiter.defaults(),
+        }];
         let out = render(&a, 48_000, 0, 1200, 1.0, &ExportControl::default()).unwrap();
         let peak = out.iter().fold(0.0f32, |p, s| p.max(s.abs()));
-        assert!(peak <= 10f32.powf(-1.0 / 20.0) + 1e-5 && peak > 0.5, "{peak}");
+        assert!(
+            peak <= 10f32.powf(-1.0 / 20.0) + 1e-5 && peak > 0.5,
+            "{peak}"
+        );
     }
 
     #[test]
@@ -334,10 +436,23 @@ mod tests {
         use crate::instruments::{InstrumentKind, PlayInstrument, PlayNote};
         let mut a = arrangement(0.0);
         a.tracks[0].regions.clear();
-        a.tracks[0].instrument = Some(PlayInstrument::new(9, InstrumentKind::Synth, InstrumentKind::Synth.defaults()));
-        a.tracks[0].notes = vec![PlayNote { start: 1000, end: 20_000, key: 60, velocity: 100 }];
+        a.tracks[0].instrument = Some(PlayInstrument::new(
+            9,
+            InstrumentKind::Synth,
+            InstrumentKind::Synth.defaults(),
+        ));
+        a.tracks[0].notes = vec![PlayNote {
+            start: 1000,
+            end: 20_000,
+            key: 60,
+            velocity: 100,
+        }];
         let out = render(&a, 48_000, 0, 24_000, 1.0, &ExportControl::default()).unwrap();
-        let level = |from: usize, to: usize| out[from * 2..to * 2].iter().fold(0.0f32, |p, s| p.max(s.abs()));
+        let level = |from: usize, to: usize| {
+            out[from * 2..to * 2]
+                .iter()
+                .fold(0.0f32, |p, s| p.max(s.abs()))
+        };
         assert_eq!(level(0, 1000), 0.0);
         assert!(level(4000, 18_000) > 0.01);
     }

@@ -86,7 +86,11 @@ impl Mixer {
     /// The live track's keys: held now, struck since the last call, and
     /// how hard each was last played.
     pub fn take_keys(&mut self) -> (u128, u128, &[u8; 128]) {
-        (self.keys_held, std::mem::take(&mut self.keys_struck), &self.key_velocities)
+        (
+            self.keys_held,
+            std::mem::take(&mut self.keys_struck),
+            &self.key_velocities,
+        )
     }
 
     /// Jumps every track straight to its gain, with no glide (for export).
@@ -129,7 +133,11 @@ impl Mixer {
         out_r: &mut [f32],
     ) {
         // Tempo-synced effects follow the tempo where this block plays.
-        let bpm = block.positions.iter().find(|&&p| p != SILENT).map_or(arrangement.bpm, |&p| arrangement.bpm_at(p));
+        let bpm = block
+            .positions
+            .iter()
+            .find(|&&p| p != SILENT)
+            .map_or(arrangement.bpm, |&p| arrangement.bpm_at(p));
         let ctx = Context { sample_rate, bpm };
         let positions = block.positions;
         let n = positions.len().min(BLOCK).min(out_l.len()).min(out_r.len());
@@ -144,7 +152,11 @@ impl Mixer {
         // Nothing playing (no song, no notes) for a few seconds: clear the
         // effects once and skip them.
         let silent = lo > hi && block.live.is_empty() && !instruments.any_active();
-        self.quiet_blocks = if silent { self.quiet_blocks.saturating_add(1) } else { 0 };
+        self.quiet_blocks = if silent {
+            self.quiet_blocks.saturating_add(1)
+        } else {
+            0
+        };
         let quiet = (self.quiet_blocks * BLOCK) as f32 > TAIL_SECONDS * sample_rate;
         // Where automation is read for this block.
         let block_pos = positions[..n].iter().copied().find(|&p| p != SILENT);
@@ -182,8 +194,20 @@ impl Mixer {
             if let Some(inst) = &track.instrument
                 && let Some(instrument) = instruments.get_mut(inst.id, inst.kind)
             {
-                let live: &[LiveNote] = if block.live_track == Some(i) { block.live } else { &[] };
-                instrument.render(inst, &track.notes, &positions[..n], live, sample_rate, tl, tr);
+                let live: &[LiveNote] = if block.live_track == Some(i) {
+                    block.live
+                } else {
+                    &[]
+                };
+                instrument.render(
+                    inst,
+                    &track.notes,
+                    &positions[..n],
+                    live,
+                    sample_rate,
+                    tl,
+                    tr,
+                );
                 if block.live_track == Some(i) {
                     let (held, struck) = instrument.keys();
                     self.keys_held = held;
@@ -224,7 +248,10 @@ impl Mixer {
                     continue;
                 }
                 let step = (level - from) / n as f32;
-                let (bl, br) = (&mut self.bus_l[bus * BLOCK..bus * BLOCK + n], &mut self.bus_r[bus * BLOCK..bus * BLOCK + n]);
+                let (bl, br) = (
+                    &mut self.bus_l[bus * BLOCK..bus * BLOCK + n],
+                    &mut self.bus_r[bus * BLOCK..bus * BLOCK + n],
+                );
                 for k in 0..n {
                     let g = from + step * (k + 1) as f32;
                     bl[k] += tl[k] * g;
@@ -247,7 +274,10 @@ impl Mixer {
         for (j, bus) in arrangement.buses.iter().take(buses).enumerate() {
             let target = bus.target_gains();
             let mut gain = self.bus_gains[j];
-            let (bl, br) = (&mut self.bus_l[j * BLOCK..j * BLOCK + n], &mut self.bus_r[j * BLOCK..j * BLOCK + n]);
+            let (bl, br) = (
+                &mut self.bus_l[j * BLOCK..j * BLOCK + n],
+                &mut self.bus_r[j * BLOCK..j * BLOCK + n],
+            );
             if !quiet && !bus.inserts.is_empty() {
                 bank.run(&bus.inserts, &ctx, bl, br);
             }
@@ -281,7 +311,11 @@ impl Mixer {
             f(i, p.0, p.1);
             *p = (0.0, 0.0);
         }
-        for (j, p) in self.peaks[MAX_TRACKS..].iter_mut().take(buses.min(MAX_BUSES)).enumerate() {
+        for (j, p) in self.peaks[MAX_TRACKS..]
+            .iter_mut()
+            .take(buses.min(MAX_BUSES))
+            .enumerate()
+        {
             f(tracks + j, p.0, p.1);
             *p = (0.0, 0.0);
         }
@@ -297,50 +331,121 @@ mod tests {
     use crate::clip::Clip;
 
     fn block(positions: &[u64]) -> Block<'_> {
-        Block { positions, fades: &[], live: &[], live_track: None }
+        Block {
+            positions,
+            fades: &[],
+            live: &[],
+            live_track: None,
+        }
     }
 
     fn track(level: f32, start: u64, gain: f32) -> PlayTrack {
-        let audio = Arc::new(Clip { name: String::new(), sample_rate: 1000, left: vec![level; 100], right: vec![level; 100] });
-        PlayTrack { gain, pan: 0.0, audible: true, sends: vec![], inserts: vec![], automation: vec![], instrument: None, notes: vec![], regions: vec![PlayRegion { audio, start, offset: 0, len: 100, fade_in: 0, fade_out: 0, gain: 1.0, reverse: false }] }
+        let audio = Arc::new(Clip {
+            name: String::new(),
+            sample_rate: 1000,
+            left: vec![level; 100],
+            right: vec![level; 100],
+        });
+        PlayTrack {
+            gain,
+            pan: 0.0,
+            audible: true,
+            sends: vec![],
+            inserts: vec![],
+            automation: vec![],
+            instrument: None,
+            notes: vec![],
+            regions: vec![PlayRegion {
+                audio,
+                start,
+                offset: 0,
+                len: 100,
+                fade_in: 0,
+                fade_out: 0,
+                gain: 1.0,
+                reverse: false,
+            }],
+        }
     }
 
     #[test]
     fn mixes_tracks_and_skips_silent_positions() {
-        let a = Arrangement { tracks: vec![track(0.25, 0, 1.0), track(0.5, 10, 0.5)], ..Default::default() };
+        let a = Arrangement {
+            tracks: vec![track(0.25, 0, 1.0), track(0.5, 10, 0.5)],
+            ..Default::default()
+        };
         let mut m = Mixer::new();
         m.snap_gains(&a);
         let positions = [0, 10, SILENT, 200];
         let (mut l, mut r) = ([9.0; 4], [9.0; 4]);
-        m.mix(&a, &mut EffectBank::default(), &mut InstrumentBank::default(), 1000.0, &block(&positions), &mut l, &mut r);
+        m.mix(
+            &a,
+            &mut EffectBank::default(),
+            &mut InstrumentBank::default(),
+            1000.0,
+            &block(&positions),
+            &mut l,
+            &mut r,
+        );
         let want = [0.25, 0.5, 0.0, 0.0];
-        assert!(l.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-6), "{l:?}");
+        assert!(
+            l.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-6),
+            "{l:?}"
+        );
         assert_eq!(r, l);
     }
 
     #[test]
     fn reports_post_fader_peaks_per_track() {
-        let a = Arrangement { tracks: vec![track(0.5, 0, 0.5), track(0.5, 1000, 1.0)], ..Default::default() };
+        let a = Arrangement {
+            tracks: vec![track(0.5, 0, 0.5), track(0.5, 1000, 1.0)],
+            ..Default::default()
+        };
         let mut m = Mixer::new();
         m.snap_gains(&a);
         let positions: Vec<u64> = (0..64).collect();
         let (mut l, mut r) = (vec![0.0; 64], vec![0.0; 64]);
-        m.mix(&a, &mut EffectBank::default(), &mut InstrumentBank::default(), 1000.0, &block(&positions), &mut l, &mut r);
+        m.mix(
+            &a,
+            &mut EffectBank::default(),
+            &mut InstrumentBank::default(),
+            1000.0,
+            &block(&positions),
+            &mut l,
+            &mut r,
+        );
         let mut seen = vec![];
         m.take_peaks(2, 0, |i, l, _| seen.push((i, l)));
         assert_eq!(seen.len(), 2);
-        assert!((seen[0].1 - 0.25).abs() < 1e-6 && seen[1].1 == 0.0, "{seen:?}");
+        assert!(
+            (seen[0].1 - 0.25).abs() < 1e-6 && seen[1].1 == 0.0,
+            "{seen:?}"
+        );
         m.take_peaks(1, 0, |_, l, _| assert_eq!(l, 0.0, "reset after reading"));
     }
 
     #[test]
     fn gain_changes_glide() {
-        let a = Arrangement { tracks: vec![track(1.0, 0, 1.0)], ..Default::default() };
+        let a = Arrangement {
+            tracks: vec![track(1.0, 0, 1.0)],
+            ..Default::default()
+        };
         let mut m = Mixer::new();
         let positions: Vec<u64> = (0..8).collect();
         let (mut l, mut r) = (vec![0.0; 8], vec![0.0; 8]);
-        m.mix(&a, &mut EffectBank::default(), &mut InstrumentBank::default(), 1000.0, &block(&positions), &mut l, &mut r);
-        assert!(l[0] > 0.0 && l[0] < 0.01 && l[7] > l[0], "rises from silence: {l:?}");
+        m.mix(
+            &a,
+            &mut EffectBank::default(),
+            &mut InstrumentBank::default(),
+            1000.0,
+            &block(&positions),
+            &mut l,
+            &mut r,
+        );
+        assert!(
+            l[0] > 0.0 && l[0] < 0.01 && l[7] > l[0],
+            "rises from silence: {l:?}"
+        );
     }
 
     #[test]
@@ -351,12 +456,29 @@ mod tests {
         let mut muted = track(0.5, 0, 1.0);
         muted.audible = false;
         muted.sends = vec![(0, 1.0)];
-        let a = Arrangement { tracks: vec![t, muted], buses: vec![PlayBus { gain: 1.0, pan: 0.0, audible: true, inserts: vec![] }], ..Default::default() };
+        let a = Arrangement {
+            tracks: vec![t, muted],
+            buses: vec![PlayBus {
+                gain: 1.0,
+                pan: 0.0,
+                audible: true,
+                inserts: vec![],
+            }],
+            ..Default::default()
+        };
         let mut m = Mixer::new();
         m.snap_gains(&a);
         let positions: Vec<u64> = (0..4).collect();
         let (mut l, mut r) = (vec![0.0; 4], vec![0.0; 4]);
-        m.mix(&a, &mut EffectBank::default(), &mut InstrumentBank::default(), 1000.0, &block(&positions), &mut l, &mut r);
+        m.mix(
+            &a,
+            &mut EffectBank::default(),
+            &mut InstrumentBank::default(),
+            1000.0,
+            &block(&positions),
+            &mut l,
+            &mut r,
+        );
         // 0.5 dry + 0.5 * 0.5 through the bus; the muted track sends nothing (post-fader).
         assert!((l[3] - 0.75).abs() < 1e-5, "{l:?}");
         let mut seen = vec![];
@@ -369,17 +491,39 @@ mod tests {
     fn automation_moves_the_fader_over_time() {
         use crate::arrangement::{AutoTarget, PlayLane};
         let mut t = track(1.0, 0, 1.0);
-        t.automation = vec![PlayLane { target: AutoTarget::Volume, points: vec![(0, -60.0), (50, 0.0)] }];
-        let a = Arrangement { tracks: vec![t], ..Default::default() };
+        t.automation = vec![PlayLane {
+            target: AutoTarget::Volume,
+            points: vec![(0, -60.0), (50, 0.0)],
+        }];
+        let a = Arrangement {
+            tracks: vec![t],
+            ..Default::default()
+        };
         let mut m = Mixer::new();
         m.set_all_gains(0.0);
         let (mut l, mut r) = (vec![0.0; 1], vec![0.0; 1]);
         // At position 0 the lane says silence; at 60 it says 0 dB.
-        m.mix(&a, &mut EffectBank::default(), &mut InstrumentBank::default(), 1000.0, &block(&[0]), &mut l, &mut r);
+        m.mix(
+            &a,
+            &mut EffectBank::default(),
+            &mut InstrumentBank::default(),
+            1000.0,
+            &block(&[0]),
+            &mut l,
+            &mut r,
+        );
         assert!(l[0].abs() < 1e-6);
         let mut last = 0.0;
         for _ in 0..3000 {
-            m.mix(&a, &mut EffectBank::default(), &mut InstrumentBank::default(), 1000.0, &block(&[60]), &mut l, &mut r);
+            m.mix(
+                &a,
+                &mut EffectBank::default(),
+                &mut InstrumentBank::default(),
+                1000.0,
+                &block(&[60]),
+                &mut l,
+                &mut r,
+            );
             last = l[0];
         }
         assert!((last - 1.0).abs() < 0.01, "{last}");

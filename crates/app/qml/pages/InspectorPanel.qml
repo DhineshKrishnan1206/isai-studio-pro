@@ -10,6 +10,8 @@ Rectangle {
     property var app
     property var tracks: []
     property var meters: []
+    /// What the info button's lesson card blurs behind it (the studio page).
+    property Item backdrop: null
     signal instrumentRequested(int id)
     signal effectEditRequested(int id, string chain, color tint)
     signal closeRequested()
@@ -74,6 +76,43 @@ Rectangle {
             onClicked: inspector.instrumentRequested(inspector.track.id)
         }
 
+        // The channel's slots, top to bottom as on Logic's channel strip.
+        ColumnLayout {
+            visible: !!inspector.track
+            Layout.fillWidth: true
+            spacing: 4
+            ChannelSlot {
+                label: "EQ"
+                lit: !!inspector.track && inspector.track.inserts.some(i => String(i.kind || "").toLowerCase().indexOf("eq") >= 0)
+                tint: inspector.tint
+                value: lit ? "On" : ""
+            }
+            ChannelSlot {
+                label: "Instrument"
+                lit: !!inspector.track && !!inspector.track.instrument
+                tint: inspector.tint
+                value: lit ? inspector.track.instrument.label : "None"
+            }
+            ChannelSlot {
+                label: "Audio FX"
+                lit: !!inspector.track && inspector.track.inserts.length > 0
+                tint: inspector.tint
+                value: inspector.track ? inspector.track.inserts.length + (inspector.track.inserts.length === 1 ? " effect" : " effects") : ""
+            }
+            ChannelSlot {
+                label: "Sends"
+                lit: !!inspector.track && Object.keys(inspector.track.sends || {}).length > 0
+                tint: inspector.tint
+                value: inspector.track ? Object.keys(inspector.track.sends || {}).length + " bus" : ""
+            }
+            ChannelSlot {
+                label: "Output"
+                lit: true
+                tint: inspector.tint
+                value: "Stereo Out"
+            }
+        }
+
         EffectsPanel {
             visible: !!inspector.track
             Layout.fillWidth: true
@@ -89,7 +128,10 @@ Rectangle {
         }
         Item { visible: !inspector.track; Layout.fillHeight: true }
 
-        // Channel strip
+        // Channel strips: the selected track, then the master output, side by side.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
         Rectangle {
             visible: !!inspector.track
             Layout.fillWidth: true
@@ -147,6 +189,36 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        // Master output: the Stereo Out channel's fader.
+        Rectangle {
+            Layout.preferredWidth: 84
+            Layout.preferredHeight: Math.min(300, Math.max(200, inspector.height * 0.38))
+            radius: Theme.radiusMd
+            color: Theme.surface
+            border.color: Theme.line
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 8
+                DText { Layout.fillWidth: true; text: "Stereo Out"; faint: true; font.pixelSize: Theme.textXs; elide: Text.ElideRight }
+                VFader {
+                    Layout.fillHeight: true
+                    Layout.alignment: Qt.AlignHCenter
+                    db: 20 * Math.log10(Math.max(0.0001, inspector.app.volume))
+                    tint: Theme.accent
+                    onMoved: (d, done) => inspector.app.setVolumeLevel(Math.pow(10, d / 20))
+                }
+                DText {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: inspector.app.volume < 0.001 ? "-∞ dB" : (20 * Math.log10(inspector.app.volume)).toFixed(1) + " dB"
+                    font.family: Theme.mono
+                    font.pixelSize: Theme.textXs
+                }
+            }
+        }
         }
     }
 }

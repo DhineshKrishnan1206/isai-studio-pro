@@ -8,6 +8,7 @@
 //! denominator); positions inside audio files are in seconds.
 
 mod history;
+pub mod midi_file;
 mod storage;
 
 use std::collections::BTreeMap;
@@ -18,7 +19,10 @@ use isai_engine::{Meter, TempoMap};
 use serde::{Deserialize, Serialize};
 
 pub use history::History;
-pub use storage::{AUDIO_DIR, Autosave, EXTENSION, ProjectPaths, load, resolve, save};
+pub use storage::{
+    AUDIO_DIR, Autosave, BACKUP_DIR, EXTENSION, KEEP_BACKUPS, ProjectPaths, backup_time,
+    list_backups, load, resolve, save,
+};
 
 /// Bump when the file format changes, and upgrade older files in `storage::load`.
 pub const FORMAT_VERSION: u32 = 1;
@@ -199,7 +203,9 @@ impl Instrument {
 
     /// Values in the instrument's parameter order, for the engine.
     pub fn values(&self) -> [f32; MAX_INST_PARAMS] {
-        let Some(kind) = self.instrument_kind() else { return [0.0; MAX_INST_PARAMS] };
+        let Some(kind) = self.instrument_kind() else {
+            return [0.0; MAX_INST_PARAMS];
+        };
         let mut out = kind.defaults();
         for (o, def) in out.iter_mut().zip(kind.params()) {
             if let Some(&v) = self.params.get(def.key) {
@@ -253,6 +259,9 @@ pub struct Track {
     /// apply to the tracks inside it.
     #[serde(default)]
     pub folder: bool,
+    /// A video track: its clips are videos (`Project::videos` with this track's id).
+    #[serde(default)]
+    pub video: bool,
     /// The folder this track is in, if any.
     #[serde(default)]
     pub group: Option<u64>,
@@ -297,12 +306,24 @@ fn default_chord() -> String {
 impl MidiFx {
     /// An arpeggiator: sixteenth notes going up over one octave.
     pub fn arpeggio() -> Self {
-        Self { kind: "arp".into(), rate: 0.25, pattern: "up".into(), octaves: 1, chord: default_chord() }
+        Self {
+            kind: "arp".into(),
+            rate: 0.25,
+            pattern: "up".into(),
+            octaves: 1,
+            chord: default_chord(),
+        }
     }
 
     /// A chord trigger: each key plays a major chord.
     pub fn chord() -> Self {
-        Self { kind: "chord".into(), rate: default_rate(), pattern: default_pattern(), octaves: 1, chord: "major".into() }
+        Self {
+            kind: "chord".into(),
+            rate: default_rate(),
+            pattern: default_pattern(),
+            octaves: 1,
+            chord: "major".into(),
+        }
     }
 }
 
@@ -386,7 +407,12 @@ fn arpeggio_notes(fx: &MidiFx, notes: &[BeatNote]) -> Vec<BeatNote> {
             let mut step = 0;
             while t < end - 1e-9 && step < MAX_ARP_STEPS {
                 let next = (t + fx.rate).min(end);
-                out.push(BeatNote { start: t, end: t + (next - t) * 0.9, key: order[step % order.len()], velocity });
+                out.push(BeatNote {
+                    start: t,
+                    end: t + (next - t) * 0.9,
+                    key: order[step % order.len()],
+                    velocity,
+                });
                 t = next;
                 step += 1;
             }
@@ -446,7 +472,9 @@ impl Insert {
 
     /// Values in the effect's parameter order, for the engine.
     pub fn values(&self) -> [f32; MAX_PARAMS] {
-        let Some(kind) = self.effect_kind() else { return [0.0; MAX_PARAMS] };
+        let Some(kind) = self.effect_kind() else {
+            return [0.0; MAX_PARAMS];
+        };
         let mut out = kind.defaults();
         for (o, def) in out.iter_mut().zip(kind.params()) {
             if let Some(&v) = self.params.get(def.key) {
@@ -489,7 +517,11 @@ pub struct Bus {
 
 /// Linear gain for a fader or send level in dB (silent at `Track::MIN_DB`).
 pub fn db_to_gain(db: f32) -> f32 {
-    if db <= Track::MIN_DB { 0.0 } else { 10f32.powf(db.min(Track::MAX_DB) / 20.0) }
+    if db <= Track::MIN_DB {
+        0.0
+    } else {
+        10f32.powf(db.min(Track::MAX_DB) / 20.0)
+    }
 }
 
 impl Track {
@@ -518,6 +550,12 @@ pub struct Project {
     pub cycle: bool,
     pub cycle_start: f64,
     pub cycle_end: f64,
+    /// Record only inside the cycle region (punch in and out).
+    #[serde(default)]
+    pub punch: bool,
+    /// Videos placed on the timeline, for scoring to picture.
+    #[serde(default)]
+    pub videos: Vec<VideoClip>,
     pub snap: bool,
     pub snap_value: Snap,
     pub tracks: Vec<Track>,
@@ -539,6 +577,25 @@ impl Default for Project {
     fn default() -> Self {
         Self::new("Untitled", Meter::default(), "C major")
     }
+}
+
+/// A video placed on the timeline, for scoring to picture. Its sound is not
+/// played: the mix comes from the tracks.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct VideoClip {
+    pub id: u64,
+    pub name: String,
+    /// The video file. Relative to the project's Video folder once saved;
+    /// an absolute path for a video in a project not yet saved.
+    pub file: String,
+    /// Where the picture starts on the timeline, in beats.
+    pub start: f64,
+    /// How long the video is, in seconds. 0 when unknown.
+    #[serde(default)]
+    pub length: f64,
+    /// The video track it plays on.
+    #[serde(default)]
+    pub track: u64,
 }
 
 /// Regions copied with ⌘C or ⌘X.
@@ -571,11 +628,16 @@ pub fn parse_key(key: &str) -> Option<(u8, bool)> {
         Some('b' | '♭') => -1,
         _ => 0,
     };
-    Some(((base + shift).rem_euclid(12) as u8, rest.to_lowercase().contains("min")))
+    Some((
+        (base + shift).rem_euclid(12) as u8,
+        rest.to_lowercase().contains("min"),
+    ))
 }
 
 /// Track colours, in the order new tracks use them.
-pub const TRACK_COLORS: [&str; 8] = ["blue", "green", "yellow", "orange", "red", "pink", "violet", "teal"];
+pub const TRACK_COLORS: [&str; 8] = [
+    "blue", "green", "yellow", "orange", "red", "pink", "violet", "teal",
+];
 
 /// Empty projects are at least this many bars long, like a fresh DAW session.
 const MIN_BARS: f64 = 32.0;
@@ -587,7 +649,11 @@ impl Project {
         let bar = f64::from(meter.numerator.max(1));
         Self {
             version: FORMAT_VERSION,
-            name: if name.trim().is_empty() { "Untitled".into() } else { name.trim().into() },
+            name: if name.trim().is_empty() {
+                "Untitled".into()
+            } else {
+                name.trim().into()
+            },
             tempo: meter.bpm,
             numerator: meter.numerator,
             denominator: meter.denominator,
@@ -598,6 +664,8 @@ impl Project {
             // A four-bar cycle from the start, ready to switch on.
             cycle_start: 0.0,
             cycle_end: 4.0 * bar,
+            punch: false,
+            videos: Vec::new(),
             snap: true,
             snap_value: Snap::Beat,
             tracks: Vec::new(),
@@ -611,16 +679,31 @@ impl Project {
     }
 
     pub fn meter(&self) -> Meter {
-        Meter { bpm: self.tempo, numerator: self.numerator, denominator: self.denominator }
+        Meter {
+            bpm: self.tempo,
+            numerator: self.numerator,
+            denominator: self.denominator,
+        }
     }
 
     /// The tempo and time signature over the whole song.
     pub fn tempo_map(&self) -> TempoMap {
-        let tempos: Vec<isai_engine::TempoPoint> = self.tempo_changes.iter().map(|t| isai_engine::TempoPoint { beat: t.beat, bpm: t.bpm }).collect();
+        let tempos: Vec<isai_engine::TempoPoint> = self
+            .tempo_changes
+            .iter()
+            .map(|t| isai_engine::TempoPoint {
+                beat: t.beat,
+                bpm: t.bpm,
+            })
+            .collect();
         let sigs: Vec<isai_engine::SigChange> = self
             .signature_changes
             .iter()
-            .map(|c| isai_engine::SigChange { bar: c.bar, numerator: c.numerator, denominator: c.denominator })
+            .map(|c| isai_engine::SigChange {
+                bar: c.bar,
+                numerator: c.numerator,
+                denominator: c.denominator,
+            })
             .collect();
         TempoMap::new(self.meter(), &tempos, &sigs)
     }
@@ -639,7 +722,11 @@ impl Project {
             self.tempo = bpm;
             return true;
         }
-        match self.tempo_changes.iter_mut().find(|t| (t.beat - beat).abs() < 1e-6) {
+        match self
+            .tempo_changes
+            .iter_mut()
+            .find(|t| (t.beat - beat).abs() < 1e-6)
+        {
             Some(t) => t.bpm = bpm,
             None => self.tempo_changes.push(TempoChange { beat, bpm }),
         }
@@ -650,7 +737,11 @@ impl Project {
     /// Moves the tempo change at `from` to `to` with a new tempo; at the
     /// start (or dragged onto it) it becomes the opening tempo.
     pub fn move_tempo_change(&mut self, from: f64, to: f64, bpm: f64) -> bool {
-        let Some(i) = self.tempo_changes.iter().position(|t| (t.beat - from).abs() < 1e-6) else {
+        let Some(i) = self
+            .tempo_changes
+            .iter()
+            .position(|t| (t.beat - from).abs() < 1e-6)
+        else {
             return from < 1e-6 && self.add_tempo_change(0.0, bpm);
         };
         self.tempo_changes.remove(i);
@@ -666,15 +757,43 @@ impl Project {
     /// Sets the tempo of the section the position is in (what the tempo
     /// display and tap tempo change).
     pub fn set_tempo_at(&mut self, beat: f64, bpm: f64) -> bool {
-        let at = self.tempo_changes.iter().rev().find(|t| t.beat <= beat + 1e-9).map(|t| t.beat);
+        // Audio that doesn't follow the tempo yet is pinned to the tempo it
+        // plays at now first, so this change stretches it like the rest.
+        self.pin_audio_tempo();
+        let at = self
+            .tempo_changes
+            .iter()
+            .rev()
+            .find(|t| t.beat <= beat + 1e-9)
+            .map(|t| t.beat);
         self.add_tempo_change(at.unwrap_or(0.0), bpm)
+    }
+
+    /// Audio regions with no tempo of their own take the tempo they play at
+    /// now, so they follow the song's tempo from here on (slower tempo, longer
+    /// audio). MIDI already follows, because it is stored in beats.
+    pub fn pin_audio_tempo(&mut self) {
+        let map = self.tempo_map();
+        for track in &mut self.tracks {
+            for r in track
+                .regions
+                .iter_mut()
+                .filter(|r| r.midi.is_none() && r.tempo.is_none())
+            {
+                r.tempo = Some(map.bpm_at(r.start));
+            }
+        }
     }
 
     /// Adds a time-signature change at the start of `bar` (or changes the one
     /// there). Bar 1 sets the opening signature.
     pub fn add_signature_change(&mut self, bar: u32, numerator: u32, denominator: u32) -> bool {
         let numerator = numerator.clamp(1, 32);
-        let denominator = if matches!(denominator, 2 | 4 | 8 | 16) { denominator } else { 4 };
+        let denominator = if matches!(denominator, 2 | 4 | 8 | 16) {
+            denominator
+        } else {
+            4
+        };
         if bar <= 1 {
             self.numerator = numerator;
             self.denominator = denominator;
@@ -685,7 +804,11 @@ impl Project {
                 c.numerator = numerator;
                 c.denominator = denominator;
             }
-            None => self.signature_changes.push(SignatureChange { bar, numerator, denominator }),
+            None => self.signature_changes.push(SignatureChange {
+                bar,
+                numerator,
+                denominator,
+            }),
         }
         self.signature_changes.sort_by_key(|c| c.bar);
         true
@@ -700,7 +823,12 @@ impl Project {
     /// Sets the time signature of the section the position is in.
     pub fn set_signature_at(&mut self, beat: f64, numerator: u32, denominator: u32) -> bool {
         let map = self.tempo_map();
-        let bar = map.sections().iter().rev().find(|s| s.0 <= beat + 1e-9).map_or(1, |s| s.1) as u32;
+        let bar = map
+            .sections()
+            .iter()
+            .rev()
+            .find(|s| s.0 <= beat + 1e-9)
+            .map_or(1, |s| s.1) as u32;
         self.add_signature_change(bar, numerator, denominator)
     }
 
@@ -708,6 +836,57 @@ impl Project {
         self.tempo = meter.bpm;
         self.numerator = meter.numerator;
         self.denominator = meter.denominator;
+    }
+
+    /// Places a video on the timeline at `start` (in beats).
+    pub fn add_video(
+        &mut self,
+        file: &str,
+        name: &str,
+        start: f64,
+        length: f64,
+        track: u64,
+    ) -> u64 {
+        let id = self.take_id();
+        self.videos.push(VideoClip {
+            id,
+            name: name.into(),
+            file: file.into(),
+            start: start.max(0.0),
+            length: length.max(0.0),
+            track,
+        });
+        id
+    }
+
+    /// Adds a video track (its own row in the track list).
+    pub fn add_video_track(&mut self, name: &str) -> u64 {
+        let id = self.add_track(Some(name));
+        if let Some(t) = self.tracks.iter_mut().find(|t| t.id == id) {
+            t.video = true;
+        }
+        id
+    }
+
+    /// The first video track, if there is one.
+    pub fn first_video_track(&self) -> Option<u64> {
+        self.tracks.iter().find(|t| t.video).map(|t| t.id)
+    }
+
+    /// Moves a video to `start` (in beats). Returns whether anything changed.
+    pub fn move_video(&mut self, id: u64, start: f64) -> bool {
+        let start = start.max(0.0);
+        match self.videos.iter_mut().find(|v| v.id == id) {
+            Some(v) if v.start != start => {
+                v.start = start;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn remove_video(&mut self, id: u64) {
+        self.videos.retain(|v| v.id != id);
     }
 
     fn take_id(&mut self) -> u64 {
@@ -738,9 +917,17 @@ impl Project {
 
     /// Sets the cycle region, snapped and in order, at least one grid step long.
     pub fn set_cycle(&mut self, start: f64, end: f64) {
-        let (a, b) = if start <= end { (start, end) } else { (end, start) };
+        let (a, b) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
         let (a, mut b) = (self.snap(a), self.snap(b));
-        let min = if self.snap { self.snap_value.step(&self.meter()) } else { 0.25 };
+        let min = if self.snap {
+            self.snap_value.step(&self.meter())
+        } else {
+            0.25
+        };
         if b - a < min {
             b = a + min;
         }
@@ -773,7 +960,11 @@ impl Project {
     /// Turns the cycle on around these regions: from the earliest start to
     /// the latest end (loops included), exactly, not snapped.
     pub fn cycle_regions(&mut self, ids: &[u64]) -> bool {
-        let spans: Vec<(f64, f64)> = ids.iter().filter_map(|&id| self.find_region(id)).map(|(_, r)| (r.start, r.start + self.region_span(r))).collect();
+        let spans: Vec<(f64, f64)> = ids
+            .iter()
+            .filter_map(|&id| self.find_region(id))
+            .map(|(_, r)| (r.start, r.start + self.region_span(r)))
+            .collect();
         if spans.is_empty() {
             return false;
         }
@@ -801,7 +992,9 @@ impl Project {
     /// Makes an audio region follow the song's tempo, its audio being at
     /// `bpm` (or stop following with `None`).
     pub fn set_region_tempo(&mut self, id: u64, bpm: Option<f64>) -> bool {
-        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else { return false };
+        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else {
+            return false;
+        };
         r.tempo = bpm.map(|b| b.clamp(Meter::MIN_BPM, Meter::MAX_BPM));
         true
     }
@@ -820,7 +1013,11 @@ impl Project {
             .flat_map(|t| &t.regions)
             .map(|r| r.start + self.region_span(r))
             .fold(0.0, f64::max);
-        let content = if end > 0.0 { (end / bar).ceil() * bar + TAIL_BARS * bar } else { 0.0 };
+        let content = if end > 0.0 {
+            (end / bar).ceil() * bar + TAIL_BARS * bar
+        } else {
+            0.0
+        };
         content.max(MIN_BARS * bar).max(self.cycle_end)
     }
 
@@ -848,6 +1045,7 @@ impl Project {
             frozen: None,
             regions: Vec::new(),
             folder: false,
+            video: false,
             group: None,
             midi_fx: None,
         });
@@ -882,7 +1080,10 @@ impl Project {
 
     /// The level a track's folder adds to it (1 when it is not in a folder).
     pub fn group_gain(&self, track: &Track) -> f32 {
-        track.group.and_then(|g| self.track(g)).map_or(1.0, Track::gain)
+        track
+            .group
+            .and_then(|g| self.track(g))
+            .map_or(1.0, Track::gain)
     }
 
     pub fn track(&self, id: u64) -> Option<&Track> {
@@ -926,7 +1127,10 @@ impl Project {
     /// Whether a track should be heard, taking every track's solo into account.
     pub fn audible(&self, track: &Track) -> bool {
         let any_solo = self.tracks.iter().any(|t| t.solo);
-        let folder_muted = track.group.and_then(|g| self.track(g)).is_some_and(|f| f.mute);
+        let folder_muted = track
+            .group
+            .and_then(|g| self.track(g))
+            .is_some_and(|f| f.mute);
         !track.mute && !folder_muted && (!any_solo || track.solo)
     }
 
@@ -934,27 +1138,53 @@ impl Project {
 
     /// Adds an instrument track at the end and returns its id.
     pub fn add_instrument_track(&mut self, kind: InstrumentKind) -> u64 {
-        let number = self.tracks.iter().filter(|t| t.instrument.is_some()).count() + 1;
+        let number = self
+            .tracks
+            .iter()
+            .filter(|t| t.instrument.is_some())
+            .count()
+            + 1;
         let id = self.add_track(Some(&format!("{} {number}", kind.label())));
         let instrument_id = self.take_id();
-        let params = kind.params().iter().map(|d| (d.key.to_owned(), d.default)).collect();
+        let params = kind
+            .params()
+            .iter()
+            .map(|d| (d.key.to_owned(), d.default))
+            .collect();
         if let Some(t) = self.track_mut(id) {
-            t.instrument = Some(Instrument { id: instrument_id, kind: kind.key().into(), params, sample: None, slices: Vec::new(), plugin: None });
+            t.instrument = Some(Instrument {
+                id: instrument_id,
+                kind: kind.key().into(),
+                params,
+                sample: None,
+                slices: Vec::new(),
+                plugin: None,
+            });
         }
         id
     }
 
     /// Sets one instrument parameter, kept within its range.
     pub fn set_instrument_param(&mut self, track: u64, key: &str, value: f32) -> bool {
-        let Some(inst) = self.track_mut(track).and_then(|t| t.instrument.as_mut()) else { return false };
-        let Some(def) = inst.instrument_kind().and_then(|k| k.params().iter().find(|d| d.key == key)) else { return false };
-        inst.params.insert(key.to_owned(), value.clamp(def.min, def.max));
+        let Some(inst) = self.track_mut(track).and_then(|t| t.instrument.as_mut()) else {
+            return false;
+        };
+        let Some(def) = inst
+            .instrument_kind()
+            .and_then(|k| k.params().iter().find(|d| d.key == key))
+        else {
+            return false;
+        };
+        inst.params
+            .insert(key.to_owned(), value.clamp(def.min, def.max));
         true
     }
 
     /// Loads an audio file into a track's sampler (forgetting old slices).
     pub fn set_instrument_sample(&mut self, track: u64, file: Option<&str>) -> bool {
-        let Some(inst) = self.track_mut(track).and_then(|t| t.instrument.as_mut()) else { return false };
+        let Some(inst) = self.track_mut(track).and_then(|t| t.instrument.as_mut()) else {
+            return false;
+        };
         inst.sample = file.map(str::to_owned);
         inst.slices.clear();
         true
@@ -962,8 +1192,14 @@ impl Project {
 
     /// Sets where the sampler's slices start (seconds; sorted, duplicates dropped).
     pub fn set_slices(&mut self, track: u64, slices: &[f64]) -> bool {
-        let Some(inst) = self.track_mut(track).and_then(|t| t.instrument.as_mut()) else { return false };
-        let mut s: Vec<f64> = slices.iter().copied().filter(|x| x.is_finite() && *x >= 0.0).collect();
+        let Some(inst) = self.track_mut(track).and_then(|t| t.instrument.as_mut()) else {
+            return false;
+        };
+        let mut s: Vec<f64> = slices
+            .iter()
+            .copied()
+            .filter(|x| x.is_finite() && *x >= 0.0)
+            .collect();
         s.sort_by(f64::total_cmp);
         s.dedup_by(|a, b| (*a - *b).abs() < 1e-4);
         inst.slices = s;
@@ -984,7 +1220,11 @@ impl Project {
             fade_in: 0.0,
             fade_out: 0.0,
             source_length: 0.0,
-            midi: Some(MidiData { length: length.max(Self::MIN_MIDI_BEATS), offset: 0.0, notes: Vec::new() }),
+            midi: Some(MidiData {
+                length: length.max(Self::MIN_MIDI_BEATS),
+                offset: 0.0,
+                notes: Vec::new(),
+            }),
             gain_db: 0.0,
             reverse: false,
             loop_to: 0.0,
@@ -994,13 +1234,89 @@ impl Project {
         Some(id)
     }
 
+    /// Imports a MIDI file. The first track with notes goes on `track` (an
+    /// instrument track) from `start` beats; each further track gets its own
+    /// instrument track of the same kind, named after the MIDI track. Returns
+    /// the regions made, in file order (empty if `track` can't hold MIDI).
+    pub fn import_midi(&mut self, track: u64, start: f64, song: &midi_file::Song) -> Vec<u64> {
+        let Some(kind) = self
+            .track(track)
+            .and_then(|t| t.instrument.as_ref())
+            .and_then(|i| InstrumentKind::from_key(&i.kind))
+        else {
+            return Vec::new();
+        };
+        let bar = self.bar_beats();
+        let mut regions = Vec::new();
+        let mut target = track;
+        for (n, midi_track) in song
+            .tracks
+            .iter()
+            .filter(|t| !t.notes.is_empty())
+            .enumerate()
+        {
+            if n > 0 {
+                target = self.add_instrument_track(kind);
+                if !midi_track.name.is_empty()
+                    && let Some(t) = self.track_mut(target)
+                {
+                    t.name = midi_track.name.clone();
+                }
+            }
+            let end = midi_track
+                .notes
+                .iter()
+                .map(|note| note.start + note.length)
+                .fold(0.0, f64::max);
+            let length = (end / bar).ceil().max(1.0) * bar;
+            let Some(id) = self.add_midi_region(target, start, length) else {
+                break;
+            };
+            if self.add_notes(id, &midi_track.notes).is_none() {
+                break;
+            }
+            regions.push(id);
+        }
+        regions
+    }
+
+    /// The notes of a MIDI region as a Standard MIDI File, as they play (from
+    /// the region's offset), with the project's tempo and time signature.
+    pub fn export_midi(&self, region: u64) -> Option<Vec<u8>> {
+        let (_, r) = self.find_region(region)?;
+        let m = r.midi.as_ref()?;
+        let notes: Vec<Note> = m
+            .notes
+            .iter()
+            .filter(|n| n.start >= m.offset)
+            .map(|n| Note {
+                start: n.start - m.offset,
+                ..*n
+            })
+            .filter(|n| n.start < m.length)
+            .collect();
+        Some(midi_file::write(
+            &notes,
+            &r.name,
+            self.tempo,
+            (self.numerator, self.denominator),
+        ))
+    }
+
     fn midi_mut(&mut self, region: u64) -> Option<&mut MidiData> {
         self.region_mut(region)?.midi.as_mut()
     }
 
     /// Adds a note (start in beats from the region's start). Grows the region
     /// to the next bar if the note runs past its end. Returns the note's index.
-    pub fn add_note(&mut self, region: u64, start: f64, length: f64, key: u8, velocity: u8) -> Option<usize> {
+    pub fn add_note(
+        &mut self,
+        region: u64,
+        start: f64,
+        length: f64,
+        key: u8,
+        velocity: u8,
+    ) -> Option<usize> {
         let bar = self.bar_beats();
         let m = self.midi_mut(region)?;
         let note = Note {
@@ -1013,14 +1329,24 @@ impl Project {
         if end > m.length {
             m.length = (end / bar).ceil() * bar;
         }
-        let i = m.notes.partition_point(|n| (n.start, n.key) < (note.start, note.key));
+        let i = m
+            .notes
+            .partition_point(|n| (n.start, n.key) < (note.start, note.key));
         m.notes.insert(i, note);
         Some(i)
     }
 
     /// Replaces a note (moved, resized, transposed or re-velocitied).
     /// Returns its new index.
-    pub fn update_note(&mut self, region: u64, index: usize, start: f64, length: f64, key: u8, velocity: u8) -> Option<usize> {
+    pub fn update_note(
+        &mut self,
+        region: u64,
+        index: usize,
+        start: f64,
+        length: f64,
+        key: u8,
+        velocity: u8,
+    ) -> Option<usize> {
         let m = self.midi_mut(region)?;
         if index >= m.notes.len() {
             return None;
@@ -1030,7 +1356,9 @@ impl Project {
     }
 
     pub fn remove_note(&mut self, region: u64, index: usize) -> bool {
-        let Some(m) = self.midi_mut(region) else { return false };
+        let Some(m) = self.midi_mut(region) else {
+            return false;
+        };
         if index >= m.notes.len() {
             return false;
         }
@@ -1041,11 +1369,22 @@ impl Project {
     /// Moves, transposes and/or resizes several notes together by the same
     /// amounts (one edit). The group stays inside the region's start and the
     /// key range. Returns the notes' new indices.
-    pub fn transform_notes(&mut self, region: u64, indices: &[usize], d_start: f64, d_key: i32, d_length: f64) -> Option<Vec<usize>> {
+    pub fn transform_notes(
+        &mut self,
+        region: u64,
+        indices: &[usize],
+        d_start: f64,
+        d_key: i32,
+        d_length: f64,
+    ) -> Option<Vec<usize>> {
         let bar = self.bar_beats();
         let m = self.midi_mut(region)?;
         let picked: Vec<usize> = {
-            let mut v: Vec<usize> = indices.iter().copied().filter(|&i| i < m.notes.len()).collect();
+            let mut v: Vec<usize> = indices
+                .iter()
+                .copied()
+                .filter(|&i| i < m.notes.len())
+                .collect();
             v.sort_unstable();
             v.dedup();
             v
@@ -1054,9 +1393,14 @@ impl Project {
             return None;
         }
         // Keep the whole group in range rather than squashing its edge notes.
-        let earliest = picked.iter().map(|&i| m.notes[i].start).fold(f64::INFINITY, f64::min);
+        let earliest = picked
+            .iter()
+            .map(|&i| m.notes[i].start)
+            .fold(f64::INFINITY, f64::min);
         let d_start = d_start.max(m.offset - earliest);
-        let (low, high) = picked.iter().fold((127u8, 0u8), |(lo, hi), &i| (lo.min(m.notes[i].key), hi.max(m.notes[i].key)));
+        let (low, high) = picked.iter().fold((127u8, 0u8), |(lo, hi), &i| {
+            (lo.min(m.notes[i].key), hi.max(m.notes[i].key))
+        });
         let d_key = d_key.clamp(-i32::from(low), 127 - i32::from(high));
         let mut tagged: Vec<(Note, bool)> = m.notes.iter().map(|&n| (n, false)).collect();
         for &i in &picked {
@@ -1066,19 +1410,33 @@ impl Project {
             n.length = (n.length + d_length).max(1.0 / 64.0);
             *moved = true;
         }
-        tagged.sort_by(|(a, _), (b, _)| (a.start, a.key).partial_cmp(&(b.start, b.key)).unwrap_or(std::cmp::Ordering::Equal));
-        let end = tagged.iter().map(|(n, _)| n.start + n.length - m.offset).fold(0.0, f64::max);
+        tagged.sort_by(|(a, _), (b, _)| {
+            (a.start, a.key)
+                .partial_cmp(&(b.start, b.key))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let end = tagged
+            .iter()
+            .map(|(n, _)| n.start + n.length - m.offset)
+            .fold(0.0, f64::max);
         if end > m.length {
             m.length = (end / bar).ceil() * bar;
         }
-        let out = tagged.iter().enumerate().filter(|(_, (_, moved))| *moved).map(|(i, _)| i).collect();
+        let out = tagged
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, moved))| *moved)
+            .map(|(i, _)| i)
+            .collect();
         m.notes = tagged.into_iter().map(|(n, _)| n).collect();
         Some(out)
     }
 
     /// Deletes several notes (one edit).
     pub fn remove_notes(&mut self, region: u64, indices: &[usize]) -> bool {
-        let Some(m) = self.midi_mut(region) else { return false };
+        let Some(m) = self.midi_mut(region) else {
+            return false;
+        };
         let before = m.notes.len();
         let mut i = 0;
         m.notes.retain(|_| {
@@ -1093,9 +1451,21 @@ impl Project {
     /// `swing` 0..=0.5 delays every second grid step by that share of a step
     /// (1/3 is a triplet feel). `indices` picks notes, or every note when
     /// empty. The notes stay sorted, so indices change.
-    pub fn quantize_notes(&mut self, region: u64, indices: &[usize], grid: f64, strength: f64, ends: bool, swing: f64) -> bool {
-        let Some(start) = self.find_region(region).map(|(_, r)| r.start) else { return false };
-        let Some(m) = self.midi_mut(region) else { return false };
+    pub fn quantize_notes(
+        &mut self,
+        region: u64,
+        indices: &[usize],
+        grid: f64,
+        strength: f64,
+        ends: bool,
+        swing: f64,
+    ) -> bool {
+        let Some(start) = self.find_region(region).map(|(_, r)| r.start) else {
+            return false;
+        };
+        let Some(m) = self.midi_mut(region) else {
+            return false;
+        };
         if grid <= 0.0 {
             return false;
         }
@@ -1113,7 +1483,11 @@ impl Project {
         };
         let q = |beats: f64| {
             let target = nearest(origin + beats) - origin;
-            if strength >= 1.0 { target } else { beats + (target - beats) * strength }
+            if strength >= 1.0 {
+                target
+            } else {
+                beats + (target - beats) * strength
+            }
         };
         for (i, n) in m.notes.iter_mut().enumerate() {
             if !indices.is_empty() && !indices.contains(&i) {
@@ -1123,9 +1497,19 @@ impl Project {
             n.start = q(n.start).max(0.0);
             let end = if ends { q(end) } else { end };
             // A note never quantizes to nothing: at least one grid step (or its own length).
-            n.length = if end - n.start > 1e-6 { end - n.start } else if ends { grid } else { n.length };
+            n.length = if end - n.start > 1e-6 {
+                end - n.start
+            } else if ends {
+                grid
+            } else {
+                n.length
+            };
         }
-        m.notes.sort_by(|a, b| (a.start, a.key).partial_cmp(&(b.start, b.key)).unwrap_or(std::cmp::Ordering::Equal));
+        m.notes.sort_by(|a, b| {
+            (a.start, a.key)
+                .partial_cmp(&(b.start, b.key))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         true
     }
 
@@ -1149,9 +1533,18 @@ impl Project {
         let m = self.midi_mut(id)?;
         m.notes = notes
             .iter()
-            .map(|n| Note { start: (n.start - start).max(0.0), length: n.length.max(1.0 / 64.0), key: n.key.min(127), velocity: n.velocity.clamp(1, 127) })
+            .map(|n| Note {
+                start: (n.start - start).max(0.0),
+                length: n.length.max(1.0 / 64.0),
+                key: n.key.min(127),
+                velocity: n.velocity.clamp(1, 127),
+            })
             .collect();
-        m.notes.sort_by(|a, b| (a.start, a.key).partial_cmp(&(b.start, b.key)).unwrap_or(std::cmp::Ordering::Equal));
+        m.notes.sort_by(|a, b| {
+            (a.start, a.key)
+                .partial_cmp(&(b.start, b.key))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Some(id)
     }
 
@@ -1177,15 +1570,32 @@ impl Project {
     /// not the region), keeps them sorted and the region long enough, and
     /// returns the indices of the added notes.
     fn merge_notes(m: &mut MidiData, remove: Vec<usize>, add: Vec<Note>, bar: f64) -> Vec<usize> {
-        let mut tagged: Vec<(Note, bool)> =
-            m.notes.iter().enumerate().filter(|(i, _)| !remove.contains(i)).map(|(_, &n)| (n, false)).collect();
+        let mut tagged: Vec<(Note, bool)> = m
+            .notes
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !remove.contains(i))
+            .map(|(_, &n)| (n, false))
+            .collect();
         tagged.extend(add.into_iter().map(|n| (n, true)));
-        tagged.sort_by(|(a, _), (b, _)| (a.start, a.key).partial_cmp(&(b.start, b.key)).unwrap_or(std::cmp::Ordering::Equal));
-        let end = tagged.iter().map(|(n, _)| n.start + n.length - m.offset).fold(0.0, f64::max);
+        tagged.sort_by(|(a, _), (b, _)| {
+            (a.start, a.key)
+                .partial_cmp(&(b.start, b.key))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let end = tagged
+            .iter()
+            .map(|(n, _)| n.start + n.length - m.offset)
+            .fold(0.0, f64::max);
         if end > m.length {
             m.length = (end / bar).ceil() * bar;
         }
-        let out = tagged.iter().enumerate().filter(|(_, (_, new))| *new).map(|(i, _)| i).collect();
+        let out = tagged
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, new))| *new)
+            .map(|(i, _)| i)
+            .collect();
         m.notes = tagged.into_iter().map(|(n, _)| n).collect();
         out
     }
@@ -1196,9 +1606,17 @@ impl Project {
         let mut picked: Vec<usize> = if indices.is_empty() {
             (0..m.notes.len()).collect()
         } else {
-            indices.iter().copied().filter(|&i| i < m.notes.len()).collect()
+            indices
+                .iter()
+                .copied()
+                .filter(|&i| i < m.notes.len())
+                .collect()
         };
-        picked.sort_by(|&a, &b| (m.notes[a].start, m.notes[a].key).partial_cmp(&(m.notes[b].start, m.notes[b].key)).unwrap_or(std::cmp::Ordering::Equal));
+        picked.sort_by(|&a, &b| {
+            (m.notes[a].start, m.notes[a].key)
+                .partial_cmp(&(m.notes[b].start, m.notes[b].key))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         picked.dedup();
         let mut groups: Vec<Vec<usize>> = Vec::new();
         for i in picked {
@@ -1213,7 +1631,13 @@ impl Project {
     /// Strums chords: each note of a chord starts `spread` beats after the
     /// one below it (above it when `down`), ending where it did. Returns the
     /// notes' new indices.
-    pub fn strum_notes(&mut self, region: u64, indices: &[usize], spread: f64, down: bool) -> Option<Vec<usize>> {
+    pub fn strum_notes(
+        &mut self,
+        region: u64,
+        indices: &[usize],
+        spread: f64,
+        down: bool,
+    ) -> Option<Vec<usize>> {
         let bar = self.bar_beats();
         let m = self.midi_mut(region)?;
         let mut remove = Vec::new();
@@ -1240,7 +1664,13 @@ impl Project {
     /// Turns chords into arpeggios: their notes one after another, `step`
     /// beats each, for as long as the chord lasted. `pattern` is "up",
     /// "down" or "updown". Returns the new notes' indices.
-    pub fn arpeggiate_notes(&mut self, region: u64, indices: &[usize], step: f64, pattern: &str) -> Option<Vec<usize>> {
+    pub fn arpeggiate_notes(
+        &mut self,
+        region: u64,
+        indices: &[usize],
+        step: f64,
+        pattern: &str,
+    ) -> Option<Vec<usize>> {
         if step <= 0.0 {
             return None;
         }
@@ -1261,7 +1691,11 @@ impl Project {
             for k in 0..count {
                 let n = notes[order[k % order.len()]];
                 let at = start + step * k as f64;
-                add.push(Note { start: at, length: step.min(start + span - at).max(1.0 / 64.0), ..n });
+                add.push(Note {
+                    start: at,
+                    length: step.min(start + span - at).max(1.0 / 64.0),
+                    ..n
+                });
             }
             remove.extend(chord);
         }
@@ -1274,7 +1708,16 @@ impl Project {
     // ------------------------------------------------------------- markers
 
     /// Names for new markers, in the order a song usually goes.
-    const MARKER_NAMES: [&'static str; 8] = ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse 2", "Bridge", "Chorus 2", "Outro"];
+    const MARKER_NAMES: [&'static str; 8] = [
+        "Intro",
+        "Verse",
+        "Pre-Chorus",
+        "Chorus",
+        "Verse 2",
+        "Bridge",
+        "Chorus 2",
+        "Outro",
+    ];
 
     /// Adds a marker at `beats` (snapped), named by how many there are unless
     /// `name` is given. Returns its id (an existing marker there is kept).
@@ -1287,7 +1730,9 @@ impl Project {
         let count = self.markers.len();
         let name = match name {
             Some(n) if !n.trim().is_empty() => n.trim().to_owned(),
-            _ => Self::MARKER_NAMES.get(count).map_or_else(|| format!("Marker {}", count + 1), |n| (*n).to_owned()),
+            _ => Self::MARKER_NAMES
+                .get(count)
+                .map_or_else(|| format!("Marker {}", count + 1), |n| (*n).to_owned()),
         };
         self.markers.push(Marker { id, beat, name });
         self.markers.sort_by(|a, b| a.beat.total_cmp(&b.beat));
@@ -1296,7 +1741,9 @@ impl Project {
 
     pub fn move_marker(&mut self, id: u64, beats: f64) -> bool {
         let beat = self.snap(beats);
-        let Some(m) = self.markers.iter_mut().find(|m| m.id == id) else { return false };
+        let Some(m) = self.markers.iter_mut().find(|m| m.id == id) else {
+            return false;
+        };
         m.beat = beat;
         self.markers.sort_by(|a, b| a.beat.total_cmp(&b.beat));
         true
@@ -1304,7 +1751,14 @@ impl Project {
 
     pub fn rename_marker(&mut self, id: u64, name: &str) -> bool {
         let name = name.trim();
-        let Some(m) = self.markers.iter_mut().find(|m| m.id == id).filter(|_| !name.is_empty()) else { return false };
+        let Some(m) = self
+            .markers
+            .iter_mut()
+            .find(|m| m.id == id)
+            .filter(|_| !name.is_empty())
+        else {
+            return false;
+        };
         m.name = name.to_owned();
         true
     }
@@ -1317,12 +1771,20 @@ impl Project {
 
     /// The next marker after `beats`, if any.
     pub fn marker_after(&self, beats: f64) -> Option<f64> {
-        self.markers.iter().map(|m| m.beat).find(|&b| b > beats + 1e-6)
+        self.markers
+            .iter()
+            .map(|m| m.beat)
+            .find(|&b| b > beats + 1e-6)
     }
 
     /// The marker before `beats`, or the start of the song.
     pub fn marker_before(&self, beats: f64) -> f64 {
-        self.markers.iter().rev().map(|m| m.beat).find(|&b| b < beats - 1e-6).unwrap_or(0.0)
+        self.markers
+            .iter()
+            .rev()
+            .map(|m| m.beat)
+            .find(|&b| b < beats - 1e-6)
+            .unwrap_or(0.0)
     }
 
     /// The section a marker starts: from it to the next marker, or to the
@@ -1331,7 +1793,12 @@ impl Project {
         let m = self.markers.iter().find(|m| m.id == id)?;
         let bar = self.bar_beats();
         let end = self.marker_after(m.beat).unwrap_or_else(|| {
-            let content = self.tracks.iter().flat_map(|t| &t.regions).map(|r| r.start + self.region_span(r)).fold(0.0, f64::max);
+            let content = self
+                .tracks
+                .iter()
+                .flat_map(|t| &t.regions)
+                .map(|r| r.start + self.region_span(r))
+                .fold(0.0, f64::max);
             ((content / bar).ceil() * bar).max(m.beat + bar)
         });
         Some((m.beat, end))
@@ -1381,7 +1848,9 @@ impl Project {
             return false;
         }
         let level_db = level_db.clamp(Track::MIN_DB, Track::MAX_DB);
-        let Some(t) = self.track_mut(track) else { return false };
+        let Some(t) = self.track_mut(track) else {
+            return false;
+        };
         match t.sends.iter_mut().find(|s| s.bus == bus) {
             Some(s) => s.level_db = level_db,
             None => t.sends.push(Send { bus, level_db }),
@@ -1391,7 +1860,11 @@ impl Project {
 
     /// A track's send level to a bus, or `Track::MIN_DB` when it has none.
     pub fn send_level(&self, track: &Track, bus: u64) -> f32 {
-        track.sends.iter().find(|s| s.bus == bus).map_or(Track::MIN_DB, |s| s.level_db)
+        track
+            .sends
+            .iter()
+            .find(|s| s.bus == bus)
+            .map_or(Track::MIN_DB, |s| s.level_db)
     }
 
     // ------------------------------------------------------------ effects
@@ -1426,8 +1899,13 @@ impl Project {
     /// already reaches the master from the tracks.
     pub fn add_insert(&mut self, chain: Chain, kind: EffectKind) -> Option<u64> {
         let id = self.next_id;
-        let mut params: BTreeMap<String, f32> = kind.params().iter().map(|d| (d.key.to_owned(), d.default)).collect();
-        if matches!(chain, Chain::Bus(_)) && matches!(kind, EffectKind::Reverb | EffectKind::Delay) {
+        let mut params: BTreeMap<String, f32> = kind
+            .params()
+            .iter()
+            .map(|d| (d.key.to_owned(), d.default))
+            .collect();
+        if matches!(chain, Chain::Bus(_)) && matches!(kind, EffectKind::Reverb | EffectKind::Delay)
+        {
             params.insert("mix".into(), 100.0);
         }
         // Pitch correction starts in the song's key.
@@ -1437,7 +1915,13 @@ impl Project {
             params.insert("key".into(), f32::from(root));
             params.insert("scale".into(), if minor { 2.0 } else { 1.0 });
         }
-        self.chain_mut(chain)?.push(Insert { id, kind: kind.key().into(), enabled: true, params, plugin: None });
+        self.chain_mut(chain)?.push(Insert {
+            id,
+            kind: kind.key().into(),
+            enabled: true,
+            params,
+            plugin: None,
+        });
         self.next_id += 1;
         Some(id)
     }
@@ -1445,7 +1929,13 @@ impl Project {
     /// Adds a plugin to the end of a chain.
     pub fn add_plugin_insert(&mut self, chain: Chain, plugin: PluginSlot) -> Option<u64> {
         let id = self.next_id;
-        let insert = Insert { id, kind: EffectKind::Plugin.key().into(), enabled: true, params: BTreeMap::new(), plugin: Some(plugin) };
+        let insert = Insert {
+            id,
+            kind: EffectKind::Plugin.key().into(),
+            enabled: true,
+            params: BTreeMap::new(),
+            plugin: Some(plugin),
+        };
         self.chain_mut(chain)?.push(insert);
         self.next_id += 1;
         Some(id)
@@ -1472,8 +1962,12 @@ impl Project {
     /// the region's track, each playing its stem where the region played. The
     /// original track is muted. `stems` is (stem name, audio file, seconds).
     pub fn add_stem_tracks(&mut self, region: u64, stems: &[(String, String, f64)]) -> bool {
-        let Some((track, r)) = self.find_region(region).map(|(t, r)| (t.id, r.clone())) else { return false };
-        let Some(index) = self.tracks.iter().position(|t| t.id == track) else { return false };
+        let Some((track, r)) = self.find_region(region).map(|(t, r)| (t.id, r.clone())) else {
+            return false;
+        };
+        let Some(index) = self.tracks.iter().position(|t| t.id == track) else {
+            return false;
+        };
         let colors = ["pink", "red", "yellow", "teal"];
         for (i, (stem, file, secs)) in stems.iter().enumerate() {
             let id = self.add_track(Some(&format!("{} · {stem}", r.name)));
@@ -1501,21 +1995,44 @@ impl Project {
 
     /// Every plugin in the song, by its insert or instrument id.
     pub fn plugins(&self) -> Vec<(u64, &PluginSlot)> {
-        let chains = self.tracks.iter().map(|t| &t.inserts).chain(self.buses.iter().map(|b| &b.inserts)).chain(std::iter::once(&self.master_inserts));
-        let mut out: Vec<(u64, &PluginSlot)> = chains.flatten().filter_map(|i| Some((i.id, i.plugin.as_ref()?))).collect();
-        out.extend(self.tracks.iter().filter_map(|t| t.instrument.as_ref()).filter_map(|i| Some((i.id, i.plugin.as_ref()?))));
+        let chains = self
+            .tracks
+            .iter()
+            .map(|t| &t.inserts)
+            .chain(self.buses.iter().map(|b| &b.inserts))
+            .chain(std::iter::once(&self.master_inserts));
+        let mut out: Vec<(u64, &PluginSlot)> = chains
+            .flatten()
+            .filter_map(|i| Some((i.id, i.plugin.as_ref()?)))
+            .collect();
+        out.extend(
+            self.tracks
+                .iter()
+                .filter_map(|t| t.instrument.as_ref())
+                .filter_map(|i| Some((i.id, i.plugin.as_ref()?))),
+        );
         out
     }
 
     /// Stores a plugin's state (from its insert or instrument id) for saving.
     pub fn set_plugin_state(&mut self, id: u64, state: String) -> bool {
         for chain in self.chains_mut() {
-            if let Some(slot) = chain.iter_mut().find(|i| i.id == id).and_then(|i| i.plugin.as_mut()) {
+            if let Some(slot) = chain
+                .iter_mut()
+                .find(|i| i.id == id)
+                .and_then(|i| i.plugin.as_mut())
+            {
                 slot.state = Some(state);
                 return true;
             }
         }
-        if let Some(slot) = self.tracks.iter_mut().filter_map(|t| t.instrument.as_mut()).find(|i| i.id == id).and_then(|i| i.plugin.as_mut()) {
+        if let Some(slot) = self
+            .tracks
+            .iter_mut()
+            .filter_map(|t| t.instrument.as_mut())
+            .find(|i| i.id == id)
+            .and_then(|i| i.plugin.as_mut())
+        {
             slot.state = Some(state);
             return true;
         }
@@ -1523,7 +2040,9 @@ impl Project {
     }
 
     pub fn insert_mut(&mut self, id: u64) -> Option<&mut Insert> {
-        self.chains_mut().flat_map(|c| c.iter_mut()).find(|i| i.id == id)
+        self.chains_mut()
+            .flat_map(|c| c.iter_mut())
+            .find(|i| i.id == id)
     }
 
     pub fn remove_insert(&mut self, id: u64) -> bool {
@@ -1540,9 +2059,18 @@ impl Project {
 
     /// Sets one parameter, kept within its range. False for an unknown key.
     pub fn set_insert_param(&mut self, id: u64, key: &str, value: f32) -> bool {
-        let Some(insert) = self.insert_mut(id) else { return false };
-        let Some(def) = insert.effect_kind().and_then(|k| k.params().iter().find(|d| d.key == key)) else { return false };
-        insert.params.insert(key.to_owned(), value.clamp(def.min, def.max));
+        let Some(insert) = self.insert_mut(id) else {
+            return false;
+        };
+        let Some(def) = insert
+            .effect_kind()
+            .and_then(|k| k.params().iter().find(|d| d.key == key))
+        else {
+            return false;
+        };
+        insert
+            .params
+            .insert(key.to_owned(), value.clamp(def.min, def.max));
         true
     }
 
@@ -1593,7 +2121,10 @@ impl Project {
         let i = match t.automation.iter().position(|l| l.target == target) {
             Some(i) => i,
             None if create => {
-                t.automation.push(Lane { target: target.to_owned(), points: Vec::new() });
+                t.automation.push(Lane {
+                    target: target.to_owned(),
+                    points: Vec::new(),
+                });
                 t.automation.len() - 1
             }
             None => return None,
@@ -1602,11 +2133,24 @@ impl Project {
     }
 
     /// Adds a point (or replaces one at the same beat). Returns its index.
-    pub fn add_auto_point(&mut self, track: u64, target: &str, beat: f64, value: f32) -> Option<usize> {
+    pub fn add_auto_point(
+        &mut self,
+        track: u64,
+        target: &str,
+        beat: f64,
+        value: f32,
+    ) -> Option<usize> {
         let (min, max, _) = self.target_range(self.track(track)?, target)?;
-        let point = AutoPoint { beat: beat.max(0.0), value: value.clamp(min, max) };
+        let point = AutoPoint {
+            beat: beat.max(0.0),
+            value: value.clamp(min, max),
+        };
         let lane = self.lane_mut(track, target, true)?;
-        if let Some(i) = lane.points.iter().position(|p| (p.beat - point.beat).abs() < 1e-6) {
+        if let Some(i) = lane
+            .points
+            .iter()
+            .position(|p| (p.beat - point.beat).abs() < 1e-6)
+        {
             lane.points[i] = point;
             return Some(i);
         }
@@ -1616,21 +2160,33 @@ impl Project {
     }
 
     /// Moves a point; returns its new index (points stay sorted by beat).
-    pub fn move_auto_point(&mut self, track: u64, target: &str, index: usize, beat: f64, value: f32) -> Option<usize> {
+    pub fn move_auto_point(
+        &mut self,
+        track: u64,
+        target: &str,
+        index: usize,
+        beat: f64,
+        value: f32,
+    ) -> Option<usize> {
         let (min, max, _) = self.target_range(self.track(track)?, target)?;
         let lane = self.lane_mut(track, target, false)?;
         if index >= lane.points.len() {
             return None;
         }
         lane.points.remove(index);
-        let point = AutoPoint { beat: beat.max(0.0), value: value.clamp(min, max) };
+        let point = AutoPoint {
+            beat: beat.max(0.0),
+            value: value.clamp(min, max),
+        };
         let i = lane.points.partition_point(|p| p.beat < point.beat);
         lane.points.insert(i, point);
         Some(i)
     }
 
     pub fn remove_auto_point(&mut self, track: u64, target: &str, index: usize) -> bool {
-        let Some(lane) = self.lane_mut(track, target, false) else { return false };
+        let Some(lane) = self.lane_mut(track, target, false) else {
+            return false;
+        };
         if index >= lane.points.len() {
             return false;
         }
@@ -1640,7 +2196,9 @@ impl Project {
 
     /// Removes every point of a lane, so the parameter stops changing.
     pub fn clear_lane(&mut self, track: u64, target: &str) -> bool {
-        let Some(t) = self.track_mut(track) else { return false };
+        let Some(t) = self.track_mut(track) else {
+            return false;
+        };
         let before = t.automation.len();
         t.automation.retain(|l| l.target != target);
         t.automation.len() != before
@@ -1649,7 +2207,14 @@ impl Project {
     // ------------------------------------------------------------ regions
 
     /// Places a whole audio file on a track. Returns the region id.
-    pub fn add_region(&mut self, track: u64, file: &str, name: &str, start: f64, length_secs: f64) -> Option<u64> {
+    pub fn add_region(
+        &mut self,
+        track: u64,
+        file: &str,
+        name: &str,
+        start: f64,
+        length_secs: f64,
+    ) -> Option<u64> {
         let id = self.take_id();
         let region = Region {
             id,
@@ -1681,18 +2246,34 @@ impl Project {
     /// Moves a region to a new start (snapped) and, optionally, another track.
     pub fn move_region(&mut self, id: u64, start: f64, to_track: Option<u64>) -> bool {
         let start = self.snap(start);
-        let Some(from) = self.find_region(id).map(|(t, _)| t.id) else { return false };
-        let to = to_track.filter(|t| self.track(*t).is_some()).unwrap_or(from);
-        let Some(src) = self.track_mut(from) else { return false };
-        let index = src.regions.iter().position(|r| r.id == id).expect("found above");
+        let Some(from) = self.find_region(id).map(|(t, _)| t.id) else {
+            return false;
+        };
+        let to = to_track
+            .filter(|t| self.track(*t).is_some())
+            .unwrap_or(from);
+        let Some(src) = self.track_mut(from) else {
+            return false;
+        };
+        let index = src
+            .regions
+            .iter()
+            .position(|r| r.id == id)
+            .expect("found above");
         let mut region = src.regions.remove(index);
         region.start = start;
-        self.track_mut(to).expect("checked above").regions.push(region);
+        self.track_mut(to)
+            .expect("checked above")
+            .regions
+            .push(region);
         true
     }
 
     fn region_mut(&mut self, id: u64) -> Option<&mut Region> {
-        self.tracks.iter_mut().flat_map(|t| t.regions.iter_mut()).find(|r| r.id == id)
+        self.tracks
+            .iter_mut()
+            .flat_map(|t| t.regions.iter_mut())
+            .find(|r| r.id == id)
     }
 
     /// Shortest a MIDI region can be, in beats.
@@ -1705,12 +2286,19 @@ impl Project {
     /// audio where it is in time: like dragging the edge of a region in a DAW.
     pub fn trim_region(&mut self, id: u64, left: bool, beats: f64) -> bool {
         let beats = self.snap(beats);
-        let Some(meter) = self.find_region(id).map(|(_, r)| self.region_meter(r)) else { return false };
-        let Some(r) = self.region_mut(id) else { return false };
+        let Some(meter) = self.find_region(id).map(|(_, r)| self.region_meter(r)) else {
+            return false;
+        };
+        let Some(r) = self.region_mut(id) else {
+            return false;
+        };
         if let Some(m) = &mut r.midi {
             // MIDI: the notes stay where they are; the region shows more or less of them.
             if left {
-                let delta = (beats - r.start).max(-m.offset).max(-r.start).min(m.length - Self::MIN_MIDI_BEATS);
+                let delta = (beats - r.start)
+                    .max(-m.offset)
+                    .max(-r.start)
+                    .min(m.length - Self::MIN_MIDI_BEATS);
                 r.start += delta;
                 m.offset += delta;
                 m.length -= delta;
@@ -1732,7 +2320,9 @@ impl Project {
             r.start += meter.secs_to_beats(delta);
             r.loop_to -= meter.secs_to_beats(delta);
         } else {
-            let mut length = meter.beats_to_secs(beats - r.start).max(Self::MIN_REGION_SECS);
+            let mut length = meter
+                .beats_to_secs(beats - r.start)
+                .max(Self::MIN_REGION_SECS);
             if r.source_length > 0.0 {
                 length = length.min(r.source_length - r.offset);
             }
@@ -1750,7 +2340,10 @@ impl Project {
     pub fn split_region(&mut self, id: u64, beats: f64) -> Option<u64> {
         let meter = self.find_region(id).map(|(_, r)| self.region_meter(r))?;
         let new_id = self.next_id;
-        let track = self.tracks.iter_mut().find(|t| t.regions.iter().any(|r| r.id == id))?;
+        let track = self
+            .tracks
+            .iter_mut()
+            .find(|t| t.regions.iter().any(|r| r.id == id))?;
         let index = track.regions.iter().position(|r| r.id == id)?;
         let r = &mut track.regions[index];
         // Only the region's own length splits; the pieces stop looping.
@@ -1795,7 +2388,9 @@ impl Project {
 
     /// Sets fade lengths in seconds, kept within the region.
     pub fn set_fades(&mut self, id: u64, fade_in: f64, fade_out: f64) -> bool {
-        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else { return false };
+        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else {
+            return false;
+        };
         r.fade_in = fade_in.clamp(0.0, r.length);
         r.fade_out = fade_out.clamp(0.0, r.length - r.fade_in);
         true
@@ -1803,14 +2398,18 @@ impl Project {
 
     /// Sets a region's volume change in dB (−48 to +24). Audio regions only.
     pub fn set_region_gain(&mut self, id: u64, db: f32) -> bool {
-        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else { return false };
+        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else {
+            return false;
+        };
         r.gain_db = db.clamp(-48.0, 24.0);
         true
     }
 
     /// Plays a region backwards (or forwards again). Audio regions only.
     pub fn set_region_reverse(&mut self, id: u64, on: bool) -> bool {
-        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else { return false };
+        let Some(r) = self.region_mut(id).filter(|r| r.midi.is_none()) else {
+            return false;
+        };
         r.reverse = on;
         true
     }
@@ -1819,9 +2418,20 @@ impl Project {
     /// (snapped). An end at or before the region's own end stops the loop.
     pub fn set_region_loop(&mut self, id: u64, end: f64) -> bool {
         let end = self.snap(end);
-        let Some((start, len)) = self.find_region(id).map(|(_, r)| (r.start, self.region_beats(r))) else { return false };
-        let Some(r) = self.region_mut(id) else { return false };
-        r.loop_to = if end - start > len + 1e-6 { end - start } else { 0.0 };
+        let Some((start, len)) = self
+            .find_region(id)
+            .map(|(_, r)| (r.start, self.region_beats(r)))
+        else {
+            return false;
+        };
+        let Some(r) = self.region_mut(id) else {
+            return false;
+        };
+        r.loop_to = if end - start > len + 1e-6 {
+            end - start
+        } else {
+            0.0
+        };
         true
     }
 
@@ -1834,7 +2444,12 @@ impl Project {
         if ids.len() < 2 || ids.iter().any(|&id| self.row_of(id) != Some(row)) {
             return None;
         }
-        let mut picked: Vec<Region> = self.tracks[row].regions.iter().filter(|r| ids.contains(&r.id)).cloned().collect();
+        let mut picked: Vec<Region> = self.tracks[row]
+            .regions
+            .iter()
+            .filter(|r| ids.contains(&r.id))
+            .cloned()
+            .collect();
         if picked.len() < 2 {
             return None;
         }
@@ -1842,7 +2457,10 @@ impl Project {
         let first = picked[0].clone();
         let joined = if first.midi.is_some() {
             let start = first.start;
-            let end = picked.iter().map(|r| r.start + self.region_span(r)).fold(start, f64::max);
+            let end = picked
+                .iter()
+                .map(|r| r.start + self.region_span(r))
+                .fold(start, f64::max);
             let mut notes = Vec::new();
             for r in &picked {
                 let m = r.midi.as_ref()?;
@@ -1856,13 +2474,29 @@ impl Project {
                             continue;
                         }
                         let length = n.length.min(m.length - rel).min(span - pass - rel);
-                        notes.push(Note { start: r.start - start + pass + rel, length, ..*n });
+                        notes.push(Note {
+                            start: r.start - start + pass + rel,
+                            length,
+                            ..*n
+                        });
                     }
                     pass += m.length.max(Self::MIN_MIDI_BEATS);
                 }
             }
-            notes.sort_by(|a, b| (a.start, a.key).partial_cmp(&(b.start, b.key)).unwrap_or(std::cmp::Ordering::Equal));
-            Region { midi: Some(MidiData { length: end - start, offset: 0.0, notes }), loop_to: 0.0, ..first }
+            notes.sort_by(|a, b| {
+                (a.start, a.key)
+                    .partial_cmp(&(b.start, b.key))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            Region {
+                midi: Some(MidiData {
+                    length: end - start,
+                    offset: 0.0,
+                    notes,
+                }),
+                loop_to: 0.0,
+                ..first
+            }
         } else {
             for w in picked.windows(2) {
                 let (a, b) = (&w[0], &w[1]);
@@ -1882,7 +2516,11 @@ impl Project {
                 }
             }
             let last = picked.last()?;
-            Region { length: last.offset + last.length - first.offset, fade_out: last.fade_out, ..first }
+            Region {
+                length: last.offset + last.length - first.offset,
+                fade_out: last.fade_out,
+                ..first
+            }
         };
         let id = joined.id;
         self.tracks[row].regions.retain(|r| !ids.contains(&r.id));
@@ -1892,7 +2530,9 @@ impl Project {
 
     /// Moves a track to a new position in the list (0 = top).
     pub fn move_track(&mut self, id: u64, to: usize) -> bool {
-        let Some(from) = self.tracks.iter().position(|t| t.id == id) else { return false };
+        let Some(from) = self.tracks.iter().position(|t| t.id == id) else {
+            return false;
+        };
         let to = to.min(self.tracks.len() - 1);
         if from == to {
             return false;
@@ -1917,7 +2557,9 @@ impl Project {
 
     /// Row (0 = top) of the track holding `region`.
     fn row_of(&self, region: u64) -> Option<usize> {
-        self.tracks.iter().position(|t| t.regions.iter().any(|r| r.id == region))
+        self.tracks
+            .iter()
+            .position(|t| t.regions.iter().any(|r| r.id == region))
     }
 
     /// Regions overlapping beats `from..to` on track rows `top..=bottom`
@@ -1950,7 +2592,10 @@ impl Project {
             .collect();
         let top = picked.iter().map(|(row, _)| *row).min()?;
         let first = picked.iter().map(|(_, r)| r.start).fold(f64::MAX, f64::min);
-        let last = picked.iter().map(|(_, r)| r.start + self.region_span(r)).fold(0.0, f64::max);
+        let last = picked
+            .iter()
+            .map(|(_, r)| r.start + self.region_span(r))
+            .fold(0.0, f64::max);
         let items = picked
             .into_iter()
             .map(|(row, r)| {
@@ -1959,7 +2604,10 @@ impl Project {
                 (row - top, r)
             })
             .collect();
-        Some(Clipboard { items, span: last - first })
+        Some(Clipboard {
+            items,
+            span: last - first,
+        })
     }
 
     /// Places copied regions with the earliest at `at` beats and the topmost on
@@ -1983,9 +2631,19 @@ impl Project {
     /// Copies regions to right after the end of the group (⌘D), rounded up to
     /// the snap grid so repeats stay in time. Returns the new ids.
     pub fn duplicate_regions(&mut self, ids: &[u64]) -> Vec<u64> {
-        let Some(clip) = self.copy_regions(ids) else { return Vec::new() };
-        let top = ids.iter().filter_map(|&id| self.row_of(id)).min().unwrap_or(0);
-        let first = ids.iter().filter_map(|&id| self.find_region(id)).map(|(_, r)| r.start).fold(f64::MAX, f64::min);
+        let Some(clip) = self.copy_regions(ids) else {
+            return Vec::new();
+        };
+        let top = ids
+            .iter()
+            .filter_map(|&id| self.row_of(id))
+            .min()
+            .unwrap_or(0);
+        let first = ids
+            .iter()
+            .filter_map(|&id| self.find_region(id))
+            .map(|(_, r)| r.start)
+            .fold(f64::MAX, f64::min);
         let mut span = clip.span;
         if self.snap {
             let step = self.snap_value.step(&self.meter());
@@ -2006,7 +2664,9 @@ impl Project {
         }
         let earliest = found.iter().map(|f| f.1).fold(f64::MAX, f64::min);
         let beats = beats.max(-earliest);
-        let (top, bottom) = found.iter().fold((usize::MAX, 0), |(t, b), f| (t.min(f.0), b.max(f.0)));
+        let (top, bottom) = found
+            .iter()
+            .fold((usize::MAX, 0), |(t, b), f| (t.min(f.0), b.max(f.0)));
         let last = self.tracks.len() as i64 - 1;
         let rows = rows.clamp(-(top as i64), last - bottom as i64);
         if beats == 0.0 && rows == 0 {
@@ -2014,10 +2674,16 @@ impl Project {
         }
         for &id in ids {
             let Some(row) = self.row_of(id) else { continue };
-            let index = self.tracks[row].regions.iter().position(|r| r.id == id).expect("found above");
+            let index = self.tracks[row]
+                .regions
+                .iter()
+                .position(|r| r.id == id)
+                .expect("found above");
             let mut region = self.tracks[row].regions.remove(index);
             region.start += beats;
-            self.tracks[(row as i64 + rows) as usize].regions.push(region);
+            self.tracks[(row as i64 + rows) as usize]
+                .regions
+                .push(region);
         }
         true
     }
@@ -2034,9 +2700,18 @@ impl Project {
 
     /// Every audio file the project uses, without duplicates.
     pub fn audio_files(&self) -> Vec<String> {
-        let mut files: Vec<String> =
-            self.tracks.iter().flat_map(|t| &t.regions).filter(|r| r.midi.is_none()).map(|r| r.file.clone()).collect();
-        files.extend(self.tracks.iter().filter_map(|t| t.instrument.as_ref()?.sample.clone()));
+        let mut files: Vec<String> = self
+            .tracks
+            .iter()
+            .flat_map(|t| &t.regions)
+            .filter(|r| r.midi.is_none())
+            .map(|r| r.file.clone())
+            .collect();
+        files.extend(
+            self.tracks
+                .iter()
+                .filter_map(|t| t.instrument.as_ref()?.sample.clone()),
+        );
         files.extend(self.tracks.iter().filter_map(|t| t.frozen.clone()));
         files.sort();
         files.dedup();
@@ -2121,11 +2796,17 @@ mod tests {
         let r = p.add_region(t, "a.wav", "a", 4.0, 4.0).unwrap(); // beats 4..12
         assert!(p.trim_region(r, true, 6.0));
         let region = p.find_region(r).unwrap().1.clone();
-        assert_eq!((region.start, region.offset, region.length), (6.0, 1.0, 3.0));
+        assert_eq!(
+            (region.start, region.offset, region.length),
+            (6.0, 1.0, 3.0)
+        );
         // The left edge can't go before the start of the file.
         p.trim_region(r, true, 0.0);
         let region = p.find_region(r).unwrap().1.clone();
-        assert_eq!((region.start, region.offset, region.length), (4.0, 0.0, 4.0));
+        assert_eq!(
+            (region.start, region.offset, region.length),
+            (4.0, 0.0, 4.0)
+        );
         // Nor the right edge past its end.
         p.trim_region(r, false, 40.0);
         assert_eq!(p.find_region(r).unwrap().1.length, 4.0);
@@ -2140,10 +2821,23 @@ mod tests {
         let r = p.add_region(t, "a.wav", "a", 0.0, 4.0).unwrap();
         p.set_fades(r, 0.5, 0.5);
         let right = p.split_region(r, 2.0).unwrap();
-        let (a, b) = (p.find_region(r).unwrap().1.clone(), p.find_region(right).unwrap().1.clone());
-        assert_eq!((a.start, a.offset, a.length, a.fade_in, a.fade_out), (0.0, 0.0, 1.0, 0.5, 0.0));
-        assert_eq!((b.start, b.offset, b.length, b.fade_in, b.fade_out), (2.0, 1.0, 3.0, 0.0, 0.5));
-        assert_eq!(p.split_region(r, 0.0), None, "nothing to split at the very edge");
+        let (a, b) = (
+            p.find_region(r).unwrap().1.clone(),
+            p.find_region(right).unwrap().1.clone(),
+        );
+        assert_eq!(
+            (a.start, a.offset, a.length, a.fade_in, a.fade_out),
+            (0.0, 0.0, 1.0, 0.5, 0.0)
+        );
+        assert_eq!(
+            (b.start, b.offset, b.length, b.fade_in, b.fade_out),
+            (2.0, 1.0, 3.0, 0.0, 0.5)
+        );
+        assert_eq!(
+            p.split_region(r, 0.0),
+            None,
+            "nothing to split at the very edge"
+        );
     }
 
     #[test]
@@ -2163,7 +2857,10 @@ mod tests {
         let b = p.add_track(None);
         let c = p.add_track(None);
         assert!(p.move_track(c, 0));
-        assert_eq!(p.tracks.iter().map(|t| t.id).collect::<Vec<_>>(), vec![c, a, b]);
+        assert_eq!(
+            p.tracks.iter().map(|t| t.id).collect::<Vec<_>>(),
+            vec![c, a, b]
+        );
         assert!(!p.move_track(c, 0), "already there");
     }
 
@@ -2223,7 +2920,11 @@ mod tests {
         let (p, [r1, r2, r3]) = three_regions();
         assert_eq!(p.regions_in(1.0, 3.0, 0, 1), vec![r1, r3]);
         assert_eq!(p.regions_in(1.0, 5.0, 0, 0), vec![r1, r2]);
-        assert_eq!(p.regions_in(2.0, 4.0, 0, 0), Vec::<u64>::new(), "touching edges don't count");
+        assert_eq!(
+            p.regions_in(2.0, 4.0, 0, 0),
+            Vec::<u64>::new(),
+            "touching edges don't count"
+        );
         assert_eq!(p.all_regions(), vec![r1, r3, r2]);
     }
 
@@ -2246,7 +2947,10 @@ mod tests {
         let (mut p, [r1, r2, _]) = three_regions();
         p.snap_value = Snap::Bar;
         let new = p.duplicate_regions(&[r1, r2]);
-        let starts: Vec<f64> = new.iter().map(|&id| p.find_region(id).unwrap().1.start).collect();
+        let starts: Vec<f64> = new
+            .iter()
+            .map(|&id| p.find_region(id).unwrap().1.start)
+            .collect();
         assert_eq!(starts, vec![8.0, 12.0], "6 beats rounds up to 2 bars");
         p.snap = false;
         let new = p.duplicate_regions(&[r1]);
@@ -2277,7 +2981,13 @@ mod tests {
         assert!(!p.set_send(t, 999, 0.0), "no such bus");
         assert!(p.set_send(t, b, -6.0));
         assert!(p.set_send(t, b, -3.0));
-        assert_eq!(p.track(t).unwrap().sends, vec![Send { bus: b, level_db: -3.0 }]);
+        assert_eq!(
+            p.track(t).unwrap().sends,
+            vec![Send {
+                bus: b,
+                level_db: -3.0
+            }]
+        );
         assert_eq!(p.send_level(p.track(t).unwrap(), b), -3.0);
         assert!(p.remove_bus(b));
         assert!(p.track(t).unwrap().sends.is_empty());
@@ -2291,18 +3001,33 @@ mod tests {
         let t = p.add_track(None);
         let b = p.add_bus(None);
         let eq = p.add_insert(Chain::Track(t), EffectKind::Eq).unwrap();
-        let comp = p.add_insert(Chain::Track(t), EffectKind::Compressor).unwrap();
+        let comp = p
+            .add_insert(Chain::Track(t), EffectKind::Compressor)
+            .unwrap();
         let verb = p.add_insert(Chain::Bus(b), EffectKind::Reverb).unwrap();
         let lim = p.add_insert(Chain::Master, EffectKind::Limiter).unwrap();
         assert!(p.add_insert(Chain::Track(999), EffectKind::Eq).is_none());
-        assert_eq!(p.insert_mut(verb).unwrap().params["mix"], 100.0, "bus reverbs start fully wet");
+        assert_eq!(
+            p.insert_mut(verb).unwrap().params["mix"],
+            100.0,
+            "bus reverbs start fully wet"
+        );
 
         assert!(p.set_insert_param(eq, "b1_gain", 99.0));
-        assert_eq!(p.insert_mut(eq).unwrap().values()[9], 24.0, "clamped to the range");
+        assert_eq!(
+            p.insert_mut(eq).unwrap().values()[9],
+            24.0,
+            "clamped to the range"
+        );
         assert!(!p.set_insert_param(eq, "nope", 1.0));
 
         assert!(p.move_insert(comp, 0));
-        let ids: Vec<u64> = p.chain(Chain::Track(t)).unwrap().iter().map(|i| i.id).collect();
+        let ids: Vec<u64> = p
+            .chain(Chain::Track(t))
+            .unwrap()
+            .iter()
+            .map(|i| i.id)
+            .collect();
         assert_eq!(ids, vec![comp, eq]);
 
         assert!(p.remove_insert(lim) && p.master_inserts.is_empty());
@@ -2317,19 +3042,44 @@ mod tests {
         let mut p = project();
         let t = p.add_track(None);
         assert_eq!(p.add_auto_point(t, "volume", 4.0, -6.0), Some(0));
-        assert_eq!(p.add_auto_point(t, "volume", 0.0, 99.0), Some(0), "goes first");
-        assert_eq!(p.track(t).unwrap().automation[0].points[0].value, Track::MAX_DB, "clamped");
-        assert_eq!(p.add_auto_point(t, "volume", 4.0, -3.0), Some(1), "same beat replaces");
+        assert_eq!(
+            p.add_auto_point(t, "volume", 0.0, 99.0),
+            Some(0),
+            "goes first"
+        );
+        assert_eq!(
+            p.track(t).unwrap().automation[0].points[0].value,
+            Track::MAX_DB,
+            "clamped"
+        );
+        assert_eq!(
+            p.add_auto_point(t, "volume", 4.0, -3.0),
+            Some(1),
+            "same beat replaces"
+        );
         assert_eq!(p.track(t).unwrap().automation[0].points.len(), 2);
-        assert_eq!(p.move_auto_point(t, "volume", 0, 8.0, 0.0), Some(1), "moving past re-sorts");
+        assert_eq!(
+            p.move_auto_point(t, "volume", 0, 8.0, 0.0),
+            Some(1),
+            "moving past re-sorts"
+        );
         assert!(p.remove_auto_point(t, "volume", 0));
-        assert!(p.add_auto_point(t, "wobble", 0.0, 0.0).is_none(), "unknown target");
+        assert!(
+            p.add_auto_point(t, "wobble", 0.0, 0.0).is_none(),
+            "unknown target"
+        );
 
         // Lanes for a bus send and an effect knob go away with the bus or effect.
         let b = p.add_bus(None);
         let fx = p.add_insert(Chain::Track(t), EffectKind::Eq).unwrap();
-        assert!(p.add_auto_point(t, &format!("send:{b}"), 0.0, -10.0).is_some());
-        assert!(p.add_auto_point(t, &format!("fx:{fx}:b1_gain"), 0.0, 4.0).is_some());
+        assert!(
+            p.add_auto_point(t, &format!("send:{b}"), 0.0, -10.0)
+                .is_some()
+        );
+        assert!(
+            p.add_auto_point(t, &format!("fx:{fx}:b1_gain"), 0.0, 4.0)
+                .is_some()
+        );
         assert_eq!(p.track(t).unwrap().automation.len(), 3);
         p.remove_bus(b);
         p.remove_insert(fx);
@@ -2342,7 +3092,10 @@ mod tests {
     fn midi_regions_hold_notes_and_edit_like_audio_regions() {
         let mut p = project();
         let audio = p.add_track(None);
-        assert!(p.add_midi_region(audio, 0.0, 4.0).is_none(), "only on instrument tracks");
+        assert!(
+            p.add_midi_region(audio, 0.0, 4.0).is_none(),
+            "only on instrument tracks"
+        );
         let t = p.add_instrument_track(InstrumentKind::Synth);
         assert_eq!(p.track(t).unwrap().name, "Isai Synth 1");
         let r = p.add_midi_region(t, 4.0, 4.0).unwrap();
@@ -2366,7 +3119,10 @@ mod tests {
         assert!(p.audio_files().is_empty(), "MIDI has no audio files");
         assert!(!p.set_fades(r, 1.0, 1.0));
         assert!(p.set_instrument_param(t, "cutoff", 99999.0));
-        assert_eq!(p.track(t).unwrap().instrument.as_ref().unwrap().values()[2], 18000.0);
+        assert_eq!(
+            p.track(t).unwrap().instrument.as_ref().unwrap().values()[2],
+            18000.0
+        );
     }
 
     #[test]
@@ -2377,16 +3133,32 @@ mod tests {
         p.add_note(r, 0.0, 1.0, 60, 100);
         p.add_note(r, 1.0, 1.0, 127, 100);
         p.add_note(r, 2.0, 1.0, 64, 100);
-        let notes = |p: &Project| p.find_region(r).unwrap().1.midi.as_ref().unwrap().notes.clone();
+        let notes = |p: &Project| {
+            p.find_region(r)
+                .unwrap()
+                .1
+                .midi
+                .as_ref()
+                .unwrap()
+                .notes
+                .clone()
+        };
         // Notes 0 and 1 move right two beats and up: the top note limits the transpose.
         let moved = p.transform_notes(r, &[0, 1], 2.5, 5, 0.0).unwrap();
         let n = notes(&p);
         assert_eq!(moved, vec![1, 2], "followed through the re-sort");
-        assert_eq!((n[1].start, n[1].key, n[2].key), (2.5, 60, 127), "keys unchanged at the top");
+        assert_eq!(
+            (n[1].start, n[1].key, n[2].key),
+            (2.5, 60, 127),
+            "keys unchanged at the top"
+        );
         // Moving left stops at the region start; lengths change together.
         let moved = p.transform_notes(r, &moved, -10.0, 0, 0.5).unwrap();
         let n = notes(&p);
-        assert_eq!(n.iter().map(|n| n.start).collect::<Vec<_>>(), vec![0.0, 1.0, 2.0]);
+        assert_eq!(
+            n.iter().map(|n| n.start).collect::<Vec<_>>(),
+            vec![0.0, 1.0, 2.0]
+        );
         assert!(moved.iter().all(|&i| n[i].length == 1.5));
         assert!(p.transform_notes(r, &[9], 1.0, 0, 0.0).is_none());
         assert!(p.remove_notes(r, &[0, 2]));
@@ -2401,14 +3173,26 @@ mod tests {
         p.add_note(r, 0.1, 0.3, 60, 100);
         p.add_note(r, 1.2, 0.5, 62, 100);
         p.add_note(r, 2.9, 0.5, 64, 100);
-        let notes = |p: &Project| p.find_region(r).unwrap().1.midi.as_ref().unwrap().notes.clone();
+        let notes = |p: &Project| {
+            p.find_region(r)
+                .unwrap()
+                .1
+                .midi
+                .as_ref()
+                .unwrap()
+                .notes
+                .clone()
+        };
         // Half strength, only the second note.
         assert!(p.quantize_notes(r, &[1], 0.5, 0.5, false, 0.0));
         assert!((notes(&p)[1].start - 1.1).abs() < 1e-9);
         // Full strength on everything, ends too.
         assert!(p.quantize_notes(r, &[], 0.5, 1.0, true, 0.0));
         let n = notes(&p);
-        assert_eq!(n.iter().map(|n| n.start).collect::<Vec<_>>(), vec![0.0, 1.0, 3.0]);
+        assert_eq!(
+            n.iter().map(|n| n.start).collect::<Vec<_>>(),
+            vec![0.0, 1.0, 3.0]
+        );
         assert_eq!(n[0].length, 0.5, "a short note keeps a grid step");
         assert_eq!(n[1].length, 0.5);
         // The grid is the song's, even when the region's notes are offset.
@@ -2421,7 +3205,20 @@ mod tests {
     fn recorded_notes_become_a_bar_aligned_region() {
         let mut p = project();
         let t = p.add_instrument_track(InstrumentKind::Synth);
-        let rec = [Note { start: 5.5, length: 1.0, key: 60, velocity: 90 }, Note { start: 9.0, length: 0.5, key: 64, velocity: 0 }];
+        let rec = [
+            Note {
+                start: 5.5,
+                length: 1.0,
+                key: 60,
+                velocity: 90,
+            },
+            Note {
+                start: 9.0,
+                length: 0.5,
+                key: 64,
+                velocity: 0,
+            },
+        ];
         let id = p.add_recorded_notes(t, &rec).unwrap();
         let region = p.find_region(id).unwrap().1;
         let m = region.midi.as_ref().unwrap();
@@ -2440,7 +3237,9 @@ mod tests {
         let mut p = project();
         p.key = "A minor".into();
         let t = p.add_track(None);
-        let id = p.add_insert(Chain::Track(t), EffectKind::PitchCorrect).unwrap();
+        let id = p
+            .add_insert(Chain::Track(t), EffectKind::PitchCorrect)
+            .unwrap();
         let i = p.insert_mut(id).unwrap();
         assert_eq!((i.params["key"], i.params["scale"]), (9.0, 2.0));
     }
@@ -2458,11 +3257,36 @@ mod tests {
         assert!(p.set_region_tempo(r, Some(120.0)));
         p.tempo = 60.0;
         assert_eq!(beats(&p), 4.0, "following: it keeps its beats");
-        assert_eq!(p.stretch_ratio(p.find_region(r).unwrap().1), 2.0, "twice as long at half the tempo");
+        assert_eq!(
+            p.stretch_ratio(p.find_region(r).unwrap().1),
+            2.0,
+            "twice as long at half the tempo"
+        );
         // Splitting a following region cuts in its own beats.
         let right = p.split_region(r, 2.0).unwrap();
-        assert_eq!(p.find_region(right).unwrap().1.offset, 1.0, "one second into the audio");
+        assert_eq!(
+            p.find_region(right).unwrap().1.offset,
+            1.0,
+            "one second into the audio"
+        );
         assert!(p.set_region_tempo(r, None));
+    }
+
+    #[test]
+    fn a_tempo_change_slows_audio_regions_down() {
+        let mut p = project(); // 120 BPM
+        let t = p.add_track(None);
+        let r = p.add_region(t, "loop.wav", "loop", 0.0, 2.0).unwrap();
+        // Half the tempo: the loop becomes twice as long, and keeps its beats.
+        assert!(p.set_tempo_at(0.0, 60.0));
+        let (_, region) = p.find_region(r).unwrap();
+        assert_eq!(
+            region.tempo,
+            Some(120.0),
+            "pinned to the tempo it played at"
+        );
+        assert_eq!(p.stretch_ratio(region), 2.0, "twice as long");
+        assert_eq!(p.region_beats(region), 4.0, "still on the same beats");
     }
 
     #[test]
@@ -2470,14 +3294,32 @@ mod tests {
         let mut p = Project::default();
         assert!(p.add_tempo_change(16.0, 90.0));
         assert!(p.add_tempo_change(8.0, 100.04));
-        assert_eq!(p.tempo_changes, vec![TempoChange { beat: 8.0, bpm: 100.0 }, TempoChange { beat: 16.0, bpm: 90.0 }]);
+        assert_eq!(
+            p.tempo_changes,
+            vec![
+                TempoChange {
+                    beat: 8.0,
+                    bpm: 100.0
+                },
+                TempoChange {
+                    beat: 16.0,
+                    bpm: 90.0
+                }
+            ]
+        );
         // The tempo display changes the section the playhead is in.
         assert!(p.set_tempo_at(10.0, 110.0));
         assert_eq!(p.tempo_changes[0].bpm, 110.0);
         assert!(p.set_tempo_at(2.0, 130.0));
         assert_eq!(p.tempo, 130.0);
         assert!(p.move_tempo_change(16.0, 20.0, 80.0));
-        assert_eq!(p.tempo_changes[1], TempoChange { beat: 20.0, bpm: 80.0 });
+        assert_eq!(
+            p.tempo_changes[1],
+            TempoChange {
+                beat: 20.0,
+                bpm: 80.0
+            }
+        );
         assert_eq!(p.tempo_map().bpm_at(19.0), 110.0);
         assert!(p.remove_tempo_change(8.0));
         assert_eq!(p.tempo_map().bpm_at(10.0), 130.0);
@@ -2505,7 +3347,10 @@ mod tests {
     fn signature_changes_move_the_bar_lines() {
         let mut p = Project::default();
         assert!(p.add_signature_change(3, 3, 4));
-        assert!(p.add_signature_change(1, 4, 4), "bar 1 sets the opening signature");
+        assert!(
+            p.add_signature_change(1, 4, 4),
+            "bar 1 sets the opening signature"
+        );
         let map = p.tempo_map();
         assert_eq!(map.bar_start(4), 11.0);
         assert_eq!(p.meter_at(12.0).numerator, 3);
@@ -2515,7 +3360,14 @@ mod tests {
         assert_eq!(p.snap(10.4), 11.0);
         assert_eq!(p.snap(9.0), 8.0);
         assert!(p.set_signature_at(12.0, 6, 8));
-        assert_eq!(p.signature_changes, vec![SignatureChange { bar: 3, numerator: 6, denominator: 8 }]);
+        assert_eq!(
+            p.signature_changes,
+            vec![SignatureChange {
+                bar: 3,
+                numerator: 6,
+                denominator: 8
+            }]
+        );
         assert!(p.remove_signature_change(3));
         assert!(p.signature_changes.is_empty());
     }
@@ -2524,7 +3376,11 @@ mod tests {
     fn cycle_wraps_the_chosen_regions() {
         let (mut p, [r1, r2, r3]) = three_regions();
         assert!(p.cycle_regions(&[r2, r3]));
-        assert_eq!((p.cycle, p.cycle_start, p.cycle_end), (true, 2.0, 6.0), "from the earliest start to the latest end");
+        assert_eq!(
+            (p.cycle, p.cycle_start, p.cycle_end),
+            (true, 2.0, 6.0),
+            "from the earliest start to the latest end"
+        );
         p.set_region_loop(r1, 10.0);
         p.cycle_regions(&[r1]);
         assert_eq!((p.cycle_start, p.cycle_end), (0.0, 10.0), "a loop counts");
@@ -2540,9 +3396,22 @@ mod tests {
             p.add_note(r, f64::from(i) * 0.5, 0.25, 60, 100);
         }
         assert!(p.quantize_notes(r, &[], 0.5, 1.0, false, 1.0 / 3.0));
-        let starts: Vec<f64> = p.find_region(r).unwrap().1.midi.as_ref().unwrap().notes.iter().map(|n| n.start).collect();
+        let starts: Vec<f64> = p
+            .find_region(r)
+            .unwrap()
+            .1
+            .midi
+            .as_ref()
+            .unwrap()
+            .notes
+            .iter()
+            .map(|n| n.start)
+            .collect();
         let want = [0.0, 0.5 + 0.5 / 3.0, 1.0, 1.5 + 0.5 / 3.0];
-        assert!(starts.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-9), "{starts:?}");
+        assert!(
+            starts.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-9),
+            "{starts:?}"
+        );
     }
 
     #[test]
@@ -2550,16 +3419,36 @@ mod tests {
         let mut p = project();
         let t = p.add_instrument_track(InstrumentKind::Synth);
         let r = p.add_midi_region(t, 0.0, 4.0).unwrap();
-        let chord = [60, 64, 67].map(|key| Note { start: 0.0, length: 2.0, key, velocity: 100 });
+        let chord = [60, 64, 67].map(|key| Note {
+            start: 0.0,
+            length: 2.0,
+            key,
+            velocity: 100,
+        });
         assert_eq!(p.add_notes(r, &chord).unwrap(), vec![0, 1, 2]);
-        let notes = |p: &Project| p.find_region(r).unwrap().1.midi.as_ref().unwrap().notes.clone();
+        let notes = |p: &Project| {
+            p.find_region(r)
+                .unwrap()
+                .1
+                .midi
+                .as_ref()
+                .unwrap()
+                .notes
+                .clone()
+        };
 
         // Strummed up: each higher note a little later, all ending together.
         assert!(p.strum_notes(r, &[], 0.125, false).is_some());
         let n = notes(&p);
-        assert_eq!(n.iter().map(|n| (n.start, n.key)).collect::<Vec<_>>(), vec![(0.0, 60), (0.125, 64), (0.25, 67)]);
+        assert_eq!(
+            n.iter().map(|n| (n.start, n.key)).collect::<Vec<_>>(),
+            vec![(0.0, 60), (0.125, 64), (0.25, 67)]
+        );
         assert!(n.iter().all(|n| (n.start + n.length - 2.0).abs() < 1e-9));
-        assert!(p.strum_notes(r, &[0], 0.1, false).is_none(), "a single note isn't a chord");
+        assert!(
+            p.strum_notes(r, &[0], 0.1, false).is_none(),
+            "a single note isn't a chord"
+        );
 
         // Arpeggiate a fresh chord up-down in eighths over its two beats.
         p.remove_notes(r, &[0, 1, 2]);
@@ -2567,8 +3456,14 @@ mod tests {
         let new = p.arpeggiate_notes(r, &[], 0.5, "updown").unwrap();
         let n = notes(&p);
         assert_eq!(new.len(), 4);
-        assert_eq!(n.iter().map(|n| n.key).collect::<Vec<_>>(), vec![60, 64, 67, 64]);
-        assert_eq!(n.iter().map(|n| n.start).collect::<Vec<_>>(), vec![0.0, 0.5, 1.0, 1.5]);
+        assert_eq!(
+            n.iter().map(|n| n.key).collect::<Vec<_>>(),
+            vec![60, 64, 67, 64]
+        );
+        assert_eq!(
+            n.iter().map(|n| n.start).collect::<Vec<_>>(),
+            vec![0.0, 0.5, 1.0, 1.5]
+        );
         assert!(p.arpeggiate_notes(r, &[], 0.0, "up").is_none());
     }
 
@@ -2577,8 +3472,18 @@ mod tests {
         let mut p = project();
         let intro = p.add_marker(0.0, None);
         let verse = p.add_marker(16.2, None);
-        assert_eq!(p.markers.iter().map(|m| (m.beat, m.name.as_str())).collect::<Vec<_>>(), vec![(0.0, "Intro"), (16.0, "Verse")]);
-        assert_eq!(p.add_marker(16.0, Some("Again")), verse, "one marker per place");
+        assert_eq!(
+            p.markers
+                .iter()
+                .map(|m| (m.beat, m.name.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(0.0, "Intro"), (16.0, "Verse")]
+        );
+        assert_eq!(
+            p.add_marker(16.0, Some("Again")),
+            verse,
+            "one marker per place"
+        );
         assert!(p.move_marker(intro, 32.0));
         assert_eq!(p.markers[0].id, verse, "kept in order");
         assert!(p.rename_marker(verse, " Hook "));
@@ -2586,7 +3491,11 @@ mod tests {
         assert_eq!(p.marker_after(16.0), Some(32.0));
         assert_eq!(p.marker_before(16.0), 0.0);
         assert_eq!(p.marker_section(verse), Some((16.0, 32.0)));
-        assert_eq!(p.marker_section(intro), Some((32.0, 36.0)), "the last one runs a bar");
+        assert_eq!(
+            p.marker_section(intro),
+            Some((32.0, 36.0)),
+            "the last one runs a bar"
+        );
         assert!(p.remove_marker(intro) && !p.remove_marker(intro));
     }
 
@@ -2598,18 +3507,33 @@ mod tests {
         assert!(p.set_region_loop(r, 13.0));
         let region = p.find_region(r).unwrap().1.clone();
         assert_eq!((region.loop_to, p.region_span(&region)), (13.0, 13.0));
-        assert_eq!(p.regions_in(10.0, 11.0, 0, 0), vec![r], "the loop counts as the region");
+        assert_eq!(
+            p.regions_in(10.0, 11.0, 0, 0),
+            vec![r],
+            "the loop counts as the region"
+        );
         p.set_region_loop(r, 3.0);
-        assert_eq!(p.find_region(r).unwrap().1.loop_to, 0.0, "shorter than the region: no loop");
+        assert_eq!(
+            p.find_region(r).unwrap().1.loop_to,
+            0.0,
+            "shorter than the region: no loop"
+        );
         p.set_region_loop(r, 12.0);
         p.trim_region(r, true, 2.0);
-        assert_eq!(p.find_region(r).unwrap().1.loop_to, 10.0, "the loop end stays put");
+        assert_eq!(
+            p.find_region(r).unwrap().1.loop_to,
+            10.0,
+            "the loop end stays put"
+        );
 
         assert!(p.set_region_gain(r, 40.0) && p.find_region(r).unwrap().1.gain_db == 24.0);
         assert!(p.set_region_reverse(r, true) && p.find_region(r).unwrap().1.reverse);
         let m = p.add_instrument_track(InstrumentKind::Synth);
         let mr = p.add_midi_region(m, 0.0, 4.0).unwrap();
-        assert!(!p.set_region_gain(mr, 3.0) && !p.set_region_reverse(mr, true), "audio only");
+        assert!(
+            !p.set_region_gain(mr, 3.0) && !p.set_region_reverse(mr, true),
+            "audio only"
+        );
     }
 
     #[test]
@@ -2626,14 +3550,20 @@ mod tests {
         let region = p.find_region(a).unwrap().1;
         let m = region.midi.as_ref().unwrap();
         assert_eq!(m.length, 12.0);
-        assert_eq!(m.notes.iter().map(|n| (n.start, n.key)).collect::<Vec<_>>(), vec![(1.0, 60), (8.0, 62), (10.0, 62)]);
+        assert_eq!(
+            m.notes.iter().map(|n| (n.start, n.key)).collect::<Vec<_>>(),
+            vec![(1.0, 60), (8.0, 62), (10.0, 62)]
+        );
         assert!(p.find_region(b).is_none());
 
         let audio = p.add_track(None);
         let r = p.add_region(audio, "a.wav", "a", 0.0, 4.0).unwrap();
         let right = p.split_region(r, 4.0).unwrap();
         let other = p.add_region(audio, "b.wav", "b", 20.0, 1.0).unwrap();
-        assert!(p.join_regions(&[r, other]).is_none(), "different recordings");
+        assert!(
+            p.join_regions(&[r, other]).is_none(),
+            "different recordings"
+        );
         assert_eq!(p.join_regions(&[r, right]), Some(r));
         assert_eq!(p.find_region(r).unwrap().1.length, 4.0);
         assert!(p.join_regions(&[r, a]).is_none(), "different tracks");
@@ -2665,7 +3595,10 @@ mod folder_tests {
         let f1 = p.add_folder(Some("One"));
         let f2 = p.add_folder(Some("Two"));
         assert!(!p.set_group(a, Some(a)), "a track cannot be its own folder");
-        assert!(!p.set_group(f2, Some(f1)), "a folder cannot go inside a folder");
+        assert!(
+            !p.set_group(f2, Some(f1)),
+            "a folder cannot go inside a folder"
+        );
         assert!(p.set_group(a, Some(f1)));
         assert!(p.set_group(a, None), "a track can leave its folder");
         assert_eq!(p.track(a).unwrap().group, None);
@@ -2688,7 +3621,12 @@ mod midi_fx_tests {
     use super::*;
 
     fn note(start: f64, length: f64, key: u8) -> BeatNote {
-        BeatNote { start, end: start + length, key, velocity: 100 }
+        BeatNote {
+            start,
+            end: start + length,
+            key,
+            velocity: 100,
+        }
     }
 
     #[test]
@@ -2712,7 +3650,10 @@ mod midi_fx_tests {
 
     #[test]
     fn a_down_pattern_reverses_the_order() {
-        let fx = MidiFx { pattern: "down".into(), ..MidiFx::arpeggio() };
+        let fx = MidiFx {
+            pattern: "down".into(),
+            ..MidiFx::arpeggio()
+        };
         let chord = [note(0.0, 1.0, 60), note(0.0, 1.0, 64)];
         let keys: Vec<u8> = apply_midi_fx(&fx, &chord).iter().map(|n| n.key).collect();
         assert_eq!(keys, vec![64, 60, 64, 60]);
@@ -2728,9 +3669,111 @@ mod midi_fx_tests {
 
     #[test]
     fn a_zero_rate_leaves_the_notes_alone() {
-        let fx = MidiFx { rate: 0.0, ..MidiFx::arpeggio() };
+        let fx = MidiFx {
+            rate: 0.0,
+            ..MidiFx::arpeggio()
+        };
         let input = [note(0.0, 1.0, 60)];
         assert_eq!(apply_midi_fx(&fx, &input), input.to_vec());
     }
 }
 
+#[cfg(test)]
+mod midi_io_tests {
+    use super::*;
+    use crate::midi_file;
+
+    fn project() -> Project {
+        Project::new("Test", Meter::default(), "C major")
+    }
+
+    #[test]
+    fn a_region_exports_and_imports_back_unchanged() {
+        let mut p = project();
+        let t = p.add_instrument_track(InstrumentKind::Synth);
+        let r = p.add_midi_region(t, 0.0, 4.0).unwrap();
+        p.add_note(r, 0.0, 1.0, 60, 100);
+        p.add_note(r, 1.5, 0.5, 64, 90);
+
+        let bytes = p.export_midi(r).unwrap();
+        let song = midi_file::read(&bytes).unwrap();
+        assert_eq!(song.bpm, Some(120.0));
+        assert_eq!(song.meter, Some((4, 4)));
+
+        let mut other = project();
+        let t2 = other.add_instrument_track(InstrumentKind::Synth);
+        let back = other.import_midi(t2, 8.0, &song);
+        assert_eq!(back.len(), 1);
+        let (_, region) = other.find_region(back[0]).unwrap();
+        assert_eq!(region.start, 8.0);
+        assert_eq!(
+            region.midi.as_ref().unwrap().notes,
+            p.find_region(r).unwrap().1.midi.as_ref().unwrap().notes
+        );
+    }
+
+    #[test]
+    fn export_starts_at_the_region_offset() {
+        let mut p = project();
+        let t = p.add_instrument_track(InstrumentKind::Synth);
+        let r = p.add_midi_region(t, 0.0, 4.0).unwrap();
+        p.add_note(r, 0.0, 1.0, 60, 100);
+        p.add_note(r, 2.0, 1.0, 62, 100);
+        // Trimming the left edge moves the offset; notes before it don't export.
+        p.region_mut(r).unwrap().midi.as_mut().unwrap().offset = 2.0;
+        let song = midi_file::read(&p.export_midi(r).unwrap()).unwrap();
+        let notes = &song.tracks[0].notes;
+        assert_eq!(notes.len(), 1);
+        assert_eq!((notes[0].start, notes[0].key), (0.0, 62));
+    }
+
+    #[test]
+    fn importing_a_file_without_notes_adds_nothing() {
+        let mut p = project();
+        let t = p.add_instrument_track(InstrumentKind::Synth);
+        let empty = midi_file::Song::default();
+        assert!(p.import_midi(t, 0.0, &empty).is_empty());
+        assert!(p.track(t).unwrap().regions.is_empty());
+    }
+
+    #[test]
+    fn each_midi_track_gets_its_own_instrument_track() {
+        let mut p = project();
+        let t = p.add_instrument_track(InstrumentKind::Synth);
+        let note = |start| Note {
+            start,
+            length: 1.0,
+            key: 60,
+            velocity: 100,
+        };
+        let song = midi_file::Song {
+            name: "Mix".into(),
+            tracks: vec![
+                midi_file::Track {
+                    name: "Keys".into(),
+                    notes: vec![note(0.0)],
+                },
+                midi_file::Track {
+                    name: "Bass".into(),
+                    notes: vec![Note {
+                        key: 36,
+                        ..note(0.0)
+                    }],
+                },
+            ],
+            bpm: None,
+            meter: None,
+        };
+        let before = p.tracks.len();
+        let regions = p.import_midi(t, 0.0, &song);
+        assert_eq!(regions.len(), 2);
+        assert_eq!(
+            p.tracks.len(),
+            before + 1,
+            "one new instrument track for the second MIDI track"
+        );
+        let bass = p.tracks.last().unwrap();
+        assert_eq!(bass.name, "Bass");
+        assert_eq!(bass.regions.len(), 1);
+    }
+}

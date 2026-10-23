@@ -52,12 +52,22 @@ impl Plugins {
             return;
         }
         let (tx, rx) = mpsc::channel();
-        let out = std::env::temp_dir().join(format!("isai-plugin-scan-{}.json", std::process::id()));
+        let out =
+            std::env::temp_dir().join(format!("isai-plugin-scan-{}.json", std::process::id()));
         std::thread::spawn(move || {
-            let ran = std::env::current_exe()
-                .ok()
-                .and_then(|exe| std::process::Command::new(exe).arg("--scan-plugins").arg(&out).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().ok());
-            let found = ran.and_then(|_| std::fs::read_to_string(&out).ok()).map(|json| isai_plugins::parse_scan(&json)).unwrap_or_default();
+            let ran = std::env::current_exe().ok().and_then(|exe| {
+                std::process::Command::new(exe)
+                    .arg("--scan-plugins")
+                    .arg(&out)
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .ok()
+            });
+            let found = ran
+                .and_then(|_| std::fs::read_to_string(&out).ok())
+                .map(|json| isai_plugins::parse_scan(&json))
+                .unwrap_or_default();
             let _ = std::fs::remove_file(&out);
             let _ = tx.send(found);
         });
@@ -112,7 +122,11 @@ impl Plugins {
     pub fn ensure(&mut self, project: &Project, rate: f64) -> Vec<String> {
         if (self.rate - rate).abs() > 0.5 {
             // A new sample rate: reload everything at it (keeping their current sound).
-            let states: Vec<(u64, Vec<u8>)> = self.loaded.iter_mut().filter_map(|(id, p)| Some((*id, p.save_state()?))).collect();
+            let states: Vec<(u64, Vec<u8>)> = self
+                .loaded
+                .iter_mut()
+                .filter_map(|(id, p)| Some((*id, p.save_state()?)))
+                .collect();
             self.loaded.clear();
             self.failed.clear();
             self.rate = rate;
@@ -157,7 +171,8 @@ impl Plugins {
             }
             match isai_plugins::load(&info, rate) {
                 Ok(mut plugin) => {
-                    if let Some(bytes) = slot.state.as_deref().and_then(isai_plugins::decode_state) {
+                    if let Some(bytes) = slot.state.as_deref().and_then(isai_plugins::decode_state)
+                    {
                         let _ = plugin.load_state(&bytes);
                     }
                     self.loaded.insert(id, plugin);
@@ -179,12 +194,21 @@ impl Plugins {
             .tracks
             .iter_mut()
             .flat_map(|t| t.inserts.iter_mut())
-            .chain(arrangement.buses.iter_mut().flat_map(|b| b.inserts.iter_mut()))
+            .chain(
+                arrangement
+                    .buses
+                    .iter_mut()
+                    .flat_map(|b| b.inserts.iter_mut()),
+            )
             .chain(arrangement.master.iter_mut());
         for i in inserts {
             i.plugin = handle(i.id);
         }
-        for inst in arrangement.tracks.iter_mut().filter_map(|t| t.instrument.as_mut()) {
+        for inst in arrangement
+            .tracks
+            .iter_mut()
+            .filter_map(|t| t.instrument.as_mut())
+        {
             inst.plugin = handle(inst.id);
             inst.bpm = f64::from(arrangement.bpm);
         }
@@ -202,19 +226,40 @@ impl Plugins {
     pub fn open_window(&mut self, id: u64) -> Result<(), String> {
         match self.loaded.get_mut(&id) {
             Some(p) => p.open_window(),
-            None => Err(self.failed.get(&id).cloned().unwrap_or_else(|| "The plugin isn't loaded".into())),
+            None => Err(self
+                .failed
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| "The plugin isn't loaded".into())),
         }
     }
 
     /// Keeps open windows responsive; returns how many are open.
     pub fn service_windows(&mut self) -> usize {
-        self.loaded.values_mut().filter(|p| p.window_open()).map(|p| p.service_window()).filter(|&open| open).count()
+        self.loaded
+            .values_mut()
+            .filter(|p| p.window_open())
+            .map(|p| p.service_window())
+            .filter(|&open| open)
+            .count()
     }
 }
 
 impl qobject::AppController {
     fn plugins(self: Pin<&mut Self>) -> &mut Plugins {
         &mut self.rust_mut().get_mut().state.plugins
+    }
+
+    pub fn set_plugin_keyboard(self: Pin<&mut Self>, enabled: bool, octave: i32) {
+        crate::computer_keys::set_state(enabled, octave);
+    }
+
+    pub fn plugin_keyboard_octave(self: &qobject::AppController) -> i32 {
+        crate::computer_keys::octave()
+    }
+
+    pub fn release_plugin_keys(self: Pin<&mut Self>) {
+        crate::computer_keys::release_held();
     }
 
     /// Publishes the plugin list and whether a scan is running.
@@ -236,6 +281,9 @@ impl qobject::AppController {
     pub fn poll_plugins(mut self: Pin<&mut Self>) {
         let done = self.as_mut().plugins().poll_scan();
         let open = self.as_mut().plugins().service_windows() as i32;
+        if open < *self.plugin_windows() {
+            crate::computer_keys::release_held();
+        }
         if open != *self.plugin_windows() {
             self.as_mut().set_plugin_windows(open);
         }
@@ -245,8 +293,15 @@ impl qobject::AppController {
     }
 
     /// Adds catalog plugin `index` to a chain ("track", "bus" or "master"), and opens its window.
-    pub fn add_plugin_effect(mut self: Pin<&mut Self>, chain_type: &QString, chain_id: i32, index: i32) -> i32 {
-        let Some(slot) = self.as_mut().plugins().slot(index.max(0) as usize) else { return -1 };
+    pub fn add_plugin_effect(
+        mut self: Pin<&mut Self>,
+        chain_type: &QString,
+        chain_id: i32,
+        index: i32,
+    ) -> i32 {
+        let Some(slot) = self.as_mut().plugins().slot(index.max(0) as usize) else {
+            return -1;
+        };
         let chain = match chain_type.to_string().as_str() {
             "bus" => Chain::Bus(chain_id as u64),
             "master" => Chain::Master,
@@ -265,7 +320,9 @@ impl qobject::AppController {
 
     /// Adds a track playing catalog plugin `index`, selects it and opens the plugin's window.
     pub fn add_plugin_track(mut self: Pin<&mut Self>, index: i32) -> i32 {
-        let Some(slot) = self.as_mut().plugins().slot(index.max(0) as usize) else { return -1 };
+        let Some(slot) = self.as_mut().plugins().slot(index.max(0) as usize) else {
+            return -1;
+        };
         let mut track = 0;
         let label = format!("Add {}", slot.name);
         self.as_mut().edit(&label, true, |p| {
@@ -273,12 +330,14 @@ impl qobject::AppController {
             true
         });
         self.as_mut().select_track(track as i32);
-        let inst = self
-            .as_mut()
-            .st()
-            .session
-            .as_ref()
-            .and_then(|s| s.project.tracks.iter().find(|t| t.id == track).and_then(|t| t.instrument.as_ref()).map(|i| i.id));
+        let inst = self.as_mut().st().session.as_ref().and_then(|s| {
+            s.project
+                .tracks
+                .iter()
+                .find(|t| t.id == track)
+                .and_then(|t| t.instrument.as_ref())
+                .map(|i| i.id)
+        });
         if let Some(id) = inst {
             self.as_mut().open_plugin(id as i32);
         }

@@ -11,7 +11,9 @@ use crate::controller::{qobject::AppController, qs};
 use crate::project_ops::{id, url_path};
 
 /// Files the browser shows: audio the app can open, and projects.
-pub(crate) const SOUND_EXTENSIONS: [&str; 10] = ["wav", "flac", "mp3", "ogg", "m4a", "aac", "aif", "aiff", "caf", "isai"];
+pub(crate) const SOUND_EXTENSIONS: [&str; 10] = [
+    "wav", "flac", "mp3", "ogg", "m4a", "aac", "aif", "aiff", "caf", "isai",
+];
 const MAX_RESULTS: usize = 300;
 /// Folders deeper than this aren't searched (a whole disk would take too long).
 const MAX_DEPTH: usize = 6;
@@ -19,12 +21,19 @@ const MAX_DEPTH: usize = 6;
 impl AppController {
     pub fn preview_file(mut self: Pin<&mut Self>, url: &QUrl, sync: bool) {
         let Some(path) = url_path(url) else { return };
-        if path.extension().is_some_and(|e| e == isai_project::EXTENSION) {
+        if path
+            .extension()
+            .is_some_and(|e| e == isai_project::EXTENSION)
+        {
             return;
         }
         let st = self.as_mut().st();
         // Only the project's audio, pending imports and this preview stay decoded.
-        let mut keep = st.session.as_ref().map(crate::session::Session::audio_paths).unwrap_or_default();
+        let mut keep = st
+            .session
+            .as_ref()
+            .map(crate::session::Session::audio_paths)
+            .unwrap_or_default();
         keep.extend(st.pending_imports.iter().map(|(p, _)| p.clone()));
         keep.push(path.clone());
         st.pool.retain(&keep);
@@ -54,7 +63,8 @@ impl AppController {
     /// Keeps `previewing` up to date while a preview plays.
     pub(crate) fn poll_preview(mut self: Pin<&mut Self>) {
         let st = self.as_mut().st();
-        let on = st.preview_pending.is_some() || st.audio.engine.as_ref().is_some_and(|e| e.previewing());
+        let on = st.preview_pending.is_some()
+            || st.audio.engine.as_ref().is_some_and(|e| e.previewing());
         if on != *self.previewing() {
             self.set_previewing(on);
         }
@@ -62,7 +72,10 @@ impl AppController {
 
     pub fn import_at(mut self: Pin<&mut Self>, url: &QUrl, track: i32, beats: f64) {
         let Some(path) = url_path(url) else { return };
-        if path.extension().is_some_and(|e| e == isai_project::EXTENSION) {
+        if path
+            .extension()
+            .is_some_and(|e| e == isai_project::EXTENSION)
+        {
             self.open_path(&path);
             return;
         }
@@ -75,8 +88,15 @@ impl AppController {
     }
 
     pub fn find_sounds(&self, folder: &QUrl, query: &QString) -> QString {
-        let Some(root) = url_path(folder) else { return qs("[]") };
-        let words: Vec<String> = query.to_string().to_lowercase().split_whitespace().map(str::to_owned).collect();
+        let Some(root) = url_path(folder) else {
+            return qs("[]");
+        };
+        let words: Vec<String> = query
+            .to_string()
+            .to_lowercase()
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect();
         let mut found = Vec::new();
         search(&root, &words, 0, &mut found);
         let items: Vec<_> = found
@@ -93,7 +113,9 @@ impl AppController {
 }
 
 fn is_sound(path: &Path) -> bool {
-    path.extension().and_then(|e| e.to_str()).is_some_and(|e| SOUND_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| SOUND_EXTENSIONS.contains(&e.to_ascii_lowercase().as_str()))
 }
 
 /// Sound files under `dir` whose names hold every word, depth first, sorted by name.
@@ -101,14 +123,18 @@ fn search(dir: &Path, words: &[String], depth: usize, out: &mut Vec<PathBuf>) {
     if depth > MAX_DEPTH || out.len() >= MAX_RESULTS {
         return;
     }
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     let mut entries: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
     entries.sort();
     for path in entries {
         if out.len() >= MAX_RESULTS {
             return;
         }
-        let name = path.file_name().map_or_else(String::new, |n| n.to_string_lossy().to_lowercase());
+        let name = path
+            .file_name()
+            .map_or_else(String::new, |n| n.to_string_lossy().to_lowercase());
         // Skip hidden folders and app bundles: they hold nothing to browse.
         if name.starts_with('.') || name.ends_with(".app") {
             continue;
@@ -131,12 +157,22 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("Drums/Kicks")).unwrap();
         std::fs::create_dir_all(dir.join(".hidden")).unwrap();
-        for f in ["Drums/Kicks/Big Kick.wav", "Drums/snare.flac", "notes.txt", ".hidden/kick.wav", "Song.isai"] {
+        for f in [
+            "Drums/Kicks/Big Kick.wav",
+            "Drums/snare.flac",
+            "notes.txt",
+            ".hidden/kick.wav",
+            "Song.isai",
+        ] {
             std::fs::write(dir.join(f), b"").unwrap();
         }
         let mut found = Vec::new();
         search(&dir, &["kick".into()], 0, &mut found);
-        assert_eq!(found, vec![dir.join("Drums/Kicks/Big Kick.wav")], "hidden folders are skipped");
+        assert_eq!(
+            found,
+            vec![dir.join("Drums/Kicks/Big Kick.wav")],
+            "hidden folders are skipped"
+        );
         found.clear();
         search(&dir, &[], 0, &mut found);
         assert_eq!(found.len(), 3, "audio and projects, not text: {found:?}");
