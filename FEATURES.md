@@ -25,7 +25,7 @@ its own open-source versions rather than copying products.
 | Project settings: tempo, time signature, key, sample rate | L/F | 🟡 (sample rate follows the device) |
 | Clean up unused audio files / consolidate | L | ⬜ |
 | Import/export MIDI files | L/F | ✅ (Standard MIDI Files: each MIDI track becomes its own instrument track, at the playhead; export writes the open piano-roll region) |
-| Video for scoring: import a video onto the timeline, saved with the project (copied into `Video/`) | F | 🟡 (player window with dock and snap, follows the playhead, muted by default; all common formats through FFmpeg, see HANDOFF; player not yet tested in the app) |
+| Video for scoring: video tracks with clip previews, saved with the project (copied into `Video/`) | F | 🟡 (video panel docked inside the window, follows the playhead, muted by default; all common formats through FFmpeg; not yet tested in the app) |
 | Import projects from other DAWs (AAF/OMF, DAWproject) | L | ⬜ |
 
 ## 2. Transport & time
@@ -64,7 +64,7 @@ its own open-source versions rather than copying products.
 | Loop a region by dragging its corner | L/F | ✅ |
 | Region gain and reverse | L/F | ✅ (plus normalize) |
 | Join regions, bounce region in place | L/F | 🟡 (join MIDI, rejoin split audio; bounce later) |
-| Track folders / stacks (group tracks, summing) | L/F | ⬜ |
+| Track folders / stacks (group tracks, summing) | L/F | ✅ (folders with their own level and mute; tracks inside follow it) |
 | Track alternatives (swap playlists on a track) | L | ⬜ |
 | Take folders and comping (best parts of several takes) | L | ⬜ |
 | Patterns: reusable clips placed many times (FL workflow) | F | ⬜ |
@@ -103,7 +103,7 @@ its own open-source versions rather than copying products.
 | Channel rack (FL-style pattern instruments) | F | ⬜ |
 | Event list editor | L/F | ⬜ |
 | Score / notation editor | L | ⬜ |
-| MIDI effects: arpeggiator, chord trigger, randomizer | L/F | ⬜ |
+| MIDI effects: arpeggiator, chord trigger, randomizer | L/F | 🟡 (arpeggiator and chord trigger on instrument tracks; randomizer later) |
 | Riff/melody generator | F | ⬜ |
 | Live Loops / clip launcher grid | L | ⬜ |
 | Performance mode (launch clips live) | F | ⬜ |
@@ -220,7 +220,8 @@ its own open-source versions rather than copying products.
 | Detachable windows / multiple monitors | F | ⬜ |
 | Inspector panel (details of the selected track/region) | L | 🟡 (track: instrument, effects, fader, pan, mute/solo; I) |
 | Quick help / tooltips everywhere | L | 🟡 |
-| Video track (score to picture) | L/F | ⬜ |
+| Built-in lessons and a Start here guide (Help menu) | L/F | ✅ |
+| Video track in the track list (score to picture) | L/F | 🟡 (video track with clip previews; drag to move; see section 1) |
 | Touch and pen support | F | ⬜ |
 | Accessibility (screen readers, full keyboard use) | L | 🟡 |
 
