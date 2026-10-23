@@ -29,7 +29,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ matrix.qt }}
-          modules: qtsvg qtshadertools qtmultimedia
+          modules: qtshadertools qtmultimedia
           cache: true
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
